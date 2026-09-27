@@ -6,6 +6,7 @@ dofile("tests/harness.lua")
 WoW.money = 1234567
 loadAddon()
 eq(textOf("gold"), "123g45s67c", "gold text via C_CurrencyInfo")
+eq(block("gold").icon, nil, "no block icon: it read as a gold coin before silver-only amounts")
 WoW.money = 1234567 + 250
 WoW.fire("PLAYER_MONEY")
 WoW.tick()

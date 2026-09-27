@@ -18,7 +18,8 @@ end
 GlassPanel.RegisterBlock({
     id = "gold",
     label = "Gold",
-    icon = 133784,   -- INV_Misc_Coin_01
+    -- No block icon: the coin text carries its own icons, and it drops zero
+    -- denominations, so a leading coin icon made "37s 81c" read as 37 gold.
     order = 30,
     events = { "PLAYER_MONEY", "PLAYER_ENTERING_WORLD" },
     onEvent = function()
