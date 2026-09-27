@@ -32,15 +32,19 @@ GlassPanel.failures = {}
 
 -- Called from inside the isolation boundary, so it must not throw itself:
 -- a block may error() with a secret or an object whose __tostring throws.
+-- Secrecy is tested FIRST, on everything: a client secret keeps its
+-- underlying type, so a secret string passes type(x) == "string" and would be
+-- stored, then throw when /gpanel failures concatenates it.
+local function printable(v)
+    if API.IsSecret(v) then return nil end
+    if type(v) == "string" then return v end
+    local ok, s = pcall(tostring, v)
+    if ok and type(s) == "string" and not API.IsSecret(s) then return s end
+    return nil
+end
+
 function API.Fail(key, err)
-    local msg = "(unprintable error)"
-    if type(err) == "string" then
-        msg = err
-    elseif not API.IsSecret(err) then
-        local ok, s = pcall(tostring, err)
-        if ok and type(s) == "string" then msg = s end
-    end
-    GlassPanel.failures[key] = msg
+    GlassPanel.failures[printable(key) or "?"] = printable(err) or "(unprintable error)"
 end
 
 -- RegisterEvent throws on an unknown name and returns false on a refusal.

@@ -37,6 +37,11 @@ end
 
 function issecretvalue(v) return secrets[v] ~= nil end
 
+-- Mark an existing value secret for issecretvalue. The client's secrets keep
+-- their type (a secret string is still type "string"), which a proxy can't
+-- model; use this to reach `type(x) == "string"` branches.
+function WoW.MarkSecret(v, label) secrets[v] = label or "marked" end
+
 --------------------------------------------------------------------------------
 -- Known events (from the dump when present)
 --------------------------------------------------------------------------------

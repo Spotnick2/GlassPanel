@@ -78,6 +78,17 @@ WoW.tick()
 eq(textOf("last"), "last", "blocks after unprintable errors still paint")
 check(GlassPanel.failures["secreterr:text"], "secret error recorded")
 check(GlassPanel.failures["badtostring:text"], "throwing __tostring recorded")
+
+-- A secret STRING (the client's secrets keep their type) is not stored as is.
+local secretMsg = "secret-error-text"
+WoW.MarkSecret(secretMsg)
+GlassPanel.API.Fail("plugin:secretstring", secretMsg)
+eq(GlassPanel.failures["plugin:secretstring"], "(unprintable error)", "secret string error replaced")
+local secretKey = "secret-key-text"
+WoW.MarkSecret(secretKey)
+GlassPanel.API.Fail(secretKey, "boom")
+eq(GlassPanel.failures["?"], "boom", "secret key replaced")
+check(GlassPanel.failures[secretKey] == nil, "secret key not stored")
 eq(textOf("fine"), "fine", "neighbour still paints")
 check(textOf("boom"):find("error"), "thrower shows an error mark")
 check(GlassPanel.failures["boom:text"], "thrower recorded in failures")
