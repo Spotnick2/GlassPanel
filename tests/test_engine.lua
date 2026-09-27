@@ -155,4 +155,28 @@ WoW.tick()
 check(GlassPanel.failures["event:NOT_A_REAL_EVENT"], "unknown event recorded")
 eq(textOf("badevent"), "ok", "block still painted")
 
+-- Graphical blocks: width, build, paint.
+loadAddon()
+check(register({ id = "w1", text = function() end, width = 5 }) == nil, "refused: width too small")
+check(register({ id = "w2", text = function() end, build = true }) == nil, "refused: build not a function")
+local builds, paints, txt = 0, 0, ""
+local g = register({ id = "graph", width = 120, text = function() return txt end,
+                     build = function(blk) builds = builds + 1; check(blk.widget ~= nil, "build sees the widget") end,
+                     paint = function() paints = paints + 1 end })
+WoW.tick()
+eq(builds, 1, "build runs once")
+eq(paints, 1, "paint runs after the repaint")
+eq(g.widget._shown, true, "fixed-width block with empty text shows")
+eq(g.widget._width, 120, "fixed width used")
+txt = nil
+GlassPanel.Refresh("graph"); WoW.tick()
+eq(g.widget._shown, false, "nil text hides it")
+eq(paints, 1, "no paint while hidden")
+register({ id = "badpaint", width = 50, text = function() return "" end, paint = function() error("p") end })
+WoW.tick()
+check(GlassPanel.failures["badpaint:paint"], "paint error recorded")
+register({ id = "badbuild", width = 50, text = function() return "" end, build = function() error("b") end })
+WoW.tick()
+check(GlassPanel.failures["badbuild:build"], "build error recorded, block still registered")
+
 done("test_engine")

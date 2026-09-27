@@ -83,6 +83,11 @@ function WoW.reset()
     WoW.money = 12345
     WoW.moneySecret = false
     WoW.gameTime = { 18, 3 }
+    WoW.now = 1000
+    WoW.player = { level = 23, maxLevel = 60, xp = 12000, maxXP = 45000, rested = nil, xpDisabled = false }
+    WoW.quests = {}          -- { { questID, xp, complete = bool, isHeader = bool }, ... }
+    WoW.playedRequests = 0
+    WoW.timers = {}
 end
 
 --------------------------------------------------------------------------------
@@ -161,6 +166,7 @@ function Methods.RegisterEvent(w, e)
     return true
 end
 function Methods.UnregisterEvent(w, e) w._events[e] = nil end
+function Methods.IsEventRegistered(w, e) return w._events[e] == true end
 
 -- Regions.
 function Methods.CreateTexture(w) return newWidget("Texture", w) end
@@ -199,6 +205,8 @@ function Methods.SetFont(fs, file, size, flags) fs._font = { file, size, flags }
 
 -- StatusBar.
 function Methods.SetMinMaxValues(b, lo, hi, interp) b._min, b._max = lo, hi end
+function Methods.SetStatusBarColor(b, r, g, bl, a) b._color = { r, g, bl, a } end
+function Methods.GetValue(b) return b._value end
 function Methods.SetValue(b, v) b._value = v end
 function Methods.SetStatusBarTexture(b, file)
     b._fill = b._fill or newWidget("Texture", b)
@@ -253,6 +261,57 @@ C_CurrencyInfo = { GetCoinTextureString = function(copper)
     return string.format("%dg%ds%dc", math.floor(copper / 10000), math.floor(copper / 100) % 100, copper % 100)
 end }
 function GetGameTime() return WoW.gameTime[1], WoW.gameTime[2] end
+function GetTime() return WoW.now end
+-- Timers keep their delay: WoW.flushTimers(upTo) runs those due within upTo
+-- seconds (all when nil) and keeps the rest, so a fallback timer can't mask a
+-- missing immediate one.
+C_Timer = { After = function(s, fn) table.insert(WoW.timers, { s = s, fn = fn }) end }
+function WoW.flushTimers(upTo)
+    local run, keep = {}, {}
+    for _, t in ipairs(WoW.timers) do
+        if upTo == nil or t.s <= upTo then run[#run + 1] = t else keep[#keep + 1] = t end
+    end
+    WoW.timers = keep
+    for _, t in ipairs(run) do t.fn() end
+end
+
+-- XP. A field set to "secret" comes back as a secret value.
+local function playerField(k)
+    local v = WoW.player[k]
+    if v == "secret" then return WoW.Secret("player." .. k) end
+    return v
+end
+function UnitXP() return playerField("xp") end
+function UnitXPMax() return playerField("maxXP") end
+function GetXPExhaustion() return playerField("rested") end
+function UnitLevel() return playerField("level") end
+function GetMaxPlayerLevel() return WoW.player.maxLevel end
+function IsXPUserDisabled() return WoW.player.xpDisabled end
+function RequestTimePlayed() WoW.playedRequests = WoW.playedRequests + 1 end
+function BreakUpLargeNumbers(n)
+    local s = tostring(n)
+    local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+    return (out:gsub("^,", ""))
+end
+
+-- Quest log: WoW.quests = { { questID = n, xp = n, complete = bool, isHeader = bool }, ... }
+C_QuestLog = {
+    GetNumQuestLogEntries = function() return #WoW.quests, #WoW.quests end,
+    GetInfo = function(i)
+        local q = WoW.quests[i]
+        if not q then return nil end
+        return { questID = q.questID, isHeader = q.isHeader == true, isHidden = false }
+    end,
+    ReadyForTurnIn = function(id)
+        for _, q in ipairs(WoW.quests) do if q.questID == id then return q.complete == true end end
+        return false
+    end,
+    IsComplete = function() return false end,
+}
+function GetQuestLogRewardXP(id)
+    for _, q in ipairs(WoW.quests) do if q.questID == id then return q.xp or 0 end end
+    return 0
+end
 date = os.date
 
 --------------------------------------------------------------------------------

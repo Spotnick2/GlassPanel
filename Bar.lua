@@ -87,6 +87,7 @@ function Bar.Attach(block)
     b.label = fs
 
     block.widget = b
+    if block.build then Engine.Call(block, "build", block.build, block) end
     Engine.MarkDirty(block)
 end
 
@@ -95,7 +96,7 @@ function Bar.SetText(block, text)
     local b = block.widget
     if not b or b.text == text then return false end
     b.text = text
-    b.label:SetText(text)
+    b.label:SetText(text or "")
     return true
 end
 
@@ -121,7 +122,8 @@ function Bar.Layout()
         local offset = EDGE
         for _, block in ipairs(sorted(side)) do
             local b = block.widget
-            local show = not Bar.IsHidden(block) and b.text ~= nil and b.text ~= ""
+            -- nil never shows; "" shows only for a fixed-width (graphical) block.
+            local show = not Bar.IsHidden(block) and b.text ~= nil and (b.text ~= "" or block.width ~= nil)
             b:SetShown(show)
             local visible = show and barShown
             if block.onShown and b.visible ~= visible then
@@ -129,7 +131,7 @@ function Bar.Layout()
             end
             b.visible = visible
             if show then
-                local w = b.textX + math.ceil(b.label:GetStringWidth()) + PAD
+                local w = block.width or (b.textX + math.ceil(b.label:GetStringWidth()) + PAD)
                 b:SetWidth(w)
                 b:ClearAllPoints()
                 if side == "left" then

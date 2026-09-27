@@ -9,6 +9,7 @@ Compat.lua
 Glass.lua
 Engine.lua
 Bar.lua
+Blocks\XP.lua
 Blocks\Gold.lua
 Blocks\Clock.lua
 GlassPanel.lua

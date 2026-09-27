@@ -47,6 +47,14 @@ GlassPanel.RegisterBlock({
 })
 ```
 
+A block that draws more than text (the XP bar, `Blocks\XP.lua`) adds:
+
+```lua
+    width = 360,                            -- fixed width in px; "" text then still shows the block, nil hides it
+    build = function(block) end,            -- once, when block.widget exists: create your own frames on it
+    paint = function(block) end,            -- after every repaint while the text is non-nil
+```
+
 `onInit` runs when you call `RegisterBlock`, which is usually while your files load, **before**
 your own SavedVariables exist. Read them in your own `ADDON_LOADED` handler (filtered on your
 addon's name), then call `GlassPanel.Refresh(id)`.
@@ -76,7 +84,9 @@ data changed without an event. `GlassPanel.API_VERSION` is `1`.
 
 `GlassPanel.API`: `Print`, `IsSecret`, `CoinText(copper)` (coin icons, `nil` for a secret),
 `RegisterEvent(frame, name, owner)` for the rare plugin that must own a frame, and `Fail(key, err)`
-to record into `/gpanel failures`.
+to record into `/gpanel failures`, and `Suppressor(globalName)` to hide a Blizzard frame your block
+replaces while it's on screen (`s.Want(visible)` from `onShown`, `s.Sync()` when a load-on-demand
+Blizzard addon loads). It only shows the frame again if it hid it.
 
 `GlassPanel.Glass` is the material (`Apply`, `Bar`, `Font`, …) for a block that draws more than
 text, such as the XP bar. See `..\GlassUnitFrames\docs\GLASS-MATERIAL.md`.

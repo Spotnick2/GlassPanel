@@ -50,8 +50,10 @@ function Engine.MarkAllDirty()
 end
 
 -- Ask the block for its text and hand it to the bar; true if the text
--- changed. The contract is a plain string (or nil for empty): a secret would reach the width measurement and
--- the layout arithmetic, so it is refused here, at the boundary.
+-- changed. The contract is a plain string, or nil for "not on the bar": a
+-- secret would reach the width measurement and the layout arithmetic, so it
+-- is refused here, at the boundary. Then the block's own paint hook, if any,
+-- draws whatever it built (only while it has something to show).
 local function paint(block)
     local text
     local ok, res = call(block, "text", block.text, block)
@@ -64,9 +66,13 @@ local function paint(block)
         API.Fail(block.id .. ":text", "returned a " .. type(res) .. ", not a string")
         text = ERROR_TEXT
     else
-        text = res or ""
+        text = res
     end
-    return GlassPanel.Bar ~= nil and GlassPanel.Bar.SetText(block, text)
+    local changed = GlassPanel.Bar ~= nil and GlassPanel.Bar.SetText(block, text)
+    if block.paint and text ~= nil and text ~= ERROR_TEXT then
+        call(block, "paint", block.paint, block)
+    end
+    return changed
 end
 
 function Engine.Flush()
@@ -144,6 +150,10 @@ end
 --   interval (seconds, or function(block) -> seconds until the next repaint),
 --   tooltip(block, GameTooltip), onClick(block, mouseButton), onInit(block),
 --   onShown(block, visible) when it appears on or leaves the screen.
+-- For a block that draws more than text (the XP bar):
+--   width (fixed, px), build(block) once its widget exists (block.widget),
+--   paint(block) after every repaint while its text is non-nil. With a width,
+--   text "" still shows the block; nil hides it.
 function GlassPanel.RegisterBlock(spec)
     if type(spec) ~= "table" then return invalid(spec, "not a table") end
     if type(spec.id) ~= "string" or spec.id == "" then return invalid(spec, "id must be a non-empty string") end
@@ -163,7 +173,10 @@ function GlassPanel.RegisterBlock(spec)
             if type(e) ~= "string" then return invalid(spec, "events must be a list of event names") end
         end
     end
-    for _, key in ipairs({ "onEvent", "tooltip", "onClick", "onInit", "onShown" }) do
+    if spec.width ~= nil and (type(spec.width) ~= "number" or spec.width < 16) then
+        return invalid(spec, "width must be a number of pixels, at least 16")
+    end
+    for _, key in ipairs({ "onEvent", "tooltip", "onClick", "onInit", "onShown", "build", "paint" }) do
         if spec[key] ~= nil and type(spec[key]) ~= "function" then return invalid(spec, key .. " must be a function") end
     end
 

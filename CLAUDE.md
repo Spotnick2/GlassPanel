@@ -36,7 +36,9 @@ TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Bar.lua` → 
 - **`Compat.lua`**: `GlassPanel.API`, the only route to client APIs that moved or may be absent.
   It has `IsSecret`, `RegisterEvent` (reports throws and refusals, naming the block that asked),
   `Fail(key, err)` (**the one failure recorder**, `GlassPanel.failures`, read by
-  `/gpanel failures`) and `CoinText`. The global `GetCoinTextureString` is **absent** on 70009;
+  `/gpanel failures`), `CoinText`, and `Suppressor(globalName)`, which hides a Blizzard frame
+  while our block replaces it and only restores what it hid (clock: `TimeManagerClockButton`;
+  XP: `MainStatusTrackingBarContainer`). The global `GetCoinTextureString` is **absent** on 70009;
   use `C_CurrencyInfo`'s. `MEASURED_ON_BUILD` lives here too.
 - **`Glass.lua`**: the material, **copied** from GlassUnitFrames' **`main`** branch
   (`git -C ..\GlassUnitFrames show main:Glass.lua`), with only the namespace lines and header
@@ -59,6 +61,10 @@ TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Bar.lua` → 
   `Button` per block (icon, `Glass.Font` label, `HIGHLIGHT` hover), and the layout. There are two
   lanes, `left` and `right`, sorted by `order` then registration. Hidden and empty blocks take
   no space. **Nothing is secure**, so the bar may be touched in combat.
+- **`Blocks\XP.lua`**: XP+ (#3), the only graphical block so far (`width`/`build`/`paint`).
+  Four layered bars on one `Glass.Bar` host. Session XP follows wrap-around across a level.
+  `/played` is requested with `TIME_PLAYED_MSG` muted on the chat frames (unmuted on the next
+  frame after the answer, or after 10 s), **never** by replacing `ChatFrame_DisplayTimePlayed`.
 - **`Blocks\*.lua`**: built-in blocks. They register through the **public** API, exactly as a
   plugin would, so the built-ins keep the contract honest.
 - **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`). The bar is built at

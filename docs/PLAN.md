@@ -33,10 +33,8 @@ Contract: `docs/PLUGINS.md`.
 Built-in blocks (core):
 1. **XP+**: port of `C:\Projects\TitanPanelXPP` as a block that draws a `Glass.Bar` (XP, rested,
    completed and incomplete quest XP), XP/hr, time to level, the tooltip breakdown. Hidden at
-   max level (`UnitXPMax` returns 0 there, and 0 is truthy). Needs the contract to grow then,
-   not now: a fixed `width`, a hook that builds custom content on the attached widget (it
-   runs after `Bar.Attach`, unlike `onInit`), a paint hook for it, and a rule that a
-   graphical block with empty text still shows.
+   max level (`UnitXPMax` returns 0 there, and 0 is truthy). **In progress (#3)**: the contract
+   grew `width`, `build` and `paint`.
 2. **Location**: zone, subzone and coordinates (`C_Map.GetBestMapForUnit` +
    `C_Map.GetPlayerMapPosition`; check what they return inside instances).
 3. **Durability**: lowest percentage across equipped slots (`GetInventoryItemDurability`), and
