@@ -28,7 +28,7 @@ end
 
 local COMMANDS = {
     { "list", "lanes, their blocks, and which are hidden" },
-    { "move <id> left|center|right|<0-100> [n]", "move a block to a lane (or start one at n% of the bar)" },
+    { "move <id> left|center|right|<0-100> [n]", "move a block into a lane (a % starts one there); n = position as /gpanel list shows it" },
     { "layout reset", "forget the arrangement: blocks go back to their default lanes" },
     { "show <id>", "show a block" },
     { "hide <id>", "hide a block" },
@@ -58,13 +58,15 @@ local function slash(msg)
             say(string.format("lane at %d%%: %s", math.floor(lane.x * 100 + 0.5), table.concat(names, ", ")))
         end
     elseif cmd == "move" then
+        local usage = "usage: /gpanel move <id> left|center|right|<0-100> [position]"
         local id, where, n = arg:match("^(%S+)%s+(%S+)%s*(%d*)$")
+        if not id then say(usage) return end
         local block = findBlock(id)
         if not block then return end
-        local x = ({ left = 0, center = 0.5, right = 1 })[where or ""]
+        local x = Layout.SIDE_X[where]
         local pct = tonumber(where or "")
         if x == nil and pct and pct >= 0 and pct <= 100 then x = pct / 100 end
-        if x == nil then say("usage: /gpanel move <id> left|center|right|<0-100> [position]") return end
+        if x == nil then say(usage) return end
         if n ~= "" then
             Layout.Move(block.id, { lane = x, index = tonumber(n) })
         else

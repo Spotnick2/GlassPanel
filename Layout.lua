@@ -21,6 +21,7 @@ Layout.GAP = 8      -- px between blocks in a lane
 Layout.SNAP = 40    -- px: a drop this close to a slot joins it, else starts a lane
 
 local SIDE_X = { left = 0, center = 0.5, right = 1 }
+Layout.SIDE_X = SIDE_X   -- the named lanes, for /gpanel move
 
 local function saved()
     local d = GlassPanelDB
@@ -102,6 +103,25 @@ local function removeId(lanes, id)
     end
 end
 
+-- A cursor at bar x -> an anchor, snapping to the ends within EDGE + SNAP px:
+-- the same rule for dropping a block and for moving a lane.
+function Layout.SnapPx(cx, W)
+    if cx <= Layout.EDGE + Layout.SNAP then return 0 end
+    if cx >= W - Layout.EDGE - Layout.SNAP then return 1 end
+    return W > 0 and cx / W or 0
+end
+
+-- The lane nearest to x within tol: typed percentages are rounded (a dragged
+-- lane sits at 0.4371 while /gpanel list shows 44%).
+local function laneNear(lanes, x, tol)
+    local best, bestD
+    for _, lane in ipairs(lanes) do
+        local d = math.abs(lane.x - x)
+        if d <= tol and (not bestD or d < bestD) then best, bestD = lane, d end
+    end
+    return best
+end
+
 -- Snap an anchor near the ends to the ends; keep it in 0..1.
 function Layout.SnapX(x)
     if x <= 0.02 then return 0 end
@@ -120,7 +140,7 @@ function Layout.Move(id, target)
         local lane = laneAt(lanes, x)
         if x == 0 then table.insert(lane.ids, 1, id) else lane.ids[#lane.ids + 1] = id end
     else
-        local lane = laneAt(lanes, target.lane)
+        local lane = laneNear(lanes, target.lane, 0.006) or laneAt(lanes, target.lane)
         local n = target.index
         if n == nil or n > #lane.ids + 1 then n = #lane.ids + 1 end
         if n < 1 then n = 1 end
@@ -217,7 +237,5 @@ function Layout.DropTarget(geometry, W, cx, draggedId)
         end
     end
     if best and bestDist <= Layout.SNAP then return best end
-    local f = W > 0 and cx / W or 0
-    if cx <= Layout.EDGE + Layout.SNAP then f = 0 elseif cx >= W - Layout.EDGE - Layout.SNAP then f = 1 end
-    return { x = f, slotX = cx }
+    return { x = Layout.SnapPx(cx, W), slotX = cx }
 end

@@ -68,43 +68,76 @@ local function cursorX()
     return x / Bar.frame:GetEffectiveScale() - (Bar.frame:GetLeft() or 0)
 end
 
+-- What a drop at the cursor would do. Cached per cursor x: the marker asks
+-- every frame, and the answer only changes when the cursor moves.
+--   { none }  the block's own spot: a click that wobbled a pixel also starts
+--             a drag, and must leave everything where it was;
+--   { laneX } shift-drag: move the whole lane (edges snap like a drop does);
+--   otherwise Layout.DropTarget's { lane, index } or { x }.
 local function dropTarget()
-    return Layout.DropTarget(Bar.geometry or {}, Bar.frame:GetWidth(), cursorX(), drag.block.id)
+    local cx = cursorX()
+    if drag.cachedX == cx then return drag.cached end
+    local W = Bar.frame:GetWidth()
+    local b, t = drag.button, nil
+    local left = b.left or 0
+    if cx >= left - Layout.GAP / 2 and cx <= left + b:GetWidth() + Layout.GAP / 2 then
+        t = { none = true }
+    elseif drag.lane then
+        local f = Layout.SnapPx(cx, W)
+        t = { laneX = f, slotX = (f == 0 and Layout.EDGE) or (f == 1 and W - Layout.EDGE) or cx }
+    else
+        t = Layout.DropTarget(Bar.geometry or {}, W, cx, drag.block.id)
+    end
+    drag.cachedX, drag.cached = cx, t
+    return t
 end
 
 local function updateMarker()
     local t = dropTarget()
+    Bar.marker:SetShown(not t.none)
+    if t.none then return end
     Bar.marker:ClearAllPoints()
-    Bar.marker:SetPoint("CENTER", Bar.content, "LEFT", drag.lane and cursorX() or t.slotX, 0)
+    Bar.marker:SetPoint("CENTER", Bar.content, "LEFT", t.slotX, 0)
 end
 
 local function onDragStart(button)
     drag = { button = button, block = button.block, lane = IsShiftKeyDown() }
     button:SetAlpha(0.4)
     GameTooltip:Hide()
-    Bar.marker:Show()
     Bar.dragFrame:Show()
 end
 
-local function onDragStop(button)
+-- Put everything back to rest. `relayout` is false when called from an
+-- OnHide that Bar.Layout itself may have caused.
+local function endDrag(relayout)
     if not drag then return end
-    local W = Bar.frame:GetWidth()
-    if drag.lane then
-        Layout.MoveLane(drag.block.id, W > 0 and cursorX() / W or 0)
-    else
-        local t = dropTarget()
-        if t.x ~= nil then
-            Layout.Move(drag.block.id, { x = t.x })
-        else
-            Layout.Move(drag.block.id, { lane = t.lane, index = t.index })
-        end
-    end
-    button:SetAlpha(1)
+    drag.button:SetAlpha(1)
     Bar.marker:Hide()
     Bar.dragFrame:Hide()
     drag = nil
     lastDragStop = GetTime()
-    Bar.Layout()
+    if relayout then Bar.Layout() end
+end
+
+local function onDragStop()
+    if not drag then return end
+    local t = dropTarget()
+    local id = drag.block.id
+    if t.laneX then
+        Layout.MoveLane(id, t.laneX)
+    elseif t.x then
+        Layout.Move(id, { x = t.x })
+    elseif not t.none then
+        Layout.Move(id, { lane = t.lane, index = t.index })
+    end
+    endDrag(true)
+end
+
+-- A hidden frame may never get OnDragStop: end the drag when the dragged
+-- block (its text went empty) or the whole bar is hidden mid-drag, so the
+-- marker and the click guard can't get stuck.
+local function onHide(button)
+    if drag and drag.button == button then endDrag(false) end
 end
 
 local function onClick(button, mouseButton)
@@ -127,6 +160,7 @@ function Bar.Attach(block)
     b:RegisterForDrag("LeftButton")
     b:SetScript("OnDragStart", onDragStart)
     b:SetScript("OnDragStop", onDragStop)
+    b:SetScript("OnHide", onHide)
 
     -- The HIGHLIGHT layer is drawn only while the mouse is over the button.
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
@@ -236,6 +270,7 @@ function Bar.Build()
     Bar.frame = f
     -- Lanes are placed by fractions of the width: redo them when it changes.
     f:SetScript("OnSizeChanged", function() Bar.Layout() end)
+    f:SetScript("OnHide", function() endDrag(false) end)
 
     -- The drop marker, and a frame that moves it while a drag is on.
     local marker = content:CreateTexture(nil, "OVERLAY")

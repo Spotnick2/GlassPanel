@@ -65,9 +65,11 @@ eq(clicks, 1, "a later click goes through")
 
 -- The drop marker follows the cursor while dragging.
 gb._scripts.OnDragStart(gb)
-eq(GlassPanel.Bar.marker._shown, true, "marker shown while dragging")
 eq(gb._alpha, 0.4, "dragged block dimmed")
+WoW.cursor = { leftOf("gold") + 3, 0 }; WoW.tick()
+eq(GlassPanel.Bar.marker._shown, false, "no marker over the block's own spot")
 WoW.cursor = { 500, 0 }; WoW.tick()
+eq(GlassPanel.Bar.marker._shown, true, "marker shown away from it")
 eq(GlassPanel.Bar.marker._points[1][4], 500, "marker at the cursor for a new lane")
 gb._scripts.OnDragStop(gb)
 eq(GlassPanel.Bar.marker._shown, false, "marker hidden after the drop")
@@ -114,6 +116,59 @@ local geo = L.Place({ { x = 0.95, ids = { "a" } } }, 1000, function() return 360
 eq(geo[1].items[1].left, 1000 - 8 - 360, "clamped at the right end")
 geo = L.Place({ { x = 0.05, ids = { "a" } } }, 1000, function() return 360 end)
 eq(geo[1].items[1].left, 8, "clamped at the left end")
+
+-- Review fixes (#8). A fresh session: no leftover test blocks.
+loadAddon()
+L = GlassPanel.Layout
+GlassPanelDB.hidden.xp = true
+GlassPanel.Bar.Layout()
+eq(lanes(), "0:xp,gold | 1:clock", "gold alone on screen in the left lane (xp hidden)")
+-- A click that wobbles a pixel is a drag onto the block's own spot: no move.
+dragTo("gold", leftOf("gold") + 30)
+eq(GlassPanelDB.layout, nil, "a drag onto its own spot changes nothing")
+eq(leftOf("gold"), 8, "gold still at the edge")
+GlassPanelDB.hidden.xp = nil
+
+-- A drag whose block is hidden mid-drag ends cleanly: no stuck marker or clicks.
+GlassPanel.Bar.Layout()
+clicks = 0
+block("gold").onClick = function() clicks = clicks + 1 end
+gb = block("gold").widget
+gb._scripts.OnDragStart(gb)
+WoW.cursor = { 500, 0 }; WoW.tick()
+GlassPanel._test.slash("hide gold")
+eq(GlassPanel.Bar.marker._shown, false, "marker gone when the dragged block hides")
+eq(gb._alpha, 1, "block restored")
+GlassPanel._test.slash("show gold")
+WoW.now = WoW.now + 1
+gb._scripts.OnClick(gb, "LeftButton")
+eq(clicks, 1, "clicks work again")
+-- Same when the whole bar is toggled off mid-drag.
+gb._scripts.OnDragStart(gb)
+GlassPanel._test.slash("toggle")
+GlassPanel._test.slash("toggle")
+WoW.now = WoW.now + 1
+gb._scripts.OnClick(gb, "LeftButton")
+eq(clicks, 2, "clicks work after the bar was hidden mid-drag")
+
+-- /gpanel move with a rounded % reaches a dragged lane.
+dragTo("clock", 637)
+local x = L.Lanes()[2].x
+check(x > 0.63 and x < 0.64, "clock lane at a fractional anchor (" .. x .. ")")
+GlassPanel._test.slash("move gold 64 1")
+eq(#L.Lanes(), 2, "joined the lane /gpanel list showed as 64%, not a new one")
+check(L.Lanes()[2].ids[1] == "gold", "gold first in that lane")
+
+-- Shift-dragging a lane near an edge snaps like a drop does (48 px, not 2%).
+GlassPanel._test.slash("layout reset")
+GlassPanel._test.slash("move clock 50")
+dragTo("clock", 1000 - 45, true)
+eq(lanes(), "0:xp,gold | 1:clock", "lane snapped to the right edge")
+
+-- Bad /gpanel move arguments print the usage, not "no block 'nil'".
+WoW.chat = {}
+GlassPanel._test.slash("move gold")
+check(WoW.chat[1] and WoW.chat[1]:find("usage"), "usage shown")
 
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_layout")

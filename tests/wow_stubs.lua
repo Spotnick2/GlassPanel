@@ -131,7 +131,11 @@ function CreateFrame(ftype, name, parent)
 end
 
 function Methods.Show(w) w._shown = true; if w._scripts.OnShow then w._scripts.OnShow(w) end end
-function Methods.Hide(w) w._shown = false end
+function Methods.Hide(w)
+    local was = w._shown
+    w._shown = false
+    if was and w._scripts.OnHide then w._scripts.OnHide(w) end
+end
 function Methods.SetShown(w, v) if v then Methods.Show(w) else Methods.Hide(w) end end
 function Methods.IsShown(w) return w._shown end
 function Methods.IsVisible(w)
