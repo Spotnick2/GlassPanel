@@ -1,0 +1,60 @@
+-- Blocks/Clock.lua: local time on the bar, realm time in the tooltip.
+--
+-- While this block is on screen, Blizzard's minimap clock
+-- (TimeManagerClockButton, from Blizzard_TimeManager) is hidden: two clocks
+-- side by side is noise. It comes back when the block is hidden or the bar is
+-- toggled off. We only ever Show() it again if we were the ones who hid it.
+-- It is a plain button, not a protected frame, so this is safe in combat.
+
+local wantHidden = false   -- our block is visible
+local hidBlizzard = false  -- we hid it (so we may show it again)
+local hooked = false
+
+local function blizzardClock()
+    return rawget(_G, "TimeManagerClockButton")
+end
+
+local function syncBlizzardClock()
+    local c = blizzardClock()
+    if not c then return end   -- Blizzard_TimeManager not loaded yet: ADDON_LOADED retries
+    if not hooked then
+        -- Blizzard re-shows it (settings, Edit Mode). A local flag, not a field
+        -- on their frame: writing into a Blizzard frame's table taints it.
+        c:HookScript("OnShow", function(self) if wantHidden then self:Hide() end end)
+        hooked = true
+    end
+    if wantHidden then
+        if c:IsShown() then hidBlizzard = true end
+        c:Hide()
+    elseif hidBlizzard then
+        hidBlizzard = false
+        c:Show()
+    end
+end
+
+local function realmTime()
+    local h, m = GetGameTime()
+    return string.format("%02d:%02d", h, m)
+end
+
+GlassPanel.RegisterBlock({
+    id = "clock",
+    label = "Clock",
+    side = "right",
+    order = 100,
+    interval = 1,     -- the text only changes once a minute; an unchanged repaint is skipped
+    events = { "ADDON_LOADED" },
+    onEvent = function(_, _, addon)
+        if addon == "Blizzard_TimeManager" then syncBlizzardClock() end
+    end,
+    onShown = function(_, visible)
+        wantHidden = visible
+        syncBlizzardClock()
+    end,
+    text = function() return date("%H:%M") end,
+    tooltip = function(_, tt)
+        tt:AddLine("Clock")
+        tt:AddDoubleLine("Local", date("%H:%M"), 1, 1, 1, 1, 1, 1)
+        tt:AddDoubleLine("Realm", realmTime(), 1, 1, 1, 1, 1, 1)
+    end,
+})

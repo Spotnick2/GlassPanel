@@ -1,0 +1,25 @@
+package-as: GlassPanel
+
+enable-nolib-creation: no
+
+# One CurseForge project, one addon folder per plugin. WoW only discovers
+# addons as top-level folders under Interface/AddOns, so plugins cannot ship
+# nested inside GlassPanel/: the packager moves them out (AltStable's pattern).
+# Add a line here with each new Plugins/<Name>.
+# move-folders:
+#   GlassPanel/Plugins/GearScore: GlassPanelGearScore
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+# YAML list, not markdown bullets.
+ignore:
+  - .github
+  - .claude
+  - docs
+  - tests
+  - Tools
+  - CLAUDE.md
+  - README.md
+  - CHANGELOG.md

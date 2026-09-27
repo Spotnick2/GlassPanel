@@ -1,0 +1,14 @@
+## Interface: 16001
+## Title: |cff7fd4ffGlass|r Panel
+## Notes: A liquid-glass info bar across the top of the screen, with a small plugin API. /gpanel
+## Author: Spotnick
+## Version: @project-version@
+## SavedVariables: GlassPanelDB
+
+Compat.lua
+Glass.lua
+Engine.lua
+Bar.lua
+Blocks\Gold.lua
+Blocks\Clock.lua
+GlassPanel.lua
