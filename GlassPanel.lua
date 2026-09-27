@@ -53,6 +53,7 @@ local function slash(msg)
         db.shown = not db.shown
         Bar.SetShown(db.shown)
     elseif cmd == "font" then
+        arg = arg:lower()
         if Glass.SetFont(arg) then
             db.font = arg
             -- Every width depends on the font: remeasure.

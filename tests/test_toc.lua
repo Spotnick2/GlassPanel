@@ -10,6 +10,10 @@ for _, f in ipairs(tocFiles()) do
     check(io.open(f, "r") ~= nil, "TOC file exists: " .. f)
 end
 eq(tocFiles()[1], "Compat.lua", "Compat loads first")
+for _, f in ipairs(tocFiles()) do
+    local src = io.open(f):read("*a")
+    check(src:find("\nGlassPanel = GlassPanel or {}\n", 1, true), "starts with the namespace line: " .. f)
+end
 eq(tocFiles()[#tocFiles()], "GlassPanel.lua", "bootstrap loads last")
 local seen = {}
 for _, f in ipairs(tocFiles()) do

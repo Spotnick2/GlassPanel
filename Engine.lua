@@ -70,6 +70,9 @@ local function paint(block)
 end
 
 function Engine.Flush()
+    -- Idle first: a callback below that marks a block dirty shows the frame
+    -- again, and that repaint happens next frame instead of being lost.
+    flushFrame:Hide()
     local changed = false
     for _, block in ipairs(Engine.blocks) do
         if dirty[block] then
@@ -77,7 +80,6 @@ function Engine.Flush()
             if block.widget and paint(block) then changed = true end
         end
     end
-    flushFrame:Hide()
     -- Widths follow text, so only a changed text can move anything.
     if changed then GlassPanel.Bar.Layout() end
 end
@@ -105,12 +107,21 @@ clockFrame:SetScript("OnUpdate", function(_, elapsed)
         if block.interval then
             block._due = (block._due or 0) - step
             if block._due <= 0 then
-                block._due = block.interval
+                block._due = Engine.NextInterval(block)
                 Engine.MarkDirty(block)
             end
         end
     end
 end)
+
+-- Seconds until an interval block is next due. A function interval lets a
+-- block wake exactly when its text changes (the clock: on the minute).
+function Engine.NextInterval(block)
+    if type(block.interval) ~= "function" then return block.interval end
+    local ok, s = call(block, "interval", block.interval, block)
+    if ok and type(s) == "number" and not API.IsSecret(s) and s >= 1 then return s end
+    return 1
+end
 
 local function listen(block, event)
     if not listeners[event] then
@@ -129,7 +140,8 @@ end
 -- The public entry point. Returns the block (the spec itself) or nil.
 -- Required: id (unique string), text = function(block) -> string|nil.
 -- Optional: label, icon, side ("left"|"right"), order (number, default 100),
---   events = { "EVENT", ... }, onEvent(block, event, ...), interval (seconds),
+--   events = { "EVENT", ... }, onEvent(block, event, ...),
+--   interval (seconds, or function(block) -> seconds until the next repaint),
 --   tooltip(block, GameTooltip), onClick(block, mouseButton), onInit(block),
 --   onShown(block, visible) when it appears on or leaves the screen.
 function GlassPanel.RegisterBlock(spec)
@@ -140,9 +152,11 @@ function GlassPanel.RegisterBlock(spec)
     if spec.side ~= nil and spec.side ~= "left" and spec.side ~= "right" then
         return invalid(spec, "side must be \"left\" or \"right\"")
     end
-    if spec.interval ~= nil and (type(spec.interval) ~= "number" or spec.interval < 1) then
-        return invalid(spec, "interval must be a number of seconds, at least 1")
+    if spec.interval ~= nil and type(spec.interval) ~= "function"
+        and (type(spec.interval) ~= "number" or spec.interval < 1) then
+        return invalid(spec, "interval must be seconds (at least 1) or a function returning them")
     end
+    if spec.label ~= nil and type(spec.label) ~= "string" then return invalid(spec, "label must be a string") end
     if spec.events ~= nil then
         if type(spec.events) ~= "table" then return invalid(spec, "events must be a list of event names") end
         for _, e in ipairs(spec.events) do
@@ -158,11 +172,14 @@ function GlassPanel.RegisterBlock(spec)
     spec.order = type(spec.order) == "number" and spec.order or 100
     spec.label = spec.label or spec.id
     spec._seq = seq
-    spec._due = spec.interval
+    spec._due = Engine.NextInterval(spec)
     table.insert(Engine.blocks, spec)
     Engine.byId[spec.id] = spec
 
-    for _, event in ipairs(spec.events or {}) do listen(spec, event) end
+    local seen = {}
+    for _, event in ipairs(spec.events or {}) do
+        if not seen[event] then seen[event] = true; listen(spec, event) end   -- a repeat would run onEvent twice
+    end
     if spec.onInit then call(spec, "onInit", spec.onInit, spec) end
     -- Plugins may load before or after the bar is built: attach now if it is.
     if GlassPanel.Bar and GlassPanel.Bar.frame then GlassPanel.Bar.Attach(spec) end

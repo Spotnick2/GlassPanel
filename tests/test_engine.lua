@@ -18,6 +18,26 @@ check(register({ id = "a", text = function() end, events = { 42 } }) == nil, "re
 eq(#GlassPanel.Engine.blocks, before, "nothing half-registered")
 check(#WoW.chat >= 8, "each refusal was reported")
 check(block("a") == nil, "a refused id stays free")
+check(register({ id = "a", text = function() end, label = true }) == nil, "refused: label not a string")
+
+-- A repeated event name runs onEvent once.
+loadAddon()
+local hits = 0
+register({ id = "dup", events = { "PLAYER_MONEY", "PLAYER_MONEY" }, onEvent = function() hits = hits + 1 end,
+           text = function() return "d" end })
+WoW.fire("PLAYER_MONEY")
+eq(hits, 1, "duplicate event registered once")
+
+-- A block marked dirty during a flush, after the flush passed it, still repaints.
+loadAddon()
+local bText = "b1"
+register({ id = "early1", text = function() return bText end })
+register({ id = "late1", text = function() bText = "b2"; GlassPanel.Refresh("early1"); return "l" end })
+WoW.tick()
+eq(textOf("early1"), "b1", "painted before the late block ran")
+eq(GlassPanel.Engine._test.flushFrame._shown, true, "the refresh keeps the flush frame awake")
+WoW.tick()
+eq(textOf("early1"), "b2", "and it repaints on the next frame")
 
 -- A block registered before the bar exists (an early plugin) is attached at build.
 loadAddon({ before = function()
@@ -84,6 +104,17 @@ WoW.tick(1.0); WoW.tick()
 eq(n, after, "not due after 1 s")
 WoW.tick(1.0); WoW.tick()
 eq(n, after + 1, "due after 2 s")
+
+-- A function interval chooses when the block is next due.
+loadAddon()
+local m = 0
+register({ id = "fn", interval = function() return 3 end, text = function() m = m + 1; return "f" .. m end })
+WoW.tick()
+local base = m
+WoW.tick(1.0); WoW.tick(); WoW.tick(1.0); WoW.tick()
+eq(m, base, "not due before 3 s")
+WoW.tick(1.0); WoW.tick()
+eq(m, base + 1, "due at 3 s")
 
 -- Layout: lanes, order, hidden and empty blocks take no space.
 loadAddon()

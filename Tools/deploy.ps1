@@ -21,6 +21,10 @@ param(
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 if (-not (Test-Path $AddOnsPath)) { Write-Error "AddOns path not found: $AddOnsPath"; exit 1 }
+# One canonical form (absolute, backslashes): the stale-file sweep compares
+# paths as strings, and a relative or forward-slash path would match nothing
+# and delete every file just copied.
+$AddOnsPath = (Resolve-Path -LiteralPath $AddOnsPath).ProviderPath
 
 # Copy the files a TOC lists (plus the TOC) from $src to $dest, rewriting the
 # version token, and remove Lua files the TOC no longer lists.
@@ -39,7 +43,7 @@ function Deploy-Toc([string]$src, [string]$tocName, [string]$dest) {
         Write-Host "  $f"
     }
     # A Lua file removed from the TOC must not linger where the client finds it.
-    $keep = $listed | ForEach-Object { (Join-Path $dest $_).ToLower() }
+    $keep = $listed | ForEach-Object { [IO.Path]::GetFullPath((Join-Path $dest $_)).ToLower() }
     Get-ChildItem -LiteralPath $dest -Recurse -File -Filter "*.lua" |
         Where-Object { $keep -notcontains $_.FullName.ToLower() } | ForEach-Object {
             Write-Host "  removing stale $($_.Name)" -ForegroundColor DarkYellow

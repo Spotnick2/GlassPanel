@@ -5,6 +5,7 @@
 -- the block says so instead of guessing, and the session baseline waits for
 -- the first plain read.
 
+GlassPanel = GlassPanel or {}
 local API = GlassPanel.API
 
 local sessionStart   -- copper at the first plain read this session

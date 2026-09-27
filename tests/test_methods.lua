@@ -34,11 +34,14 @@ GlassPanel._test.slash("list")
 GlassPanel._test.slash("failures")
 WoW.tick(1.1); WoW.tick()
 
+local ANIMATION_TYPES = { Animation = true, Alpha = true, Translation = true, Scale = true, Rotation = true }
 local n = 0
 for name in pairs(WoW.methodsCalled) do
     n = n + 1
-    local method = name:match(":(%a+)$")
-    check(widget[name] or documented[method], "method exists on Forever: " .. name)
+    local wtype, method = name:match("^(%a+):(%a+)$")
+    -- The dump's widget walk has no animation subtypes (Alpha:SetToAlpha,
+    -- Translation:SetOffset): for those alone, a documented function will do.
+    check(widget[name] or (ANIMATION_TYPES[wtype] and documented[method]), "method exists on Forever: " .. name)
 end
 check(n > 25, "recorded a realistic number of methods (" .. n .. ")")
 done("test_methods")

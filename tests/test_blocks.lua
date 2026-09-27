@@ -83,12 +83,29 @@ bc = blizzardClock()
 WoW.fire("ADDON_LOADED", "Blizzard_TimeManager")
 eq(bc._shown, false, "late-loaded Blizzard clock hidden")
 
+-- The user turns Blizzard's clock on while ours shows: hidden, and given back later.
+rawset(_G, "TimeManagerClockButton", nil)
+loadAddon({ before = function() bc = blizzardClock(); bc._shown = false end })
+bc:Show()
+eq(bc._shown, false, "shown by the user while ours is up: hidden")
+GlassPanel._test.slash("hide clock")
+eq(bc._shown, true, "and given back when ours goes")
+GlassPanel._test.slash("show clock")
+
 -- A Blizzard clock the user had off stays off when ours is hidden.
 rawset(_G, "TimeManagerClockButton", nil)
 loadAddon({ before = function() bc = blizzardClock(); bc._shown = false end })
 GlassPanel._test.slash("hide clock")
 eq(bc._shown, false, "never shows a clock we did not hide")
 rawset(_G, "TimeManagerClockButton", nil)
+
+-- The clock wakes on the minute, not every second.
+loadAddon()
+eq(GlassPanel.Engine.NextInterval(block("clock")), 60 - tonumber(os.date("%S")), "next repaint at the minute")
+
+-- /gpanel font is case-insensitive.
+GlassPanel._test.slash("font Friz")
+eq(GlassPanelDB.font, "friz", "font name lowercased")
 
 check(next(GlassPanel.failures) == nil, "no failures recorded")
 done("test_blocks")
