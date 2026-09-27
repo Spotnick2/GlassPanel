@@ -88,6 +88,9 @@ function WoW.reset()
     WoW.quests = {}          -- { { questID, xp, complete = bool, isHeader = bool }, ... }
     WoW.playedRequests = 0
     WoW.timers = {}
+    WoW.cursor = { 0, 0 }     -- screen pixels, as GetCursorPosition returns them
+    WoW.uiScale = 1
+    WoW.shift = false
 end
 
 --------------------------------------------------------------------------------
@@ -147,6 +150,9 @@ function Methods.SetSize(w, x, y) w._width, w._height = x, y end
 function Methods.SetWidth(w, x) w._width = x end
 function Methods.SetHeight(w, y) w._height = y end
 function Methods.GetWidth(w) return w._width end
+function Methods.GetLeft(w) return 0 end
+function Methods.GetEffectiveScale(w) return WoW.uiScale end
+function Methods.SetAlpha(w, a) w._alpha = a end
 function Methods.GetHeight(w) return w._height end
 function Methods.GetFrameLevel(w) return w._level end
 function Methods.SetFrameLevel(w, l) w._level = l end
@@ -242,6 +248,8 @@ Enum = { UITextureSliceMode = { Stretched = 0, Tiled = 1 } }
 function CreateColor(r, g, b, a) return { r = r, g = g, b = b, a = a } end
 function GetBuildInfo() return "1.60.1", "70009", "Sep 23 2026", 16001 end
 function InCombatLockdown() return false end
+function GetCursorPosition() return WoW.cursor[1], WoW.cursor[2] end
+function IsShiftKeyDown() return WoW.shift end
 
 function hooksecurefunc(t, name, fn)
     local orig = t[name]

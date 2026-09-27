@@ -148,7 +148,8 @@ end
 
 -- The public entry point. Returns the block (the spec itself) or nil.
 -- Required: id (unique string), text = function(block) -> string|nil.
--- Optional: label, icon, side ("left"|"right"), order (number, default 100),
+-- Optional: label, icon, side ("left"|"center"|"right": the default lane),
+--   order (number, default 100),
 --   events = { "EVENT", ... }, onEvent(block, event, ...),
 --   interval (seconds, or function(block) -> seconds until the next repaint),
 --   tooltip(block, GameTooltip), onClick(block, mouseButton), onInit(block),
@@ -162,8 +163,8 @@ function GlassPanel.RegisterBlock(spec)
     if type(spec.id) ~= "string" or spec.id == "" then return invalid(spec, "id must be a non-empty string") end
     if Engine.byId[spec.id] then return invalid(spec, "id already registered") end
     if type(spec.text) ~= "function" then return invalid(spec, "text must be a function") end
-    if spec.side ~= nil and spec.side ~= "left" and spec.side ~= "right" then
-        return invalid(spec, "side must be \"left\" or \"right\"")
+    if spec.side ~= nil and spec.side ~= "left" and spec.side ~= "center" and spec.side ~= "right" then
+        return invalid(spec, "side must be \"left\", \"center\" or \"right\"")
     end
     if spec.interval ~= nil and type(spec.interval) ~= "function"
         and (type(spec.interval) ~= "number" or spec.interval < 1) then

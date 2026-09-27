@@ -2,7 +2,7 @@
 
 local ADDON = ...
 GlassPanel = GlassPanel or {}
-local API, Glass, Engine, Bar = GlassPanel.API, GlassPanel.Glass, GlassPanel.Engine, GlassPanel.Bar
+local API, Glass, Engine, Bar, Layout = GlassPanel.API, GlassPanel.Glass, GlassPanel.Engine, GlassPanel.Bar, GlassPanel.Layout
 local say = API.Print
 
 local DEFAULTS = { font = "arial", shown = true }
@@ -27,7 +27,9 @@ local function findBlock(id)
 end
 
 local COMMANDS = {
-    { "list", "blocks and whether they show" },
+    { "list", "lanes, their blocks, and which are hidden" },
+    { "move <id> left|center|right|<0-100> [n]", "move a block to a lane (or start one at n% of the bar)" },
+    { "layout reset", "forget the arrangement: blocks go back to their default lanes" },
     { "show <id>", "show a block" },
     { "hide <id>", "hide a block" },
     { "toggle", "show or hide the whole bar" },
@@ -40,10 +42,39 @@ local function slash(msg)
     cmd = cmd:lower()
     local db = GlassPanelDB
     if cmd == "list" then
-        for _, block in ipairs(Engine.blocks) do
-            local state = Bar.IsHidden(block) and "|cff888888hidden|r" or "|cff60ff60shown|r"
-            say(string.format("%s (%s, %s) %s", block.id, block.label, block.side, state))
+        say("drag a block to move it; shift-drag to move its whole lane")
+        for _, lane in ipairs(Layout.Lanes()) do
+            local names = {}
+            for _, id in ipairs(lane.ids) do
+                local block = Engine.byId[id]
+                if not block then
+                    names[#names + 1] = "|cff888888" .. id .. " (not loaded)|r"
+                elseif Bar.IsHidden(block) then
+                    names[#names + 1] = "|cff888888" .. id .. " (hidden)|r"
+                else
+                    names[#names + 1] = id
+                end
+            end
+            say(string.format("lane at %d%%: %s", math.floor(lane.x * 100 + 0.5), table.concat(names, ", ")))
         end
+    elseif cmd == "move" then
+        local id, where, n = arg:match("^(%S+)%s+(%S+)%s*(%d*)$")
+        local block = findBlock(id)
+        if not block then return end
+        local x = ({ left = 0, center = 0.5, right = 1 })[where or ""]
+        local pct = tonumber(where or "")
+        if x == nil and pct and pct >= 0 and pct <= 100 then x = pct / 100 end
+        if x == nil then say("usage: /gpanel move <id> left|center|right|<0-100> [position]") return end
+        if n ~= "" then
+            Layout.Move(block.id, { lane = x, index = tonumber(n) })
+        else
+            Layout.Move(block.id, { x = x })
+        end
+        Bar.Layout()
+    elseif cmd == "layout" and arg == "reset" then
+        Layout.Reset()
+        Bar.Layout()
+        say("layout reset")
     elseif cmd == "show" or cmd == "hide" then
         local block = findBlock(arg)
         if not block then return end

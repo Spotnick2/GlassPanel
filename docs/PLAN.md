@@ -21,7 +21,8 @@ bar, no auto-hide, no LibDataBroker host (yet).
 | `Compat.lua` | `GlassPanel.API`: client quirks, the failure recorder, `CoinText` |
 | `Glass.lua` | the material, copied from GlassUnitFrames (a test keeps it in sync) |
 | `Engine.lua` | block registry, event fan-out, one repaint per frame, 1 s interval clock, `pcall` isolation |
-| `Bar.lua` | the strip, one plain Button per block, two lanes, width follows text |
+| `Layout.lua` | free lanes (#6): anchors as fractions of the width, drop to join or start a lane |
+| `Bar.lua` | the strip, one plain Button per block, placement and drag and drop, width follows text |
 | `Blocks\*.lua` | built-in blocks, registered through the same public API as plugins |
 | `GlassPanel.lua` | SavedVariables, `/gpanel`, boot |
 | `Plugins\<Name>\` | separate addons (`## Dependencies: GlassPanel`), moved out by the packager |
