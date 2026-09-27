@@ -50,6 +50,15 @@ eq(values[3], 15000, "rested layer = current + rested")
 eq(values[4], 15500, "incomplete-quest layer = current + all quest XP")
 eq(bxp._shown, false, "Blizzard XP bar hidden while ours shows")
 
+-- Blizzard's bar shown again (Edit Mode, the user) while ours is up: hidden,
+-- and given back when ours goes.
+bxp:Show()
+eq(bxp._shown, false, "re-shown Blizzard XP bar hidden again")
+GlassPanel._test.slash("hide xp")
+eq(bxp._shown, true, "given back when ours is hidden")
+GlassPanel._test.slash("show xp")
+eq(bxp._shown, false, "hidden again when ours returns")
+
 -- /played asked for quietly: chat frames muted, then restored.
 eq(WoW.playedRequests, 1, "time played requested once at login")
 eq(chat1._events.TIME_PLAYED_MSG, nil, "chat frame muted during our request")
