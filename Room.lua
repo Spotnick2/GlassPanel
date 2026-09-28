@@ -18,9 +18,20 @@
 -- frame) and doesn't count. A frame centred in the middle fifth of the screen
 -- is ignored: the bar's two ends can't route around it.
 --
--- Read-only on Blizzard frames: GetRect/IsShown/IsVisible only, under pcall,
--- every number through API.Plain. Checked on layout/scale/display events and
--- on the engine's once-a-second clock.
+-- Buffs and debuffs (#33) are measured by the icons shown, not by the frame:
+-- BuffFrame's rect is Edit Mode's whole buff grid, and on a default layout
+-- the bar stopped ~350 px short of a lone buff. Their names inside the frame
+-- aren't known on Forever (nothing in the dump or in the addons shipping on
+-- it), so the icons are found by shape: the outermost visible frames under it
+-- at most ICON_MAX units a side (bigger ones are containers, looked into). Their union
+-- only ever GROWS within a session, so the bar doesn't jiggle as buffs come
+-- and go; a new session (reload, zoning, Edit Mode or scale change) measures
+-- afresh. No icon seen yet: the frame doesn't count.
+--
+-- Read-only on Blizzard frames: GetRect/IsShown/IsVisible/GetChildren only,
+-- under pcall, every number through API.Plain. Checked on layout/scale/
+-- display events and on the engine's once-a-second clock.
+-- /gpanel room why lists what each watched frame measured.
 
 GlassPanel = GlassPanel or {}
 local API, Engine = GlassPanel.API, GlassPanel.Engine
@@ -35,6 +46,9 @@ Room.WATCH = { "MinimapCluster", "BuffFrame", "DebuffFrame", "TicketStatusFrame"
 Room.MARGIN = 6        -- px between the bar's end and the frame it gives way to
 Room.MIN_WIDTH = 300   -- px: narrower than this, the bar keeps the full width
 Room.MIDDLE = 0.2      -- a frame centred in this middle fraction of the screen is ignored
+Room.AURAS = { BuffFrame = true, DebuffFrame = true }   -- measured by their icons (#33)
+Room.ICON_MAX = 100    -- UI units: bigger than any aura icon, smaller than the grid box
+Room.DEPTH = 4         -- how far under an aura frame to look for its icons
 
 -- Pure. W: the screen width; bandTop/bandBottom: the bar's band (screen px,
 -- y up); rects: { l, r, top, bottom } in screen px. A rect in the band sits on
@@ -59,21 +73,68 @@ end
 
 -- One rect table per watched frame, reused every check (no per-second garbage).
 local rects, pool = {}, {}
+-- Aura frames: the widest extent of their icons seen this session, by name.
+local seen = {}
+-- Why each watched frame counted or not, for /gpanel room why.
+local why = {}
 
--- Fill `out` with f's screen rect; false when it doesn't count (absent,
--- replaced, unreadable). Called under pcall: never throws out of Room.
-local function readRect(f, out)
-    if f:IsForbidden() then return false end
-    if not f:IsVisible() then
-        -- Hidden on its own (it comes back) counts; hidden with its parent doesn't.
-        local p = f:GetParent()
-        if f:IsShown() or not (p and p:IsVisible()) then return false end
-    end
+-- A frame's screen rect as four numbers, or nil (unreadable).
+local function screenRect(f)
     local l, b, w, h = f:GetRect()
     l, b, w, h = API.Plain(l), API.Plain(b), API.Plain(w), API.Plain(h)
     local s = API.Plain(f:GetEffectiveScale())
-    if not (l and b and w and h and s) then return false end
-    out.l, out.r, out.top, out.bottom = l * s, (l + w) * s, (b + h) * s, b * s
+    if not (l and b and w and h and s) then return nil end
+    return l * s, (l + w) * s, (b + h) * s, b * s, w, h
+end
+
+local function grow(acc, l, r, top, bottom)
+    if acc.l == nil then
+        acc.l, acc.r, acc.top, acc.bottom = l, r, top, bottom
+    else
+        acc.l, acc.r = math.min(acc.l, l), math.max(acc.r, r)
+        acc.top, acc.bottom = math.max(acc.top, top), math.min(acc.bottom, bottom)
+    end
+end
+
+-- Add the outermost visible icon-sized frames under f to acc: a frame that
+-- fits ICON_MAX is taken whole (an aura button, whatever small frames it
+-- holds); a bigger one is a container, looked into.
+local function addIcons(f, acc, depth)
+    local kids = { f:GetChildren() }
+    for _, c in ipairs(kids) do
+        if not c:IsForbidden() and c:IsVisible() then
+            local l, r, top, bottom, w, h = screenRect(c)
+            if l and w <= Room.ICON_MAX and h <= Room.ICON_MAX then
+                if r > l then grow(acc, l, r, top, bottom) end
+            elseif depth < Room.DEPTH then
+                addIcons(c, acc, depth + 1)
+            end
+        end
+    end
+end
+
+-- Fill `out` with f's screen rect; false when it doesn't count (absent,
+-- replaced, unreadable). Called under pcall: never throws out of Room.
+local function readRect(f, out, name)
+    if f:IsForbidden() then why[name] = "forbidden" return false end
+    if not f:IsVisible() then
+        -- Hidden on its own (it comes back) counts; hidden with its parent doesn't.
+        local p = f:GetParent()
+        if f:IsShown() or not (p and p:IsVisible()) then why[name] = "replaced (parent hidden)" return false end
+    end
+    if Room.AURAS[name] then
+        local acc = seen[name] or {}
+        if f:IsVisible() then addIcons(f, acc, 1) end
+        if acc.l == nil then why[name] = "no icons seen this session" return false end
+        seen[name] = acc
+        out.l, out.r, out.top, out.bottom = acc.l, acc.r, acc.top, acc.bottom
+        why[name] = "icons"
+        return true
+    end
+    local l, r, top, bottom = screenRect(f)
+    if not l then why[name] = "unreadable" return false end
+    out.l, out.r, out.top, out.bottom = l, r, top, bottom
+    why[name] = "frame"
     return true
 end
 
@@ -83,11 +144,15 @@ function Room.Measure()
         local f = rawget(_G, name)
         if type(f) == "table" then
             pool[i] = pool[i] or {}
-            local ok, counts = pcall(readRect, f, pool[i])
+            local ok, counts = pcall(readRect, f, pool[i], name)
             if ok and counts then
                 n = n + 1
                 rects[n] = pool[i]
+            elseif not ok then
+                why[name] = "error"
             end
+        else
+            why[name] = "absent"
         end
     end
     for i = #rects, n + 1, -1 do rects[i] = nil end
@@ -122,11 +187,34 @@ function Room.Update()
     if not ok then API.Fail("room", err) end
 end
 
+-- A new session: aura frames are measured afresh (the icons may sit
+-- elsewhere after a reload, zoning, an Edit Mode or scale change).
+function Room.NewSession()
+    seen = {}
+    Room.Update()
+end
+
+-- One line per watched frame: how it was measured and where it reaches
+-- (screen px), for /gpanel room why.
+function Room.Explain()
+    Room.Measure()
+    local lines = {}
+    for i, name in ipairs(Room.WATCH) do
+        local w, r = why[name] or "absent", pool[i]
+        if (w == "icons" or w == "frame") and r then
+            w = string.format("%s: x %d-%d, top %d, bottom %d", w, r.l, r.r, r.top, r.bottom)
+        end
+        lines[#lines + 1] = name .. ": " .. w
+    end
+    return lines
+end
+
 local watcher = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "EDIT_MODE_LAYOUTS_UPDATED", "UI_SCALE_CHANGED",
                      "DISPLAY_SIZE_CHANGED" }) do
     API.RegisterEvent(watcher, e, "room")
 end
--- Next frame: Edit Mode applies positions after its event.
-watcher:SetScript("OnEvent", function() C_Timer.After(0, Room.Update) end)
+-- Next frame: Edit Mode applies positions after its event. Each of these
+-- starts a new session.
+watcher:SetScript("OnEvent", function() C_Timer.After(0, Room.NewSession) end)
 Engine.EverySecond("room", Room.Update)

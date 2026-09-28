@@ -95,7 +95,12 @@ core's `ADDON_LOADED`.
   unit frames) and pulls its ends in to stop short of any that reach into its band. A frame hidden
   **on its own** (no target, no buffs) still counts, so the width doesn't jump; one whose
   **parent** is hidden has been replaced by an addon and doesn't. Frames centred in the middle
-  fifth are ignored. Pure `Room.Insets`; read-only `GetRect`/`IsShown`/`IsVisible` under pcall,
+  fifth are ignored. **Buffs and debuffs (#33) count by their icons, not the frame**
+  (`BuffFrame`'s rect is Edit Mode's whole grid): the outermost visible frames under them at most
+  `ICON_MAX` units a side (their names are unknown on Forever, so found by shape), unioned, and
+  that union only grows within a session (no jiggle as buffs come and go); layout/scale/display
+  events start a new session (`Room.NewSession`). No icon yet: they take no room. `/gpanel room
+  why` lists how each watched frame was measured. Pure `Room.Insets`; read-only `GetRect`/`IsShown`/`IsVisible` under pcall,
   every number through `API.Plain`; `Room.Update` never throws (failures go to `API.Fail`).
   Checked on layout, scale and display events and on the engine's clock (`Engine.EverySecond`:
   one clock for everything). `/gpanel room full` opts out; `/gpanel covered` lists frames in the

@@ -144,5 +144,69 @@ for _, e in ipairs(e2) do if e.name == "WideTopThing" then seen = true end end
 check(seen, "a 750 px frame isn't mistaken for a full-screen layer on a narrowed bar")
 rawset(_G, "WideTopThing", nil)
 
+-- Buffs (#33): measured by the icons shown, not Edit Mode's whole grid box.
+-- The box spans x 400-760 at the top right; the icons fill from its right.
+rawset(_G, "MinimapCluster", nil)
+loadAddon()
+R = GlassPanel.Room
+bar = GlassPanel.Bar.frame
+local buffs = blizzard("BuffFrame", { 400, 700, 360, 64 })
+local grid = CreateFrame("Frame", nil, buffs); grid._rect = { 400, 700, 360, 64 }
+local function aura(x)
+    local b = CreateFrame("Button", nil, grid); b._rect = { x, 730, 30, 30 }
+    local cd = CreateFrame("Cooldown", nil, b); cd._rect = { x + 2, 732, 26, 26 }   -- an icon's own child frame
+    return b
+end
+local a1, a2 = aura(720), aura(680)
+a1._shown, a2._shown = false, false
+R.NewSession()
+eq(point("TOPRIGHT")[4], 0, "no buffs up: the empty grid box takes no room")
+a1._shown = true
+R.Update()
+eq(point("TOPRIGHT")[4], -(1000 - 720 + R.MARGIN), "one buff: the bar stops at the icon, not the box (400)")
+a2._shown = true
+R.Update()
+eq(point("TOPRIGHT")[4], -(1000 - 680 + R.MARGIN), "a second buff to its left: pushed further")
+a2._shown = false
+R.Update()
+eq(point("TOPRIGHT")[4], -(1000 - 680 + R.MARGIN), "it expires: the bar doesn't jiggle back this session")
+-- A new session (Edit Mode, zoning, reload) measures afresh.
+WoW.fire("EDIT_MODE_LAYOUTS_UPDATED"); WoW.flushTimers(0)
+eq(point("TOPRIGHT")[4], -(1000 - 720 + R.MARGIN), "new session: only the icons up now")
+-- The icon is measured whole, not the smaller frames inside it.
+eq(select(1, a1:GetChildren())._rect[1], 722, "(the cooldown frame sits 2 px inside the icon)")
+-- A big visible frame with nothing in it is a box, not an icon.
+a1._shown = false
+local empty = CreateFrame("Frame", nil, buffs); empty._rect = { 450, 700, 200, 60 }
+R.NewSession()
+eq(point("TOPRIGHT")[4], 0, "a visible but empty container isn't an icon")
+empty._shown = false
+-- Buffs moved down in Edit Mode: below the band, full width as before.
+a1._shown = true
+a1._rect = { 720, 500, 30, 30 }; select(1, a1:GetChildren())._rect = { 722, 502, 26, 26 }
+R.NewSession()
+eq(point("TOPRIGHT")[4], 0, "icons below the band: full width")
+a1._rect = { 720, 730, 30, 30 }; select(1, a1:GetChildren())._rect = { 722, 732, 26, 26 }
+-- Replaced by an addon (reparented to a hidden frame): ignored, as before.
+local hider = CreateFrame("Frame", nil, UIParent); hider._shown = false
+buffs._parent = hider
+R.NewSession()
+eq(point("TOPRIGHT")[4], 0, "buff frame replaced: ignored")
+buffs._parent = UIParent
+-- Unreadable icon geometry: skipped, nothing thrown.
+a1._rect = { WoW.Secret("x"), 730, 30, 30 }; select(1, a1:GetChildren())._rect = { WoW.Secret("x2"), 732, 26, 26 }
+R.NewSession()
+eq(point("TOPRIGHT")[4], 0, "secret icon rect skipped")
+a1._rect = { 720, 730, 30, 30 }; select(1, a1:GetChildren())._rect = { 722, 732, 26, 26 }
+R.NewSession()
+
+-- /gpanel room why: how each watched frame was measured.
+WoW.chat = {}
+GlassPanel._test.slash("room why")
+local out = table.concat(WoW.chat, " | ")
+check(out:find("BuffFrame: icons: x 720-750", 1, true), "why: buffs measured by icons")
+check(out:find("MinimapCluster: absent", 1, true), "why: absent frames say so")
+rawset(_G, "BuffFrame", nil)
+
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_room")

@@ -84,7 +84,7 @@ local COMMANDS = {
     { "export", "the whole setup as a string, to copy to another account" },
     { "import", "paste a setup exported on another account" },
     { "failures", "errors recorded from blocks and event registration" },
-    { "room auto|full", "auto: the bar ends short of Blizzard's top frames (default); full: always full width" },
+    { "room auto|full|why", "auto: the bar ends short of Blizzard's top frames (default); full: always full width; why: what it measured" },
     { "covered", "list the frames under the bar (#2 measurement)" },
 }
 
@@ -161,7 +161,12 @@ local function slash(msg)
     elseif cmd == "font" then
         if not Settings.SetFont(arg:lower()) then say("fonts: arial, friz") end
     elseif cmd == "room" then
-        if not Settings.SetRoom(arg:lower()) then say("room: auto or full (now " .. db.room .. ")") end
+        if arg:lower() == "why" then
+            say("room (" .. db.room .. "): what each watched frame measured, screen px")
+            for _, line in ipairs(GlassPanel.Room.Explain()) do say("  " .. line) end
+        elseif not Settings.SetRoom(arg:lower()) then
+            say("room: auto, full or why (now " .. db.room .. ")")
+        end
     elseif cmd == "options" then
         if not GlassPanel.Options.Open() then say("find the options under Game Menu > Options > AddOns > Glass Panel") end
     elseif cmd == "export" then

@@ -11,7 +11,8 @@
   from the keyboard, and `/gpanel layout reset` starts over.
 - The bar stops short of the minimap, buffs and other Blizzard frames at the top of the screen
   instead of covering them, and takes the full width again when they're moved out of the way.
-  `/gpanel room full` keeps it full width always.
+  `/gpanel room full` keeps it full width always. Buffs and debuffs count by the icons actually
+  shown, so on a default layout the bar reaches your buffs instead of stopping at their empty grid.
 - Every block is its own addon, grouped under Glass Panel [Core] in the AddOns list: switch off the
   ones you don't want.
 - Durability: the lowest durability among your equipped items, coloured, with the repair cost;
