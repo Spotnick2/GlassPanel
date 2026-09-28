@@ -15,6 +15,7 @@ move-folders:
   GlassPanel/Plugins/Bags: GlassPanelBags
   GlassPanel/Plugins/PvP: GlassPanelPvP
   GlassPanel/Plugins/Guild: GlassPanelGuild
+  GlassPanel/Plugins/Professions: GlassPanelProfessions
 
 manual-changelog:
   filename: CHANGELOG.md

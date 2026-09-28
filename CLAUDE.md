@@ -110,6 +110,9 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   screen; `Bar.Layout` marks them dirty when they come back.
 - **`Plugins\Gold`, `Plugins\Clock`**: gold (secret-safe) and the clock (hides Blizzard's
   minimap clock). Plugins use the **public** API only, the same one third-party plugins get.
+- **`Plugins\Professions`** (#15): icon + coloured rank/max per primary profession (secondary ones in the
+  tooltip), from `C_SkillInfo.GetSkillLineInfo(i)` (a struct) matched by **skillID**, not name
+  (`GetProfessions` returns nils). Stale/ensure like Durability. No click yet (needs a secure spell button).
 - **`Plugins\PvP`** (#14): flagged / FFA / off and the flag's countdown (`GetPVPTimer` ms); a
   function `interval` (1 s while the timer runs, else 30 s). **No click: `C_PvP.TogglePVP` is
   protected** (measured: `ADDON_ACTION_FORBIDDEN` from a block click); the tooltip says `/pvp`.

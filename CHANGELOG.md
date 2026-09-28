@@ -23,5 +23,7 @@
 - PvP: whether you're flagged, with the countdown before the flag drops (type /pvp to toggle it).
 - Guild: your guild's name and its members online out of the total, with who's online (level, class colour, zone, AFK/DND)
   in the tooltip. Left-click opens the guild panel. Hidden when you're not in a guild.
+- Professions: an icon and your skill level for each primary profession, coloured by how close it is to
+  the cap; the tooltip adds Cooking, First Aid and Fishing.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.
