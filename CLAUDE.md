@@ -104,6 +104,8 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   screen; `Bar.Layout` marks them dirty when they come back.
 - **`Plugins\Gold`, `Plugins\Clock`**: gold (secret-safe) and the clock (hides Blizzard's
   minimap clock). Plugins use the **public** API only, the same one third-party plugins get.
+- **`Plugins\Bags`** (#13): used/total over normal bags (family 0, bags 0-4); special bags
+  (quiver, soul bag, bag 5) are listed apart and not counted. Click: `ToggleAllBags`.
 - **`Plugins\Durability`** (#12): lowest durability and repair cost. Events only mark the
   cache stale; it's rebuilt at most once per repaint (tooltip data is heavy, and only for damaged
   items). An unreadable item marks the figure with a grey `?` and makes the cost unknown; the cost comes from
