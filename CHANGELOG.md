@@ -28,5 +28,8 @@
   palette: click a profession to open it.
 - Role: your group role with its icon, while you're in a group. Left-click to set Tank, Healer,
   Damage or No Role.
+- Layer: which layer of the realm you're on, detected from the NPCs you target or mouse over
+  (nameplates confirm a known layer), numbered per zone and per realm. Left-click forgets the
+  layers seen in your zone.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.
