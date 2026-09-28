@@ -110,8 +110,8 @@ Blizzard doesn't show again itself.
 
 For a frame Blizzard manages (Edit Mode, or one it shows and hides itself), use
 `SystemHider(globalName)`: `h.Set(true)` hides it by reparenting to a hidden frame, never `Hide()`,
-on a timer, never while Edit Mode is open, after combat if protected, and undoes Blizzard putting it
-back; `h.Set(false)` gives it back to its last parent; `h.IsHidden()`. Drive it from `onShown`, as
+on a timer, after combat if protected, gives it back while Edit Mode is open (hidden again when it
+closes), and undoes Blizzard putting it back; `h.Set(false)` gives it back to its last parent; `h.IsHidden()`. Drive it from `onShown`, as
 XP+ does. **Pick the frame with care:** a frame whose children call its methods through
 `GetParent()` breaks when reparented (XP+ hides `StatusTrackingBarManager`, not the Edit Mode
 container under it, which broke Edit Mode that way). `Button(parent, text, width, onClick)` makes a

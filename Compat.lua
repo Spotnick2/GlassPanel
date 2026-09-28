@@ -165,8 +165,10 @@ end
 -- bars): reparent to a hidden frame, never Hide() (on Edit Mode systems it
 -- goes through a protected SetShownBase that a later combat show turns into
 -- ADDON_ACTION_BLOCKED). Every change is deferred to a timer (never inside
--- Blizzard's call), never made while Edit Mode is open (resumed when it
--- closes), and waits for combat to end if the frame is protected. Blizzard
+-- Blizzard's call), and waits for combat to end if the frame is protected.
+-- While Edit Mode is open the frame is given back (so it can be seen and
+-- moved there) and hidden again once Edit Mode closes: nothing is ever
+-- hidden while Edit Mode is open. Blizzard
 -- reparenting it is noticed through hooksecurefunc and undone the same
 -- deferred way; a layout change (EDIT_MODE_LAYOUTS_UPDATED) re-checks.
 -- Giving it back restores the parent Blizzard last gave it.
@@ -202,14 +204,15 @@ function API.SystemHider(globalName)
     end)
     API.RegisterEvent(waiter, "EDIT_MODE_LAYOUTS_UPDATED", "hide " .. globalName)
 
-    -- Resume when Edit Mode closes (a hook: it only schedules, never acts
-    -- inside Edit Mode's own Hide).
+    -- Edit Mode opening (give it back) and closing (hide it again): hooks
+    -- that only schedule, never act inside Edit Mode's own Show/Hide.
     local emHooked = false
-    local function afterEditMode()
+    local function watchEditMode()
         if emHooked then return end
         local em = rawget(_G, "EditModeManagerFrame")
         if type(em) == "table" and em.HookScript then
             emHooked = true
+            em:HookScript("OnShow", function() h.request() end)
             em:HookScript("OnHide", function() h.request() end)
         end
     end
@@ -220,7 +223,8 @@ function API.SystemHider(globalName)
             if h.want then API.Fail("hide " .. globalName, "no such frame on this client") end
             return
         end
-        if editModeOpen() then afterEditMode() return end
+        watchEditMode()
+        local hide = h.want and not editModeOpen()
         if API.Plain(InCombatLockdown()) ~= false and API.Plain((frame:IsProtected())) ~= false then
             API.RegisterEvent(waiter, "PLAYER_REGEN_ENABLED", "hide " .. globalName)
             return
@@ -230,7 +234,7 @@ function API.SystemHider(globalName)
             systemParent:Hide()
         end
         local parent = frame:GetParent()
-        if h.want then
+        if hide then
             if not hooked then
                 hooked = true
                 hooksecurefunc(frame, "SetParent", function(_, p)

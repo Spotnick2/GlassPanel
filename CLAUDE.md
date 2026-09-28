@@ -49,8 +49,9 @@ core's `ADDON_LOADED`.
   while our block replaces it and only restores what it hid (the clock's
   `TimeManagerClockButton`). **Only for plain frames.** Frames Blizzard manages (#9) go through
   `SystemHider(globalName)`: reparented to a hidden frame, **never `Hide()`** (protected
-  `SetShownBase` on Edit Mode systems), on a timer (never inside Blizzard's call), never while
-  `EditModeManagerFrame` is shown (resumed from its `OnHide` hook), after combat if protected,
+  `SetShownBase` on Edit Mode systems), on a timer (never inside Blizzard's call), **given back
+  while `EditModeManagerFrame` is shown** (its `OnShow`/`OnHide` hooks only schedule) so it can be
+  seen and moved there, after combat if protected,
   re-checked on `EDIT_MODE_LAYOUTS_UPDATED`; Blizzard's own `SetParent` is noticed via
   `hooksecurefunc` and undone the same way; `Set(false)` gives it back to the parent Blizzard last
   gave it. **Never reparent a frame whose children call it through `GetParent()`** (Edit Mode's

@@ -211,16 +211,23 @@ container:SetParent(layoutParent)
 eq(container._parent, layoutParent, "not undone inside Blizzard's SetParent")
 WoW.flushTimers()
 check(hider.IsHidden(), "re-hidden on the next frame")
--- Edit Mode open: nothing touched until it closes.
-local em = CreateFrame("Frame", "EditModeManagerFrame", UIParent)
-container:SetParent(layoutParent)
-WoW.flushTimers(0)
-eq(container._parent, layoutParent, "Edit Mode open: waits")
+-- Edit Mode: given back while it's open (to be seen and moved there), never
+-- hidden while open, hidden again once it closes.
+local em = CreateFrame("Frame", "EditModeManagerFrame", UIParent); em._shown = false
+hider.request()   -- (in game EditModeManagerFrame exists from login; here the next check hooks it)
 WoW.flushTimers()
-eq(container._parent, layoutParent, "no polling while Edit Mode stays open")
+check(hider.IsHidden(), "(hidden, Edit Mode closed)")
+em:Show()
+check(hider.IsHidden(), "not given back inside Edit Mode's own Show")
+WoW.flushTimers()
+eq(container._parent, layoutParent, "Edit Mode open: given back to its last parent")
+container:SetParent(layoutParent)   -- Edit Mode moving it around
+WoW.flushTimers()
+eq(container._parent, layoutParent, "never hidden while Edit Mode is open")
 em:Hide()
+check(not hider.IsHidden(), "not hidden inside Edit Mode's own Hide")
 WoW.flushTimers()
-check(hider.IsHidden(), "re-hidden once Edit Mode closed (its OnHide)")
+check(hider.IsHidden(), "hidden again once Edit Mode closed")
 rawset(_G, "EditModeManagerFrame", nil)
 -- An Edit Mode layout change re-checks (a move the SetParent hook didn't see).
 container._parent = layoutParent

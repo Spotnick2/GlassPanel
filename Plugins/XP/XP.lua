@@ -321,7 +321,8 @@ end
 -- container under our frame broke Edit Mode (measured), and the manager goes
 -- instead. A watched reputation bar hides with it while XP+ shows. The
 -- setting lives in GlassPanelXPDB (this plugin's SavedVariables; first read
--- in onShown, which runs on the first layout, after they load).
+-- in onShown, which runs on the first layout, after they load). While Edit
+-- Mode is open the bars are given back, so they can be seen and moved.
 local blizzardBar = API.SystemHider("StatusTrackingBarManager")
 local onScreen = false
 
