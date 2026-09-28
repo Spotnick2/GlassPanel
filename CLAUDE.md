@@ -114,8 +114,10 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   function `interval` (1 s while the timer runs, else 30 s). **No click: `C_PvP.TogglePVP` is
   protected** (measured: `ADDON_ACTION_FORBIDDEN` from a block click); the tooltip says `/pvp`.
 - **`Plugins\Guild`** (#18): online/total from `GetNumGuildMembers` (no loop to count). The roster
-  is requested with `C_GuildInfo.GuildRoster` at login, on tooltip open (>= 15 s apart) and every
-  90 s (`interval`); the tooltip's roster scan runs only after `GUILD_ROSTER_UPDATE` marks it stale.
+  is requested with `C_GuildInfo.GuildRoster` at login and on a guild change (at once), on tooltip
+  open (>= 15 s apart) and every 90 s from a `C_Timer.NewTicker` that runs only while the block is on
+  screen (`onShown`); counts of 0/0 (no roster yet) show `?`; the scan stops once every online
+  member is found; the tooltip's roster scan runs only after `GUILD_ROSTER_UPDATE` marks it stale.
   Names through `Ambiguate(name, "guild")`, never split on spaces. Left-click: `ToggleGuildFrame`. Its caption is
   the guild's name (`caption`, re-read on every repaint; `Bar.UpdateCaption`, secrets refused).
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);

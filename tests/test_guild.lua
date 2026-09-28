@@ -47,11 +47,16 @@ eq(WoW.guildRequests, 2, "but not twice in a row")
 WoW.fire("GUILD_ROSTER_UPDATE", true); WoW.tick()
 eq(WoW.guildRequests, 2, "the answer doesn't ask again")
 WoW.now = WoW.now + 91
-for _ = 1, 91 do WoW.tick(1.01) end
-WoW.tick()
-eq(WoW.guildRequests, 3, "periodic refresh after 90 s")
+WoW.fireTickers()
+eq(WoW.guildRequests, 3, "periodic refresh after 90 s (a ticker while on screen)")
 for _ = 1, 10 do WoW.tick() end
-eq(WoW.guildRequests, 3, "never per frame")
+eq(WoW.guildRequests, 3, "never per frame, and not from drawing the text")
+-- Hidden: the ticker stops, so no more background requests.
+GlassPanel._test.slash("hide guild")
+WoW.now = WoW.now + 91
+WoW.fireTickers()
+eq(WoW.guildRequests, 3, "no background requests while hidden")
+GlassPanel._test.slash("show guild")
 
 -- The roster is scanned lazily: once per tooltip open after it changed.
 tip()
@@ -78,8 +83,10 @@ WoW.guild.members = {
     member("Ghost", 5, "Nowhere", "secret", "MAGE"),
 }
 WoW.guild.total = 4
+WoW.guild.online = 4   -- the count says four online: one of them is the unreadable one
 WoW.fire("GUILD_ROSTER_UPDATE", false); WoW.tick()
 t = tip()
+WoW.guild.online = nil
 local q = t:find("|cff88888850|r |cffc79c6e?|r\t?", 1, true)
 local finn = t:find("|cff8888885|r Finn\tTeldrassil", 1, true)
 local eve = t:find("|cff888888?|r |cff40c7ebEve|r\tDarnassus", 1, true)
@@ -144,6 +151,40 @@ GlassPanel.RegisterBlock({ id = "leaky", label = "Leaky Label", text = function(
                            caption = function() return "Leaky" end })
 WoW.tick()
 eq(block("leaky").widget.caption._text, "Leaky Label: ", "a secret caption falls back to the label")
+
+-- Review round (#28).
+-- At login the roster hasn't arrived: GetNumGuildMembers says 0, 0. That's
+-- unknown, not "0/0".
+WoW.guild = { inGuild = true, name = "Forever Friends", members = {}, total = 0, online = 0 }
+loadAddon()
+eq(textOf("guild"), "|cff888888?|r", "no roster yet: ?, not 0/0")
+WoW.guild.total, WoW.guild.online = nil, nil
+-- A new guild asks for its roster at once, whatever the old one's throttle.
+WoW.guild.members = { member("Ann", 10, "Elwynn", true, "MAGE") }
+WoW.fire("GUILD_ROSTER_UPDATE", true); WoW.tick()
+local before = WoW.guildRequests
+WoW.fire("PLAYER_GUILD_UPDATE", "player"); WoW.tick()
+eq(WoW.guildRequests, before + 1, "joined/changed guild: roster requested now")
+-- Other units' guild updates are ignored.
+before = WoW.guildRequests
+WoW.now = WoW.now + 60
+WoW.fire("PLAYER_GUILD_UPDATE", "party1"); WoW.tick()
+eq(WoW.guildRequests, before, "a party member's guild update: ignored")
+-- A big guild: the scan stops once every online member is found.
+local big = {}
+for n = 1, 500 do big[n] = member("M" .. n, 10, "Zone", n <= 3, "MAGE") end
+WoW.guild.members = big
+WoW.fire("GUILD_ROSTER_UPDATE", false); WoW.tick()
+WoW.rosterReads = 0
+tip()
+check(WoW.rosterReads <= 3, "3 online of 500: 3 reads, not 500 (" .. WoW.rosterReads .. ")")
+-- An open tooltip redraws when the roster answer arrives.
+local gb = block("guild").widget
+gb._scripts.OnEnter(gb); GameTooltip._shown = true
+big[4].online = true
+WoW.fire("GUILD_ROSTER_UPDATE", false); WoW.tick()
+check(table.concat(GameTooltip._lines, "\n"):find("Online\t4 of 500", 1, true), "tooltip redrawn with the new roster")
+GameTooltip._shown = false
 
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_guild")

@@ -30,6 +30,7 @@ local TOOLTIP_REQUEST = 15   -- seconds between roster requests from the tooltip
 local REFRESH = 90           -- seconds between background roster requests
 
 local lastRequest   -- GetTime() of the last roster request, nil before the first
+local ticker        -- the background refresh while the block is on screen
 local roster = { members = {}, unreadable = 0 }   -- online members, sorted
 local stale = true
 
@@ -57,6 +58,9 @@ local function counts()
     local total, online = GetNumGuildMembers()
     total, online = P(total), P(online)
     if type(total) ~= "number" or type(online) ~= "number" then return nil end
+    -- In a guild the total is at least 1: 0 means the roster hasn't arrived
+    -- yet (at login), so unknown, not "0/0".
+    if total <= 0 then return nil end
     return online, total
 end
 
@@ -82,8 +86,11 @@ end
 
 local function scan()
     local members, unreadable = {}, 0
-    local _, total = counts()
+    local onlineCount, total = counts()
     for i = 1, total or 0 do
+        -- Every online member found: the rest are offline (a big guild would
+        -- otherwise cost one call per member per hover).
+        if onlineCount and #members + unreadable >= onlineCount then break end
         local name, _, _, level, _, rawZone, _, _, isOnline, status, classFile = GetGuildRosterInfo(i)
         local online = P(isOnline)
         if online == true then
@@ -130,7 +137,6 @@ GlassPanel.RegisterBlock({
     side = "right",
     order = 170,
     events = { "PLAYER_ENTERING_WORLD", "PLAYER_GUILD_UPDATE", "GUILD_ROSTER_UPDATE" },
-    interval = REFRESH,
     -- The caption is the guild's name ("Olympus: 12/148"); "Guild" when
     -- there's none or it can't be read.
     caption = function()
@@ -138,15 +144,27 @@ GlassPanel.RegisterBlock({
         local name = P((GetGuildInfo("player")))
         return type(name) == "string" and name or nil
     end,
+    -- PLAYER_GUILD_UPDATE carries a unit: only the player's own guild matters.
+    unitEvents = { PLAYER_GUILD_UPDATE = "player" },
     onEvent = function(_, event)
         stale = true
+        if event == "PLAYER_GUILD_UPDATE" then
+            lastRequest = nil   -- a new guild: its roster now, not after the old one's throttle
+        end
         if event ~= "GUILD_ROSTER_UPDATE" and inGuild() then request(TOOLTIP_REQUEST) end
+    end,
+    -- The background refresh runs only while the block is on screen: a
+    -- ticker started and stopped with it, not a side effect of drawing.
+    onShown = function(_, visible)
+        if ticker then ticker:Cancel(); ticker = nil end
+        if visible and C_Timer.NewTicker then
+            ticker = C_Timer.NewTicker(REFRESH, function() if inGuild() then request(REFRESH) end end)
+        end
     end,
     text = function()
         local g = inGuild()
         if g == false then return nil end
         -- The background refresh: a repaint at least every REFRESH seconds.
-        if g then request(REFRESH) end
         local online, total = counts()
         if not (g and online) then return "|cff888888?|r" end
         return online .. "/" .. total

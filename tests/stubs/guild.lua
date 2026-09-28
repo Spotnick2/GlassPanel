@@ -31,6 +31,7 @@ end
 -- officerNote, isOnline, status, classFile, achievementPoints,
 -- achievementRank, isMobile, canSoR, repStanding, guid (Retail shape).
 function GetGuildRosterInfo(i)
+    WoW.rosterReads = (WoW.rosterReads or 0) + 1
     local m = WoW.guild.members[i]
     if not m then return nil end
     local function f(k) return secretOr(m[k], "member." .. k) end
@@ -52,3 +53,16 @@ end }
 function ToggleGuildFrame() WoW.guildToggles = WoW.guildToggles + 1 end
 
 -- Ambiguate and C_ClassColor come from wow_stubs.lua (shared by several plugins).
+
+-- C_Timer.NewTicker(seconds, callback) -> a ticker with :Cancel(). Tests run
+-- the live ones with WoW.fireTickers().
+table.insert(WoW.resetHooks, function() WoW.tickers = {} end)
+C_Timer.NewTicker = function(seconds, fn)
+    local t = { fn = fn, seconds = seconds }
+    function t:Cancel() self.cancelled = true end
+    table.insert(WoW.tickers, t)
+    return t
+end
+function WoW.fireTickers()
+    for _, t in ipairs(WoW.tickers) do if not t.cancelled then t.fn() end end
+end
