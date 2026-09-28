@@ -112,7 +112,11 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   minimap clock). Plugins use the **public** API only, the same one third-party plugins get.
 - **`Plugins\Professions`** (#15): icon + coloured rank/max per primary profession (secondary ones in the
   tooltip), from `C_SkillInfo.GetSkillLineInfo(i)` (a struct) matched by **skillID**, not name
-  (`GetProfessions` returns nils). Stale/ensure like Durability. No click yet (needs a secure spell button).
+  (`GetProfessions` returns nils). Stale/ensure like Durability. Left-click (out of combat) opens a
+  **palette** of `SecureActionButtonTemplate` spell buttons (Mining opens Smelting, spell 2656). The
+  palette is parented to `UIParent` and placed by coordinates, **never parented or anchored to the
+  bar**: a secure descendant would make the bar protected and freeze its layout in combat. This is
+  the pattern for any future secure click (Codex review on #15).
 - **`Plugins\PvP`** (#14): flagged / FFA / off and the flag's countdown (`GetPVPTimer` ms); a
   function `interval` (1 s while the timer runs, else 30 s). **No click: `C_PvP.TogglePVP` is
   protected** (measured: `ADDON_ACTION_FORBIDDEN` from a block click); the tooltip says `/pvp`.

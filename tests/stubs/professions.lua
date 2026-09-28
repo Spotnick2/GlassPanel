@@ -35,3 +35,7 @@ C_SkillInfo = {
         return t
     end,
 }
+
+-- C_Spell.GetSpellName(spellIdentifier) -> name. Smelting (2656) opens Mining.
+C_Spell = rawget(_G, "C_Spell") or {}
+C_Spell.GetSpellName = function(id) return ({ [2656] = "Smelting" })[id] end

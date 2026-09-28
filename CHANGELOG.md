@@ -24,6 +24,7 @@
 - Guild: your guild's name and its members online out of the total, with who's online (level, class colour, zone, AFK/DND)
   in the tooltip. Left-click opens the guild panel. Hidden when you're not in a guild.
 - Professions: an icon and your skill level for each primary profession, coloured by how close it is to
-  the cap; the tooltip adds Cooking, First Aid and Fishing.
+  the cap; the tooltip adds Cooking, First Aid and Fishing. Left-click (out of combat) opens a small
+  palette: click a profession to open it.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.

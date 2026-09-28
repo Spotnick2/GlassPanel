@@ -95,6 +95,7 @@ function WoW.reset()
     WoW.cursor = { 0, 0 }     -- screen pixels, as GetCursorPosition returns them
     WoW.uiScale = 1
     WoW.shift = false
+    WoW.combat = false
     -- Equipped items: slot -> { cur, max, cost } (cost nil: tooltip has no repairCost;
     -- "secret" for cur/max/cost: comes back secret). Slots absent: no durability.
     WoW.gear = {}
@@ -204,6 +205,9 @@ function Methods.SetFrameLevel(w, l) w._level = l end
 function Methods.SetFrameStrata(w, s) w._strata = s end
 function Methods.EnableMouse(w, v) w._mouse = v end
 function Methods.RegisterForClicks(w, ...) w._clicks = { ... } end
+-- Secure attributes: recorded; like the client, refused in combat.
+function Methods.SetAttribute(w, k, v) if not WoW.combat then w._attrs = w._attrs or {}; w._attrs[k] = v end end
+function Methods.GetAttribute(w, k) return w._attrs and w._attrs[k] end
 
 function Methods.SetScript(w, name, fn) w._scripts[name] = fn end
 function Methods.GetScript(w, name) return w._scripts[name] end
@@ -314,7 +318,7 @@ function Ambiguate(fullName, context)
     return (fullName:gsub("%-.*$", ""))
 end
 function GetBuildInfo() return "1.60.1", "70009", "Sep 23 2026", 16001 end
-function InCombatLockdown() return false end
+function InCombatLockdown() return WoW.combat == true end
 function GetCursorPosition() return WoW.cursor[1], WoW.cursor[2] end
 function IsShiftKeyDown() return WoW.shift end
 -- Every frame the addon or a test created, in creation order.

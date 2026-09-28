@@ -118,9 +118,73 @@ GlassPanel.failures["professions:scan"] = nil
 GlassPanel.Refresh("professions"); WoW.tick()
 eq(textOf("professions"), icon("Trade_Mining") .. "|cffffff0060/75|r", "retried on the next repaint")
 
--- No click yet (a secure spell button comes later): no caption, no handler.
 eq(block("professions").showLabel, false, "no caption by default")
-eq(block("professions").onClick, nil, "no click handler yet")
+
+-- The palette (#15): left-click opens it out of combat, with a secure spell
+-- button per profession that has a window. It is NOT part of the bar.
+WoW.skills = {
+    { skillID = 171, name = "Alchimie", rank = 300, maxRank = 300 },
+    { skillID = 186, name = "Mining", rank = 150, maxRank = 225 },
+    { skillID = 182, name = "Herbalism", rank = 200, maxRank = 225 },   -- no window
+    { skillID = 185, name = "Cooking", rank = 60, maxRank = 75 },
+    { skillID = 356, name = "Fishing", rank = 1, maxRank = 75 },        -- no window
+}
+changed()
+local pb = block("professions").widget
+pb._rect = { 700, 746, 120, 18 }   -- where the bar put it (the stub doesn't compute block rects)
+pb._scripts.OnClick(pb, "RightButton")
+eq(block("professions")._test.palette(), nil, "right-click does nothing")
+pb._scripts.OnClick(pb, "LeftButton")
+local pal = block("professions")._test.palette()
+check(pal and pal._shown, "left-click opens the palette")
+eq(pal._parent, UIParent, "parented to UIParent, not to the bar")
+eq(pal._points[1][2], UIParent, "positioned against UIParent, not anchored to the block")
+eq(pal._points[1][4], 760, "centred under the block")
+eq(pal._points[1][5], 742, "just below it")
+local spells = {}
+for _, b in ipairs(pal.buttons) do
+    if b._shown then
+        spells[#spells + 1] = b:GetAttribute("spell")
+        eq(b:GetAttribute("type"), "spell", "secure spell button")
+        eq(b._template, nil, "(the stub doesn't record templates)")
+        eq(table.concat(b._clicks, ","), "AnyUp,AnyDown", "both mouse edges")
+    end
+end
+eq(table.concat(spells, ","), "Alchimie,Smelting,Cooking",
+   "the client's names; Mining opens Smelting; Herbalism and Fishing have no window")
+-- The bar never gets a secure descendant.
+local function under(f, root) while f do if f == root then return true end f = f._parent end return false end
+for _, b in ipairs(pal.buttons) do check(not under(b, GlassPanel.Bar.frame), "secure button outside the bar") end
+-- Using a button closes it; clicking the block again toggles it.
+pal.buttons[1]._scripts.PostClick(pal.buttons[1])
+eq(pal._shown, false, "closes after use")
+pb._scripts.OnClick(pb, "LeftButton")
+eq(pal._shown, true, "opens again")
+pb._scripts.OnClick(pb, "LeftButton")
+eq(pal._shown, false, "a second click closes it")
+
+-- In combat: it doesn't open (secure attributes can't change), and says so.
+WoW.combat = true
+WoW.chat = {}
+pb._scripts.OnClick(pb, "LeftButton")
+eq(pal._shown, false, "not opened in combat")
+check(WoW.chat[1] and WoW.chat[1]:find("can't open in combat", 1, true), "explained")
+-- Opened before combat, used in combat: it stays (can't hide a protected frame).
+WoW.combat = false
+pb._scripts.OnClick(pb, "LeftButton")
+WoW.combat = true
+pal.buttons[1]._scripts.PostClick(pal.buttons[1])
+eq(pal._shown, true, "used in combat: left open, not hidden")
+WoW.combat = false
+
+-- Nothing with a window: a message, no palette.
+WoW.skills = { { skillID = 182, name = "Herbalism", rank = 1, maxRank = 75 } }
+changed()
+pal._shown = false
+WoW.chat = {}
+pb._scripts.OnClick(pb, "LeftButton")
+eq(pal._shown, false, "no window to open: stays closed")
+check(WoW.chat[1] and WoW.chat[1]:find("none of your professions", 1, true), "explained")
 
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_professions")

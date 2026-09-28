@@ -18,8 +18,14 @@
 --   skillID) may be a profession, so the bar shows a grey "?" next to what it
 --   could read; a secret rank shows "?" for that profession, never a guess.
 -- - Events only mark the cache stale; it's rebuilt at most once per repaint.
--- - No click yet: opening a profession needs a secure spell button, which
---   comes in a later change.
+-- - Left-click opens a small palette (out of combat only) with one button
+--   per profession that has a window; clicking one opens it. Opening means
+--   casting the profession's spell, which needs a SecureActionButtonTemplate
+--   button. Those buttons live on their OWN frame parented to UIParent and
+--   placed with UIParent coordinates, never parented or anchored to the bar:
+--   a secure descendant would make the bar protected and freeze its layout in
+--   combat (Codex review on #15). The palette may stay open into combat; it
+--   can't be moved or hidden then, and closes on its next use or click.
 
 GlassPanel = GlassPanel or {}
 local API = GlassPanel.API
@@ -28,18 +34,20 @@ local P = API.Plain
 -- skillID -> kind and icon. Vanilla ids, to confirm in game. The English
 -- name is only a fallback for a client name that can't be read.
 local ICONS = "Interface\\Icons\\"
+-- opens: what opens its window: "self" = the spell named like the skill,
+-- a number = that spell id (Mining opens Smelting, 2656); none: no window.
 local PROFESSIONS = {
-    [171] = { kind = "crafting", icon = "Trade_Alchemy", name = "Alchemy" },
-    [164] = { kind = "crafting", icon = "Trade_BlackSmithing", name = "Blacksmithing" },
-    [333] = { kind = "crafting", icon = "Trade_Engraving", name = "Enchanting" },
-    [202] = { kind = "crafting", icon = "Trade_Engineering", name = "Engineering" },
-    [165] = { kind = "crafting", icon = "Trade_LeatherWorking", name = "Leatherworking" },
-    [197] = { kind = "crafting", icon = "Trade_Tailoring", name = "Tailoring" },
+    [171] = { kind = "crafting", icon = "Trade_Alchemy", name = "Alchemy", opens = "self" },
+    [164] = { kind = "crafting", icon = "Trade_BlackSmithing", name = "Blacksmithing", opens = "self" },
+    [333] = { kind = "crafting", icon = "Trade_Engraving", name = "Enchanting", opens = "self" },
+    [202] = { kind = "crafting", icon = "Trade_Engineering", name = "Engineering", opens = "self" },
+    [165] = { kind = "crafting", icon = "Trade_LeatherWorking", name = "Leatherworking", opens = "self" },
+    [197] = { kind = "crafting", icon = "Trade_Tailoring", name = "Tailoring", opens = "self" },
     [182] = { kind = "gathering", icon = "Trade_Herbalism", name = "Herbalism" },
-    [186] = { kind = "gathering", icon = "Trade_Mining", name = "Mining" },
+    [186] = { kind = "gathering", icon = "Trade_Mining", name = "Mining", opens = 2656 },
     [393] = { kind = "gathering", icon = "INV_Misc_Pelt_Wolf_01", name = "Skinning" },
-    [185] = { kind = "secondary", icon = "INV_Misc_Food_15", name = "Cooking" },
-    [129] = { kind = "secondary", icon = "Spell_Holy_SealOfSacrifice", name = "First Aid" },
+    [185] = { kind = "secondary", icon = "INV_Misc_Food_15", name = "Cooking", opens = "self" },
+    [129] = { kind = "secondary", icon = "Spell_Holy_SealOfSacrifice", name = "First Aid", opens = "self" },
     [356] = { kind = "secondary", icon = "Trade_Fishing", name = "Fishing" },
 }
 
@@ -74,6 +82,7 @@ local function scan()
                 local name = P(info.name)
                 local rank, max = num(info.rank), num(info.maxRank)
                 local entry = {
+                    id = id,
                     name = type(name) == "string" and name ~= "" and name or prof.name,
                     icon = ICONS .. prof.icon,
                     rank = rank and max and rank or nil,   -- both readable, or neither
@@ -118,6 +127,107 @@ end
 
 local function iconText(e) return "|T" .. e.icon .. ":14:14:0:0|t" end
 
+--------------------------------------------------------------------------------
+-- The palette
+--------------------------------------------------------------------------------
+
+local SIZE, GAP, PAD = 30, 4, 6
+local palette
+
+-- The spell that opens entry e's window, or nil.
+local function spellFor(e)
+    local opens = PROFESSIONS[e.id].opens
+    if opens == "self" then return e.name end
+    if type(opens) == "number" and C_Spell and C_Spell.GetSpellName then
+        local ok, name = pcall(C_Spell.GetSpellName, opens)
+        name = ok and P(name) or nil
+        return type(name) == "string" and name or nil
+    end
+    return nil
+end
+
+local function buildPalette()
+    local f = CreateFrame("Frame", "GlassPanelProfessionsPalette", UIParent)
+    f:SetFrameStrata("DIALOG")
+    f:SetClampedToScreen(true)
+    f:Hide()
+    GlassPanel.Glass.Apply(f, "small")
+    f.buttons = {}
+    return f
+end
+
+local function paletteButton(i)
+    local b = palette.buttons[i]
+    if b then return b end
+    b = CreateFrame("Button", nil, palette, "SecureActionButtonTemplate")
+    b:SetSize(SIZE, SIZE)
+    -- Both edges: the template acts on the one ActionButtonUseKeyDown picks
+    -- (measured, porting guide). Never typerelease.
+    b:RegisterForClicks("AnyUp", "AnyDown")
+    b:SetAttribute("type", "spell")
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints(b)
+    b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:SetText(self.label or "")
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- Done: close it (only possible out of combat).
+    b:SetScript("PostClick", function() if not InCombatLockdown() then palette:Hide() end end)
+    palette.buttons[i] = b
+    return b
+end
+
+-- Open (or close) the palette under the block. Out of combat only: secure
+-- attributes, size and position can't change in combat.
+local function togglePalette(block)
+    if InCombatLockdown() then
+        API.Print("Professions: the palette can't open in combat.")
+        return
+    end
+    if palette and palette:IsShown() then palette:Hide() return end
+    ensure()
+    local list = {}
+    for _, group in ipairs({ state.primary, state.secondary }) do
+        for _, e in ipairs(group) do
+            local spell = spellFor(e)
+            if spell then list[#list + 1] = { e = e, spell = spell } end
+        end
+    end
+    if #list == 0 then
+        API.Print("Professions: none of your professions has a window to open.")
+        return
+    end
+    palette = palette or buildPalette()
+    for i, item in ipairs(list) do
+        local b = paletteButton(i)
+        b:SetAttribute("spell", item.spell)
+        b.icon:SetTexture(item.e.icon)
+        b.label = item.e.name
+        b:ClearAllPoints()
+        b:SetPoint("LEFT", palette, "LEFT", PAD + (i - 1) * (SIZE + GAP), 0)
+        b:Show()
+    end
+    for i = #list + 1, #palette.buttons do palette.buttons[i]:Hide() end
+    palette:SetSize(PAD * 2 + #list * SIZE + (#list - 1) * GAP, SIZE + PAD * 2)
+    -- Under the block, in UIParent coordinates: a position, not an anchor
+    -- (anchoring it to the block would tie the bar to a protected frame).
+    local w = block.widget
+    local l, bottom, width = w:GetRect()
+    l, bottom, width = P(l), P(bottom), P(width)
+    local s = P(w:GetEffectiveScale()) and P(UIParent:GetEffectiveScale())
+        and w:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    palette:ClearAllPoints()
+    if l and bottom and width and s then
+        palette:SetPoint("TOP", UIParent, "BOTTOMLEFT", (l + width / 2) * s, bottom * s - 4)
+    else
+        -- Not laid out yet: under the middle of the bar.
+        palette:SetPoint("TOP", UIParent, "TOP", 0, -(GlassPanel.Bar.HEIGHT + 4))
+    end
+    palette:Show()
+end
+
 GlassPanel.RegisterBlock({
     id = "professions",
     label = "Professions",
@@ -161,7 +271,13 @@ GlassPanel.RegisterBlock({
             tt:AddLine(state.unreadable .. " skill line(s) can't be read right now; a profession may be missing.",
                 0.7, 0.7, 0.7, true)
         end
+        tt:AddLine(" ")
+        tt:AddLine("Left-click: open a profession (out of combat)", 0.3, 1, 0.3)
     end,
-    -- No onClick yet: opening a profession window needs a secure spell
-    -- button (blocks aren't secure); that comes in a later change.
+    onClick = function(block, button)
+        if button == "LeftButton" then togglePalette(block) end
+    end,
 })
+
+local registered = GlassPanel.Engine.byId.professions
+if registered then registered._test = { palette = function() return palette end } end
