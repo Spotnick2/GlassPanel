@@ -76,7 +76,11 @@ end
 -- State
 --------------------------------------------------------------------------------
 
+-- Plugin stub files (tests/stubs/*.lua) add their state resets here.
+WoW.resetHooks = {}
+
 function WoW.reset()
+    for _, fn in ipairs(WoW.resetHooks) do fn() end
     WoW.frames = {}
     WoW.chat = {}
     WoW.methodsCalled = {}
@@ -289,6 +293,26 @@ SlashCmdList = {}
 Enum = { UITextureSliceMode = { Stretched = 0, Tiled = 1 },
          BagIndex = { Keyring = -2, Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5 } }
 function CreateColor(r, g, b, a) return { r = r, g = g, b = b, a = a } end
+
+-- Shared by several plugins, so defined here once (a plugin's own stub file
+-- must not redefine these: whichever file loads first would win).
+-- C_ClassColor.GetClassColor(classFile) -> a colour object with r, g, b.
+local CLASS_RGB = {
+    WARRIOR = { 0.78, 0.61, 0.43 }, PALADIN = { 0.96, 0.55, 0.73 }, HUNTER = { 0.67, 0.83, 0.45 },
+    ROGUE = { 1, 0.96, 0.41 }, PRIEST = { 1, 1, 1 }, SHAMAN = { 0, 0.44, 0.87 },
+    MAGE = { 0.25, 0.78, 0.92 }, WARLOCK = { 0.53, 0.53, 0.93 }, DRUID = { 1, 0.49, 0.04 },
+}
+C_ClassColor = { GetClassColor = function(classFile)
+    local c = CLASS_RGB[classFile]
+    return c and CreateColor(c[1], c[2], c[3], 1) or nil
+end }
+-- Ambiguate("Name Surname-Realm", context) -> the name without its realm.
+-- Like the client: context "none" keeps the realm; the others drop it (all
+-- test names are same-realm).
+function Ambiguate(fullName, context)
+    if context == "none" then return fullName end
+    return (fullName:gsub("%-.*$", ""))
+end
 function GetBuildInfo() return "1.60.1", "70009", "Sep 23 2026", 16001 end
 function InCombatLockdown() return false end
 function GetCursorPosition() return WoW.cursor[1], WoW.cursor[2] end
@@ -441,6 +465,22 @@ function WoW.tick(elapsed)
     for _, w in ipairs(list) do
         local fn = w._scripts.OnUpdate
         if fn and Methods.IsVisible(w) then fn(w, elapsed) end
+    end
+end
+
+-- Each plugin's client APIs live in their own file, tests/stubs/<plugin>.lua,
+-- so plugins developed in parallel don't all edit this one. A stub file adds
+-- its globals and, for per-session state, a WoW.resetHooks entry.
+do
+    local p = io.popen('dir /b tests\\stubs\\*.lua 2>nul')
+    local n = 0
+    if p then
+        for f in p:lines() do dofile("tests/stubs/" .. f); n = n + 1 end
+        p:close()
+    end
+    -- The listing needs cmd's dir: fail here, not later on a missing global.
+    if n == 0 and io.open("tests/stubs/pvp.lua", "r") then
+        error("tests/stubs/*.lua exist but none loaded (the listing uses cmd's 'dir')")
     end
 end
 

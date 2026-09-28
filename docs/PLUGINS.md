@@ -48,7 +48,8 @@ GlassPanel.RegisterBlock({
     side     = "left",                 -- default lane: "left", "center" or "right" (users drag it anywhere)
     order    = 60,                     -- in the default lane, lower sits nearer the bar's end (default 100)
     events   = { "PLAYER_EQUIPMENT_CHANGED", "PLAYER_ENTERING_WORLD" },
-    interval = nil,                    -- seconds (>= 1) for data with no event
+    unitEvents = { UNIT_FACTION = "player" },  -- an every-unit event, for one unit only
+    interval = nil,                    -- seconds (>= 1), or function(block) -> seconds, for data with no event
     onInit   = function(block) end,    -- once, at registration (before your SavedVariables load!)
     onEvent  = function(block, event, ...) end,  -- every event, immediately: update state here
     text     = function(block) return "GS: 2057" end,  -- plain string, or nil/"" for no space
