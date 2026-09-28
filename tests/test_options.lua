@@ -91,14 +91,42 @@ eq(win.mode, "import", "Import... opens the import window")
 win:Hide()
 
 -- Plugins that register later get rows the next time the panel opens,
--- below the others, in name order among themselves.
+-- where their names sort among all the others.
 GlassPanel.RegisterBlock({ id = "zed", label = "Zed", text = function() return "x" end })
 GlassPanel.RegisterBlock({ id = "late", label = "Alpha", text = function() return "x" end })
 eq(rows.late, nil, "(no row yet)")
 open()
 check(rows.late ~= nil and rows.zed ~= nil, "late plugins' rows added")
 local yXp, yAlpha, yZed = rows.xp.name._points[1][5], rows.late.name._points[1][5], rows.zed.name._points[1][5]
-check(yXp > yAlpha and yAlpha > yZed, "below the first rows, Alpha before Zed")
+check(yAlpha > rows.bags.name._points[1][5], "Alpha sorts first, above Bags")
+check(yXp > yZed, "Zed sorts last, below XP+")
+
+-- While the panel is open, any change shows at once: a /gpanel command,
+-- an import. A stale box would write the opposite of what the user meant.
+open()
+eq(rows.gold.shown:GetChecked(), false, "(gold hidden)")
+GlassPanel._test.slash("show gold")
+eq(rows.gold.shown:GetChecked(), true, "slash change shown at once while open")
+local setup = GlassPanel.Share.Current()
+setup.shown, setup.font = false, "friz"
+GlassPanel.Share.Apply(setup)
+eq(c.shown:GetChecked(), false, "import shown at once: bar off")
+eq(c.font[2]:GetChecked(), true, "import shown at once: font")
+GlassPanel.Settings.SetShown(true)
+-- Closed: nothing to refresh (and nothing runs).
+O().panel:Hide()
+local before = rows.gold.shown:GetChecked()
+GlassPanel._test.slash("hide gold")
+eq(rows.gold.shown:GetChecked(), before, "closed panel isn't touched")
+
+-- A category whose GetID throws: /gpanel options falls back to the hint.
+do
+    local cat = O().category()
+    local realGetID = cat.GetID
+    cat.GetID = function() error("no id on this build") end
+    eq(GlassPanel.Options.Open(), false, "GetID throwing: Open says false")
+    cat.GetID = realGetID
+end
 
 -- No Settings framework: nothing throws, the slash says where it would be.
 local realSettings = Settings

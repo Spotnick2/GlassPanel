@@ -12,14 +12,15 @@
 -- and type is checked against what the core expects. Unknown keys are
 -- dropped; a wrong type rejects the whole string. A string that fails
 -- changes nothing and says why. A good one is applied at once, no reload.
+-- An export is decoded again before it's shown: the core never hands out a
+-- string it would refuse.
 --
 -- The window: a glass frame with a multi-line EditBox (the dump has
 -- SetMultiLine, HighlightText, SetFocus). Addons can't touch the
 -- clipboard: the text is selected, the user copies it with Ctrl+C.
 
 GlassPanel = GlassPanel or {}
-local API, Glass, Bar, Layout, Settings = GlassPanel.API, GlassPanel.Glass, GlassPanel.Bar, GlassPanel.Layout,
-    GlassPanel.Settings
+local API, Glass, Layout, Settings = GlassPanel.API, GlassPanel.Glass, GlassPanel.Layout, GlassPanel.Settings
 local Share = {}
 GlassPanel.Share = Share
 
@@ -28,7 +29,6 @@ local MAX_INPUT = 16384   -- characters of a pasted string
 local MAX_DEPTH = 6       -- setup > layout > lane > ids > id is 4
 local MAX_NODES = 2000    -- values in one string (a 100-block setup is ~800)
 local MAX_STRING = 128    -- characters in one string value (ids are short)
-local MAX_ID = 64
 
 --------------------------------------------------------------------------------
 -- Serialisation
@@ -200,8 +200,18 @@ function Share.Encode(setup)
     return PREFIX .. b64encode(table.concat(out))
 end
 
+-- The ids GlassPanel.RegisterBlock accepts: any non-empty string (the
+-- decoder already caps its length). Anything the core can export, it must
+-- be able to import; ids are only ever table keys, never shown or run.
 local function validId(id)
-    return type(id) == "string" and #id >= 1 and #id <= MAX_ID and id:find("^[%w_%-%.]+$") ~= nil
+    return type(id) == "string" and id ~= ""
+end
+
+-- A table whose keys are exactly 1..n.
+local function isList(t)
+    local n = 0
+    for _ in pairs(t) do n = n + 1 end
+    return n == #t
 end
 
 -- id -> value map where every value passes `ok`; nil and why otherwise.
@@ -211,13 +221,37 @@ local function cleanMap(raw, name, ok)
     local out = {}
     for id, v in pairs(raw) do
         if not validId(id) then return nil, name .. ": bad block id" end
-        if not ok(v) then return nil, name .. ": bad value for " .. id end
+        if not ok(v) then return nil, name .. ": bad value" end
         out[id] = v
     end
     return out
 end
 
 local function isBool(v) return type(v) == "boolean" end
+
+-- The lanes, strictly: a wrong shape rejects the string (SavedVariables are
+-- forgiving, Layout.Clean; an import says what's wrong instead). Empty lanes
+-- are left out.
+local function cleanLayout(raw)
+    if raw == nil then return {} end
+    if type(raw) ~= "table" or not isList(raw) then return nil, "layout isn't a list" end
+    local out, seen = {}, {}
+    for i, lane in ipairs(raw) do
+        if type(lane) ~= "table" or type(lane.x) ~= "number" or lane.x < 0 or lane.x > 1
+            or type(lane.ids) ~= "table" or not isList(lane.ids) then
+            return nil, "layout: bad lane " .. i
+        end
+        local ids = {}
+        for _, id in ipairs(lane.ids) do
+            if not validId(id) then return nil, "layout: bad block id" end
+            if seen[id] then return nil, "layout: a block listed twice" end
+            seen[id] = true
+            ids[#ids + 1] = id
+        end
+        if #ids > 0 then out[#out + 1] = { x = lane.x, ids = ids } end
+    end
+    return out
+end
 
 -- A decoded table checked against what the core expects: a setup ready to
 -- apply, or nil and why. A missing key takes the default (the string is the
@@ -245,13 +279,8 @@ function Share.Clean(raw)
     if not out.labelsFor then return nil, why end
     out.iconsFor, why = cleanMap(raw.iconsFor, "icons", function(v) return v == false end)
     if not out.iconsFor then return nil, why end
-    if raw.layout ~= nil and type(raw.layout) ~= "table" then return nil, "layout isn't a list" end
-    out.layout = Layout.Clean(raw.layout)
-    for _, lane in ipairs(out.layout) do
-        for _, id in ipairs(lane.ids) do
-            if not validId(id) then return nil, "layout: bad block id" end
-        end
-    end
+    out.layout, why = cleanLayout(raw.layout)
+    if not out.layout then return nil, why end
     return out
 end
 
@@ -282,33 +311,15 @@ function Share.Describe(setup)
         setup.font, setup.room, setup.shown and "" or ", bar hidden")
 end
 
--- Replace the setup with `setup` (from Share.Clean) and show it. Fresh
--- tables throughout, so the layout cache sees a new one.
-function Share.Apply(setup)
-    local d = GlassPanelDB
-    d.room, d.labels = setup.room, setup.labels
-    d.hidden, d.labelsFor, d.iconsFor = copyMap(setup.hidden), copyMap(setup.labelsFor), copyMap(setup.iconsFor)
-    d.layout = Layout.Clean(setup.layout)
-    Settings.SetFont(setup.font)
-    Settings.SetShown(setup.shown)
-    GlassPanel.Room.Update()
-    Bar.RefreshIcons()
-    Bar.RefreshCaptions()
-end
+-- Replace the setup with `setup` (from Share.Clean): through Settings, like
+-- every other change.
+function Share.Apply(setup) Settings.ApplyAll(setup) end
 
 --------------------------------------------------------------------------------
 -- The window
 --------------------------------------------------------------------------------
 
 local win
-
-local function button(parent, text, width, onClick)
-    local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    b:SetSize(width, 22)
-    b:SetText(text)
-    b:SetScript("OnClick", onClick)
-    return b
-end
 
 local function preview()
     local text = win.edit:GetText() or ""
@@ -337,6 +348,10 @@ local function build()
     win:SetClampedToScreen(true)
     win:EnableMouse(true)
     win:Hide()
+    -- Escape closes it even when the text box doesn't have the focus
+    -- (AltStable registers its export window the same way on Forever).
+    local special = rawget(_G, "UISpecialFrames")
+    if type(special) == "table" then table.insert(special, "GlassPanelShareWindow") end
     Glass.Apply(win, "small")
 
     win.title = Glass.Font(win, 14, "LEFT")
@@ -351,7 +366,6 @@ local function build()
     local edit = CreateFrame("EditBox", nil, scroll)
     edit:SetMultiLine(true)
     edit:SetAutoFocus(false)
-    edit:SetMaxLetters(MAX_INPUT)
     edit:SetFontObject("ChatFontNormal")
     edit:SetWidth(420)
     scroll:SetScrollChild(edit)
@@ -373,9 +387,9 @@ local function build()
     win.status:SetPoint("BOTTOMLEFT", win, "BOTTOMLEFT", 14, 40)
     win.status:SetPoint("RIGHT", win, "RIGHT", -14, 0)
 
-    win.close = button(win, "Close", 90, function() win:Hide() end)
+    win.close = API.Button(win, "Close", 90, function() win:Hide() end)
     win.close:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -12, 10)
-    win.action = button(win, "Import", 90, function()
+    win.action = API.Button(win, "Import", 90, function()
         if not win.pending then return end
         Share.Apply(win.pending)
         API.Print("setup imported: " .. Share.Describe(win.pending))
@@ -389,12 +403,21 @@ function Share.Open(mode)
     if not win then build() end
     win.mode = nil   -- no OnTextChanged work while the text is set below
     if mode == "export" then
-        win.exported = Share.Encode(Share.Current())
+        local setup = Share.Current()
+        win.exported = Share.Encode(setup)
         win.title:SetText("Export GlassPanel setup")
         win.hint:SetText("Copy with Ctrl+C, then paste it into Import on the other account.")
-        win.status:SetText(Share.Describe(Share.Current()))
+        -- The string must import: never hand out one the decoder refuses
+        -- (a setup grown past the limits).
+        local ok, why = Share.Decode(win.exported)
+        if ok then
+            win.status:SetText(Share.Describe(setup))
+        else
+            win.status:SetText("|cffff6060This setup can't be shared: " .. why .. "|r")
+        end
         win.action:Hide()
-        win.edit:SetText(win.exported)
+        win.edit:SetMaxLetters(0)   -- no cap on what we show
+        win.edit:SetText(ok and win.exported or "")
         win.mode = "export"
     else
         win.pending = nil
@@ -403,6 +426,7 @@ function Share.Open(mode)
         win.status:SetText("")
         win.action:Show()
         win.action:Disable()
+        win.edit:SetMaxLetters(MAX_INPUT)
         win.edit:SetText("")
         win.mode = "import"
     end

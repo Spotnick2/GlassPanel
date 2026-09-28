@@ -131,3 +131,13 @@ function API.Suppressor(globalName)
     end
     return s
 end
+
+-- A standard push button (UIPanelButtonTemplate exists here: porting guide),
+-- for the options panel and the share window.
+function API.Button(parent, text, width, onClick)
+    local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    b:SetSize(width, 22)
+    b:SetText(text)
+    b:SetScript("OnClick", onClick)
+    return b
+end

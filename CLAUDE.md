@@ -162,22 +162,28 @@ core's `ADDON_LOADED`.
   `type(x) == "number"` is no secrecy check: `API.Plain` first.
 - **`Settings.lua`**: `GlassPanelDB`'s defaults (`EnsureDefaults`) and **the one place a setting
   is changed and applied** (`SetFont`, `SetShown`, `SetRoom`, `SetLabels`, `SetLabelFor`,
-  `SetIconFor`, `SetHidden`, `ResetLayout`). `/gpanel`, the options panel and an import all call
-  these, so they can't drift apart.
+  `SetIconFor`, `SetHidden`, `ResetLayout`, and `ApplyAll` for a whole imported setup, with one
+  layout pass). `/gpanel`, the options panel and an import all call these, so they can't drift
+  apart. Each calls `Settings.listener` after a change: an open options panel re-reads its controls.
 - **`Share.lua`** (#34): the setup (`font`, `shown`, `room`, `labels`, `hidden`, `labelsFor`,
   `iconsFor`, and the **effective** layout from `Layout.Lanes`) as `GP1:` + base64 of our own
   serialisation (sorted keys: same setup, same string). The input is **never run as code**: hard
   limits (16k chars, depth 6, 2000 values, 128-char strings), then `Share.Clean` checks every key
-  and type (`Layout.Clean` for lanes, ids `[%w_%-%.]`); unknown keys dropped, missing ones default,
-  a wrong type rejects the whole string and says why. Applied at once, no reload. The window is a
-  glass frame with a multi-line EditBox (selected for Ctrl+C: addons have no clipboard); Import is
-  enabled only for a string that parses, and previews what it holds.
+  and type: ids are any non-empty string (**what `RegisterBlock` accepts: anything the core
+  exports, it imports**), lanes are checked strictly (a bad lane or a block listed twice rejects;
+  empty lanes are dropped). Unknown keys dropped, missing ones default, a wrong type rejects the
+  whole string and says why. Applied at once through `Settings.ApplyAll`, no reload. An export is
+  decoded again before it's shown, so an oversized setup says so instead of handing out a string
+  the import would refuse. The window is a glass frame with a multi-line EditBox (selected for
+  Ctrl+C: addons have no clipboard), in `UISpecialFrames` for Escape; Import is enabled only for a
+  string that parses, and previews what it holds.
 - **`Options.lua`** (#24): Options > AddOns > Glass Panel, a canvas panel on Retail's Settings
   framework (as GlassUnitFrames #39), registered at `PLAYER_LOGIN`. **Our `Settings` local shadows
   Blizzard's global `Settings`**: the framework is read with `rawget(_G, "Settings")`. Bar (shown,
   captions, font, width), Layout (reset), Share setup (Export / Import), and a row per loaded plugin
-  (Shown, Caption, Icon; Caption greyed for graphical blocks, Icon for blocks without one). Rows for
-  plugins registered later are added on the next open; every open re-reads the state.
+  (Shown, Caption, Icon; Caption greyed for graphical blocks, Icon for blocks without one), all in
+  name order (a plugin registered later gets its row on the next open, where its name sorts).
+  Every open, and every setting change while it's open, re-reads the state.
 - **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`, `layout`, `room`, `labels`,
   `labelsFor[id]`, `iconsFor[id]` (only `false` is stored)). The bar is built at
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles

@@ -17,7 +17,8 @@ GlassPanel.Options = Options
 
 local panel = CreateFrame("Frame", "GlassPanelOptions")
 panel.name = "Glass Panel"
-local controls = {}      -- refresh callbacks, run on every OnShow
+local refreshers = {}    -- re-read one control's state; run on open and after any change
+local widgets = {}       -- named controls (tests)
 local rows = {}          -- block id -> its plugin row
 local category
 
@@ -62,21 +63,17 @@ local function note(col, text, width)
 end
 
 local function button(col, text, width, onClick)
-    local b = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
-    b:SetSize(width, 22)
-    b:SetText(text)
-    b:SetScript("OnClick", onClick)
+    local b = API.Button(content, text, width, onClick)
     place(col, b, 28, 4)
     return b
 end
 
 local function refreshAll()
-    for i, fn in ipairs(controls) do
+    for i, fn in ipairs(refreshers) do
         local ok, err = pcall(fn)
         if not ok then API.Fail("options:control " .. i, err) end
     end
 end
-controls.refreshAll = refreshAll
 
 -- A check button with its text on the right (none when text is nil).
 local function checkButton(text, radio)
@@ -98,7 +95,7 @@ local function checkbox(col, text, get, set)
         set(self:GetChecked() and true or false)
         refreshAll()
     end)
-    controls[#controls + 1] = function() cb:SetChecked(get() and true or false) end
+    refreshers[#refreshers + 1] = function() cb:SetChecked(get() and true or false) end
     return cb
 end
 
@@ -116,7 +113,7 @@ local function radios(col, title, options, get, set)
         place(col, rb, 22, 8)
         group[#group + 1] = rb
     end
-    controls[#controls + 1] = function()
+    refreshers[#refreshers + 1] = function()
         local current = get()
         for _, rb in ipairs(group) do rb:SetChecked(rb.value == current) end
     end
@@ -134,18 +131,18 @@ local function greyed(cb, off)
     cb:SetAlpha(off and 0.35 or 1)
 end
 
--- One row: the block's name, then Shown, Caption, Icon.
-local function pluginRow(col, block)
+-- One row: the block's name, then Shown, Caption, Icon. Placed by
+-- layoutRows (the list is re-sorted when a plugin comes in late).
+local function pluginRow(block)
     local id = block.id
     local name = label(block.label or id)
     name:SetWidth(NAME_W)
-    place(col, name, 0, 4)
-    local row = { name = name }
+    local row = { name = name, sortKey = (block.label or id):lower() }
     local function toggle(i, get, set)
         local cb = checkButton(nil)
         cb:SetPoint("LEFT", name, "LEFT", NAME_W + (i - 1) * COL_W, 0)
         cb:SetScript("OnClick", function(self) set(self:GetChecked() and true or false) end)
-        controls[#controls + 1] = function() cb:SetChecked(get() and true or false) end
+        refreshers[#refreshers + 1] = function() cb:SetChecked(get() and true or false) end
         return cb
     end
     row.shown = toggle(1, function() return not Bar.IsHidden(block) end,
@@ -158,19 +155,27 @@ local function pluginRow(col, block)
     -- nothing to show.
     greyed(row.caption, block.width ~= nil)
     greyed(row.icon, block.icon == nil)
-    col.y = col.y - 26
     rows[id] = row
     return row
 end
 
-local pluginCol
-local function addPluginRows()
-    local new = {}
+local pluginCol, rowsTop
+local ROW_H = 26
+
+-- A row for every registered block, all in name order (a late plugin
+-- goes where its name sorts, not at the bottom).
+local function layoutRows()
     for _, block in ipairs(Engine.blocks) do
-        if not rows[block.id] then new[#new + 1] = block end
+        if not rows[block.id] then pluginRow(block) end
     end
-    table.sort(new, function(a, b) return (a.label or a.id):lower() < (b.label or b.id):lower() end)
-    for _, block in ipairs(new) do pluginRow(pluginCol, block) end
+    local list = {}
+    for _, row in pairs(rows) do list[#list + 1] = row end
+    table.sort(list, function(a, b) return a.sortKey < b.sortKey end)
+    for i, row in ipairs(list) do
+        row.name:ClearAllPoints()
+        row.name:SetPoint("TOPLEFT", content, "TOPLEFT", pluginCol.x + 4, rowsTop - (i - 1) * ROW_H)
+    end
+    pluginCol.y = rowsTop - #list * ROW_H
 end
 
 --------------------------------------------------------------------------------
@@ -190,28 +195,28 @@ local function build()
     pluginCol = column(340, -72)
 
     header(left, "Bar")
-    controls.shown = checkbox(left, "Show the bar",
+    widgets.shown = checkbox(left, "Show the bar",
         function() return db().shown end, Settings.SetShown)
-    controls.labels = checkbox(left, "Captions on every block",
+    widgets.labels = checkbox(left, "Captions on every block",
         function() return db().labels end, Settings.SetLabels)
     note(left, "A plugin's own Caption box (right) wins over this.")
-    controls.font = radios(left, "Font", { { "arial", "Arial Narrow" }, { "friz", "Friz Quadrata" } },
+    widgets.font = radios(left, "Font", { { "arial", "Arial Narrow" }, { "friz", "Friz Quadrata" } },
         function() return db().font end, Settings.SetFont)
-    controls.room = radios(left, "Width", { { "auto", "Stop short of Blizzard's top frames" },
+    widgets.room = radios(left, "Width", { { "auto", "Stop short of Blizzard's top frames" },
         { "full", "Always full width" } },
         function() return db().room end, Settings.SetRoom)
 
     header(left, "Layout")
     note(left, "Drag a block to move it; shift-drag moves its whole lane.")
-    controls.reset = button(left, "Reset layout", 160, function()
+    widgets.reset = button(left, "Reset layout", 160, function()
         Settings.ResetLayout()
         API.Print("layout reset")
     end)
 
     header(left, "Share setup")
     note(left, "Copy this bar's whole setup to another account.")
-    controls.export = button(left, "Export...", 160, function() GlassPanel.Share.Open("export") end)
-    controls.import = button(left, "Import...", 160, function() GlassPanel.Share.Open("import") end)
+    widgets.export = button(left, "Export...", 160, function() GlassPanel.Share.Open("export") end)
+    widgets.import = button(left, "Import...", 160, function() GlassPanel.Share.Open("import") end)
 
     header(pluginCol, "Plugins")
     local heads = { "Shown", "Caption", "Icon" }
@@ -220,6 +225,7 @@ local function build()
         fs:SetPoint("TOPLEFT", content, "TOPLEFT", pluginCol.x + 4 + NAME_W + (i - 1) * COL_W - 4, pluginCol.y)
     end
     pluginCol.y = pluginCol.y - 20
+    rowsTop = pluginCol.y
 end
 
 panel:SetScript("OnShow", function(self)
@@ -227,7 +233,7 @@ panel:SetScript("OnShow", function(self)
         self.built = true
         build()
     end
-    addPluginRows()
+    layoutRows()
     content:SetHeight(math.max(-left.y, -pluginCol.y) + 16)
     refreshAll()
 end)
@@ -249,15 +255,23 @@ local function register()
     if not ok2 then API.Fail("options:register", err) end
 end
 
--- Open the panel; false when the Settings framework can't.
+-- Open the panel; false when the Settings framework can't (a throw from
+-- GetID included).
 function Options.Open()
     local S = rawget(_G, "Settings")
-    if not (category and S and S.OpenToCategory) then return false end
-    return pcall(S.OpenToCategory, category:GetID()) and true or false
+    if not (category and type(S) == "table" and S.OpenToCategory) then return false end
+    return pcall(function() return S.OpenToCategory(category:GetID()) end) and true or false
+end
+
+-- A setting changed (from /gpanel, an import, this panel): an open panel
+-- shows it at once, never a stale box that would write the opposite.
+Settings.listener = function()
+    if panel.built and panel:IsVisible() then refreshAll() end
 end
 
 local reg = CreateFrame("Frame")
 API.RegisterEvent(reg, "PLAYER_LOGIN", "options")
 reg:SetScript("OnEvent", register)
 
-Options._test = { panel = panel, controls = controls, rows = rows, category = function() return category end }
+Options._test = { panel = panel, controls = widgets, refreshers = refreshers, rows = rows,
+                  category = function() return category end }

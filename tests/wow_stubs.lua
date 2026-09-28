@@ -394,6 +394,11 @@ function strsplit(delim, str, pieces)
     out[#out + 1] = str:sub(pos)
     return unpack(out)
 end
+-- FrameXML's list of frames Escape closes (a table, so not in the dump's
+-- function walk; AltStable's Export.lua and SheetUI.lua insert into it on
+-- Forever).
+UISpecialFrames = {}
+
 -- Retail's Settings framework (names from the dump's _G walk; signatures as
 -- GlassUnitFrames and Priestly use them on Forever). WoW.settings records
 -- what the addon did.

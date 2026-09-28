@@ -124,24 +124,63 @@ rejected(pack({ room = "half" }), "bad room", "room")
 rejected(pack({ labels = "on" }), "labels not a boolean", "labels")
 rejected(pack({ hidden = { gold = "yes" } }), "hidden value not true", "hidden")
 rejected(pack({ hidden = { "gold" } }), "hidden as a list", "hidden")
-rejected(pack({ labelsFor = { ["|cffff0000x"] = true } }), "id with escape codes", "bad block id")
+rejected(pack({ labelsFor = { [""] = true } }), "empty id", "bad block id")
 rejected(pack({ iconsFor = { bags = true } }), "icons: only 'off' is stored", "icons")
 rejected(pack({ layout = "left" }), "layout not a list", "layout")
-rejected(pack({ layout = { { x = 0, ids = { "ok", "bad id!" } } } }), "bad id in the layout", "layout")
+rejected(pack({ layout = { { x = 0, ids = { "ok", "" } } } }), "empty id in the layout", "layout")
+rejected(pack({ layout = { { x = "0.5", ids = { "gold" } } } }), "lane x not a number", "bad lane 1")
+rejected(pack({ layout = { { x = 0, ids = { "a" } }, { x = 5, ids = { "gold" } } } }), "lane x out of range", "bad lane 2")
+rejected(pack({ layout = { { x = 0, ids = { 42 } } } }), "id not a string", "bad block id")
+rejected(pack({ layout = { { x = 0, ids = { "bags" } }, { x = 1, ids = { "bags" } } } }), "a block twice", "twice")
+rejected(pack({ layout = { { x = 0, ids = { a = "gold" } } } }), "ids not a list", "bad lane 1")
+rejected(pack({ layout = { x = 0 } }), "layout not a list of lanes", "layout")
 rejected(pack("just a string"), "not a table", "not a setup")
--- A bad lane is dropped like one in SavedVariables (Layout.Clean).
-local s3 = S().Decode(pack({ layout = { { x = 5, ids = { "gold" } }, { x = 0, ids = { "bags", "bags" } } } }))
-check(s3 and #s3.layout == 1 and #s3.layout[1].ids == 1, "out-of-range lane and repeated id dropped")
+-- Empty lanes are left out (nothing wrong, nothing to place).
+local s3 = S().Decode(pack({ layout = { { x = 0, ids = {} }, { x = 1, ids = { "bags" } } } }))
+check(s3 and #s3.layout == 1 and s3.layout[1].ids[1] == "bags", "empty lane left out")
+-- Any id RegisterBlock accepts travels (a ported plugin may use spaces or
+-- colons): what the core exports, it imports.
+local odd = { font = "arial", hidden = { ["titan xpp"] = true }, labelsFor = { ["xpp:rested"] = false },
+              layout = { { x = 0, ids = { "titan xpp", "|cffff0000odd" } } } }
+local s4, why4 = S().Decode(pack(odd))
+check(s4 and s4.hidden["titan xpp"] and s4.layout[1].ids[2] == "|cffff0000odd", "unusual ids accepted (" .. tostring(why4) .. ")")
 
 -- Never run as code.
 local src = io.open("Share.lua"):read("*a")
 check(not src:find("loadstring", 1, true) and not src:find("RunScript", 1, true), "the input is never executed")
+
+-- An import lays the bar out once, not once per setting.
+do
+    local Bar = GlassPanel.Bar
+    local real, n = Bar.Layout, 0
+    Bar.Layout = function(...) n = n + 1; return real(...) end
+    S().Apply(S().Decode(exported))
+    Bar.Layout = real
+    eq(n, 1, "one layout pass per import")
+end
+
+-- A setup grown past the limits (ids of plugins long gone pile up) is never
+-- handed out as a string the import would refuse.
+do
+    local saved = GlassPanelDB.hidden
+    GlassPanelDB.hidden = {}
+    for i = 1, 1100 do GlassPanelDB.hidden["gone" .. i] = true end
+    slash("export")
+    local w = S()._test.window()
+    eq(w.edit:GetText(), "", "oversized: no string shown")
+    check(w.status._text:find("can't be shared", 1, true), "oversized: says why")
+    w:Hide()
+    GlassPanelDB.hidden = saved
+end
 
 -- The window: /gpanel export shows the string, selected, read-only.
 slash("export")
 T = S()._test
 local win = T.window()
 eq(win._shown, true, "export window open")
+local listed = false
+for _, name in ipairs(UISpecialFrames) do if name == "GlassPanelShareWindow" then listed = true end end
+check(listed, "Escape closes it (UISpecialFrames)")
 eq(win.edit:GetText(), S().Encode(S().Current()), "the current setup's string")
 eq(win.edit._highlighted, true, "selected for Ctrl+C")
 eq(win.edit._focused, true, "focused")
