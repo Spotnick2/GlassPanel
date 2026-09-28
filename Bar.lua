@@ -77,6 +77,12 @@ local function onEnter(button)
     end
 end
 
+-- Redraw the tooltip if it's open on this block (called after a repaint).
+function Bar.RefreshTooltip(block)
+    local b = block.widget
+    if b and b.visible and block.tooltip and GameTooltip:GetOwner() == b and GameTooltip:IsShown() then onEnter(b) end
+end
+
 local function onLeave(button)
     if GameTooltip:GetOwner() == button then GameTooltip:Hide() end
 end

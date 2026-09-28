@@ -307,7 +307,12 @@ C_ClassColor = { GetClassColor = function(classFile)
     return c and CreateColor(c[1], c[2], c[3], 1) or nil
 end }
 -- Ambiguate("Name Surname-Realm", context) -> the name without its realm.
-function Ambiguate(fullName, context) return (fullName:gsub("%-.*$", "")) end
+-- Like the client: context "none" keeps the realm; the others drop it (all
+-- test names are same-realm).
+function Ambiguate(fullName, context)
+    if context == "none" then return fullName end
+    return (fullName:gsub("%-.*$", ""))
+end
 function GetBuildInfo() return "1.60.1", "70009", "Sep 23 2026", 16001 end
 function InCombatLockdown() return false end
 function GetCursorPosition() return WoW.cursor[1], WoW.cursor[2] end
@@ -468,9 +473,14 @@ end
 -- its globals and, for per-session state, a WoW.resetHooks entry.
 do
     local p = io.popen('dir /b tests\\stubs\\*.lua 2>nul')
+    local n = 0
     if p then
-        for f in p:lines() do dofile("tests/stubs/" .. f) end
+        for f in p:lines() do dofile("tests/stubs/" .. f); n = n + 1 end
         p:close()
+    end
+    -- The listing needs cmd's dir: fail here, not later on a missing global.
+    if n == 0 and io.open("tests/stubs/pvp.lua", "r") then
+        error("tests/stubs/*.lua exist but none loaded (the listing uses cmd's 'dir')")
     end
 end
 

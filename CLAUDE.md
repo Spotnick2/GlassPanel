@@ -64,8 +64,11 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   - one event frame for all blocks; `onEvent` runs immediately and marks the block dirty;
   - dirty blocks repaint **once per rendered frame** (the flush frame is shown only while work
     is pending);
-  - one shared 1 s clock drives `interval` blocks; a function `interval` is asked again after
-    every repaint, so it can react to what the event changed;
+  - one shared 1 s clock drives `interval` blocks (seconds, or a function returning them, asked
+    each time the block comes due); `unitEvents = { EVENT = "player" }` lets an event that fires
+    for every unit reach a block only for the unit it names;
+  - after a repaint, a tooltip open on that block is redrawn (`Bar.RefreshTooltip`, on-screen
+    blocks only);
   - every block callback runs under `pcall` via `Engine.Call`;
   - `text` must return a plain string. Secrets and non-strings are refused and recorded.
   - A relayout runs only when some text changed.

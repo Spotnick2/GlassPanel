@@ -70,9 +70,9 @@ local function paint(block)
         text = res
     end
     local changed = GlassPanel.Bar ~= nil and GlassPanel.Bar.SetText(block, text)
-    -- A function interval is asked again after every repaint: what it
-    -- depends on (PvP's flag timer) may have changed with the event.
-    if type(block.interval) == "function" then block._due = Engine.NextInterval(block) end
+    -- An open tooltip on this block is redrawn with the new data (a PvP
+    -- countdown, a guild roster that just arrived).
+    if GlassPanel.Bar and GlassPanel.Bar.RefreshTooltip then GlassPanel.Bar.RefreshTooltip(block) end
     -- Not while hidden (the user's /gpanel hide, or the bar toggled off):
     -- Bar.Layout marks the block dirty again when it comes back on screen.
     if block.paint and text ~= nil and text ~= ERROR_TEXT and GlassPanel.Bar.OnScreen(block) then
@@ -100,9 +100,15 @@ flushFrame:SetScript("OnUpdate", Engine.Flush)
 eventFrame:SetScript("OnEvent", function(_, event, ...)
     local list = listeners[event]
     if not list then return end
+    local unit = API.Plain((...))
     for _, block in ipairs(list) do
-        if block.onEvent then call(block, "onEvent", block.onEvent, block, event, ...) end
-        Engine.MarkDirty(block)
+        -- unitEvents: an event that fires for every unit reaches the block
+        -- only for the unit it names (PvP: "player").
+        local want = block.unitEvents and block.unitEvents[event]
+        if not want or unit == want then
+            if block.onEvent then call(block, "onEvent", block.onEvent, block, event, ...) end
+            Engine.MarkDirty(block)
+        end
     end
 end)
 
@@ -166,6 +172,7 @@ end
 --   showLabel = false), icon, side ("left"|"center"|"right": the default lane),
 --   order (number, default 100),
 --   events = { "EVENT", ... }, onEvent(block, event, ...),
+--   unitEvents = { EVENT = "player" } (only that unit's firing of the event),
 --   interval (seconds, or function(block) -> seconds until the next repaint),
 --   tooltip(block, GameTooltip), onClick(block, mouseButton), onInit(block),
 --   onShown(block, visible) when it appears on or leaves the screen.
@@ -187,6 +194,14 @@ function GlassPanel.RegisterBlock(spec)
     end
     if spec.label ~= nil and type(spec.label) ~= "string" then return invalid(spec, "label must be a string") end
     if spec.showLabel ~= nil and type(spec.showLabel) ~= "boolean" then return invalid(spec, "showLabel must be a boolean") end
+    if spec.unitEvents ~= nil then
+        if type(spec.unitEvents) ~= "table" then return invalid(spec, "unitEvents must map event names to a unit") end
+        for e, u in pairs(spec.unitEvents) do
+            if type(e) ~= "string" or type(u) ~= "string" then
+                return invalid(spec, "unitEvents must map event names to a unit")
+            end
+        end
+    end
     if spec.events ~= nil then
         if type(spec.events) ~= "table" then return invalid(spec, "events must be a list of event names") end
         for _, e in ipairs(spec.events) do
