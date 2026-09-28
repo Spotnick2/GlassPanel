@@ -18,6 +18,7 @@ move-folders:
   GlassPanel/Plugins/Professions: GlassPanelProfessions
   GlassPanel/Plugins/Role: GlassPanelRole
   GlassPanel/Plugins/Layer: GlassPanelLayer
+  GlassPanel/Plugins/GearScore: GlassPanelGearScore
 
 manual-changelog:
   filename: CHANGELOG.md
