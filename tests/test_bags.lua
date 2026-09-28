@@ -36,17 +36,32 @@ eq(textOf("bags"), "|cffff404029/30|r", "red when nearly full")
 WoW.bags[5] = { slots = 20, free = 20, family = 0, name = "Reagent Bag" }
 WoW.fire("BAG_UPDATE_DELAYED"); WoW.tick()
 eq(textOf("bags"), "|cffff404029/30|r", "bag 5 not counted")
+check(has("Reagent Bag	0/20"), "but listed under the special bags")
 WoW.bags[5] = nil
 
 -- Click opens all bags.
 local b = block("bags").widget
 b._scripts.OnClick(b, "LeftButton")
-eq(WoW.bagToggles, 1, "click toggles all bags")
+eq(WoW.bagToggles, 1, "left-click toggles all bags")
+b._scripts.OnClick(b, "RightButton"); b._scripts.OnClick(b, "MiddleButton")
+eq(WoW.bagToggles, 1, "other buttons don't")
 
--- A secret free count: that bag is skipped; nothing readable hides the block.
+-- One bag's free count secret: left out AND flagged, never a smaller total
+-- passed off as the whole.
+WoW.bags = { [0] = { slots = 16, free = "secret", family = 0 }, [1] = { slots = 14, free = 4, family = 0 } }
+WoW.fire("BAG_UPDATE_DELAYED"); WoW.tick()
+eq(textOf("bags"), "|cffffffff10/14|r|cff888888?|r", "partial: marked unsure")
+check(has("1 bag(s) can't be read right now"), "tooltip says why")
+
+-- A secret family: normal or special is unknown, so the bag isn't counted as normal.
+WoW.bags = { [0] = { slots = 16, free = 8, family = 0 }, [2] = { slots = 18, free = 10, family = "secret" } }
+WoW.fire("BAG_UPDATE_DELAYED"); WoW.tick()
+eq(textOf("bags"), "|cffffffff8/16|r|cff888888?|r", "secret family: left out and flagged, not counted as normal")
+
+-- Every bag unreadable: "hidden".
 WoW.bags = { [0] = { slots = 16, free = "secret", family = 0 } }
 WoW.fire("BAG_UPDATE_DELAYED"); WoW.tick()
-eq(block("bags").widget._shown, false, "nothing readable: hidden")
+eq(textOf("bags"), "|cff888888hidden|r", "nothing readable: hidden")
 
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_bags")
