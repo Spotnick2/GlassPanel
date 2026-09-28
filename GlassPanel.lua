@@ -3,24 +3,8 @@
 local ADDON = ...
 GlassPanel = GlassPanel or {}
 local API, Glass, Engine, Bar, Layout = GlassPanel.API, GlassPanel.Glass, GlassPanel.Engine, GlassPanel.Bar, GlassPanel.Layout
+local Settings = GlassPanel.Settings
 local say = API.Print
-
-local DEFAULTS = { font = "arial", shown = true, room = "auto", labels = true }
-
--- Read settings, fill missing keys. Nothing may REQUIRE a value to have
--- survived: SavedVariables were broken on builds before 70009.
-local function ensureDefaults()
-    if type(GlassPanelDB) ~= "table" then GlassPanelDB = {} end
-    local db = GlassPanelDB
-    for k, v in pairs(DEFAULTS) do
-        if db[k] == nil then db[k] = v end
-    end
-    if type(db.hidden) ~= "table" then db.hidden = {} end
-    if type(db.labelsFor) ~= "table" then db.labelsFor = {} end
-    if not Glass.FONTS[db.font] then db.font = DEFAULTS.font end
-    if db.room ~= "auto" and db.room ~= "full" then db.room = DEFAULTS.room end
-    return db
-end
 
 local function findBlock(id)
     local block = id and Engine.byId[id]
@@ -141,46 +125,31 @@ local function slash(msg)
         end
         Bar.Layout()
     elseif cmd == "layout" and arg == "reset" then
-        Layout.Reset()
-        Bar.Layout()
+        Settings.ResetLayout()
         say("layout reset")
     elseif cmd == "labels" then
         arg = arg:lower()
         if arg ~= "on" and arg ~= "off" then say("labels: on or off") return end
-        db.labels = (arg == "on")
-        Bar.RefreshCaptions()
+        Settings.SetLabels(arg == "on")
     elseif cmd == "label" then
         local id, v = arg:match("^(%S+)%s+(%S+)$")
         local block = findBlock(id)
         if not block then return end
         v = v:lower()
-        if v == "on" then db.labelsFor[block.id] = true
-        elseif v == "off" then db.labelsFor[block.id] = false
-        elseif v == "default" then db.labelsFor[block.id] = nil
-        else say("label <id> on|off|default") return end
-        Bar.RefreshCaptions()
+        if v == "on" then Settings.SetLabelFor(block.id, true)
+        elseif v == "off" then Settings.SetLabelFor(block.id, false)
+        elseif v == "default" then Settings.SetLabelFor(block.id, nil)
+        else say("label <id> on|off|default") end
     elseif cmd == "show" or cmd == "hide" then
         local block = findBlock(arg)
         if not block then return end
-        db.hidden[block.id] = (cmd == "hide") or nil
-        Bar.Layout()
+        Settings.SetHidden(block.id, cmd == "hide")
     elseif cmd == "toggle" then
-        db.shown = not db.shown
-        Bar.SetShown(db.shown)
+        Settings.SetShown(not db.shown)
     elseif cmd == "font" then
-        arg = arg:lower()
-        if Glass.SetFont(arg) then
-            db.font = arg
-            -- Every width depends on the font: remeasure.
-            Bar.Layout()
-        else
-            say("fonts: arial, friz")
-        end
+        if not Settings.SetFont(arg:lower()) then say("fonts: arial, friz") end
     elseif cmd == "room" then
-        arg = arg:lower()
-        if arg ~= "auto" and arg ~= "full" then say("room: auto or full (now " .. db.room .. ")") return end
-        db.room = arg
-        GlassPanel.Room.Update()
+        if not Settings.SetRoom(arg:lower()) then say("room: auto or full (now " .. db.room .. ")") end
     elseif cmd == "covered" then
         local list = coveredFrames()
         say(#list .. " frame(s) in the bar's band (under = drawn over, beside = the bar stops short):")
@@ -208,7 +177,7 @@ API.RegisterEvent(boot, "PLAYER_LOGIN", "core")
 API.RegisterEvent(boot, "PLAYER_ENTERING_WORLD", "core")
 boot:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON then
-        local db = ensureDefaults()
+        local db = Settings.EnsureDefaults()
         Glass.SetFont(db.font)
         Bar.Build()
         Bar.SetShown(db.shown)
