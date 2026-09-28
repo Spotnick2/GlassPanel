@@ -126,7 +126,7 @@ GlassPanel.RegisterBlock({
     label = "Layer",
     icon = "Interface\\Icons\\INV_Misc_Map_01",
     side = "right",
-    order = 140,
+    order = 180,
     events = { "ADDON_LOADED", "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED",
                "GROUP_JOINED", "GROUP_LEFT", "ZONE_CHANGED_NEW_AREA", "UNIT_PHASE" },
     onEvent = function(_, event, arg)
