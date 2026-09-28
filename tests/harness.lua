@@ -82,7 +82,13 @@ function loadAddon(opts)
     local only
     if type(allow) == "table" then
         only = {}
-        for _, n in ipairs(allow) do only[n] = true end
+        local exists = {}
+        for _, p in ipairs(plugins()) do exists[p.name] = true end
+        for _, n in ipairs(allow) do
+            -- A misspelled or renamed plugin would silently not load.
+            if not exists[n] then error("pinned plugin '" .. n .. "' doesn't exist under Plugins/", 2) end
+            only[n] = true
+        end
     end
     if allow ~= false then
         for _, p in ipairs(plugins()) do

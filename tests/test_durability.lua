@@ -54,13 +54,48 @@ WoW.noTooltipInfo = false
 -- Secret reads: that item is skipped, nothing throws.
 WoW.gear = { [5] = { cur = "secret", max = 100, cost = 10 }, [7] = { cur = 80, max = 100, cost = "secret" } }
 WoW.fire("UPDATE_INVENTORY_DURABILITY"); WoW.tick()
-eq(textOf("durability"), "|cff40ff4080%|r", "secret durability skipped; secret cost unknown")
+eq(textOf("durability"), "|cff40ff4080%|r|cff888888?|r", "a secret item: the figure is marked unsure, the cost unknown")
+check(has("1 item(s) can't be read right now"), "tooltip says why")
+check(has("Repair cost unknown here."), "no partial total shown as the total")
 
 -- A secret cost that keeps its number type (as on the client): unknown, not added.
 WoW.MarkSecret(4321)
 WoW.gear = { [5] = { cur = 50, max = 100, cost = 4321 } }
 WoW.fire("UPDATE_INVENTORY_DURABILITY"); WoW.tick()
 eq(textOf("durability"), "|cff40ff4050%|r", "secret-but-number cost treated as unknown")
+
+-- One item unreadable, another damaged with a plain cost: the total is
+-- unknown, never the partial sum shown as the total.
+WoW.gear = { [5] = { cur = "secret", max = 100, cost = 500 }, [7] = { cur = 50, max = 100, cost = 100 } }
+WoW.fire("UPDATE_INVENTORY_DURABILITY"); WoW.tick()
+eq(textOf("durability"), "|cff40ff4050%|r|cff888888?|r", "no cost shown next to an unsure figure")
+check(has("Repair cost unknown here."), "tooltip: cost unknown")
+
+-- Every item unreadable: "hidden", not "nothing has durability".
+WoW.gear = { [5] = { cur = "secret", max = "secret" } }
+WoW.fire("UPDATE_INVENTORY_DURABILITY"); WoW.tick()
+eq(textOf("durability"), "|cff888888hidden|r", "all secret: hidden")
+
+-- A secret tooltip-data table: the cost is unknown, nothing throws.
+WoW.gear = { [5] = { cur = 50, max = 100, cost = 99, tipSecret = true } }
+WoW.fire("UPDATE_INVENTORY_DURABILITY"); WoW.tick()
+eq(textOf("durability"), "|cff40ff4050%|r", "secret tooltip data: durability, no cost")
+
+-- Rounded down: 99.5% isn't "100%", and above zero is never the broken "0%".
+WoW.gear = { [5] = { cur = 199, max = 200, cost = 12 } }
+WoW.fire("UPDATE_INVENTORY_DURABILITY"); WoW.tick()
+check(textOf("durability"):find("^|cff40ff4099%%|r"), "99.5% shows 99%")
+WoW.gear = { [5] = { cur = 1, max = 250, cost = 12 } }
+WoW.fire("UPDATE_INVENTORY_DURABILITY"); WoW.tick()
+check(textOf("durability"):find("^|cffffd200<1%%|r"), "0.4% shows <1%, yellow, not broken red")
+
+-- A burst of events is one scan, and only damaged items cost a tooltip read.
+WoW.gear = { [1] = { cur = 50, max = 50, cost = 0 }, [5] = { cur = 40, max = 100, cost = 5 },
+             [7] = { cur = 60, max = 60, cost = 0 } }
+WoW.tooltipReads = 0
+for _ = 1, 15 do WoW.fire("PLAYER_EQUIPMENT_CHANGED", 5, true) end
+WoW.tick()
+eq(WoW.tooltipReads, 1, "15 events, one scan, one read (only the damaged chest)")
 
 -- Nothing with durability equipped: the block hides.
 WoW.gear = {}

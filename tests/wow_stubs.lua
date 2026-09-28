@@ -95,9 +95,6 @@ function WoW.reset()
     -- "secret" for cur/max/cost: comes back secret). Slots absent: no durability.
     WoW.gear = {}
     WoW.noTooltipInfo = false
-    -- Bags: bag index -> { slots, free, family } (family 0: normal).
-    WoW.bags = { [0] = { slots = 16, free = 4, family = 0 } }
-    WoW.bagToggles = 0
 end
 
 --------------------------------------------------------------------------------
@@ -352,8 +349,8 @@ function BreakUpLargeNumbers(n)
     return (out:gsub("^,", ""))
 end
 
--- Quest log: WoW.quests = { { questID = n, xp = n, complete = bool, isHeader = bool }, ... }
--- Durability. A field set to "secret" comes back secret.
+-- Durability. A field set to "secret" comes back secret; tipSecret = true
+-- makes the whole tooltip-data table secret.
 local function gearField(slot, k)
     local g = WoW.gear[slot]
     if not g then return nil end
@@ -364,25 +361,21 @@ function GetInventoryItemDurability(slot)
     if not WoW.gear[slot] then return nil end
     return gearField(slot, "cur"), gearField(slot, "max")
 end
+WoW.tooltipReads = 0
 C_TooltipInfo = { GetInventoryItem = function(unit, slot)
+    WoW.tooltipReads = WoW.tooltipReads + 1
     if WoW.noTooltipInfo then error("no tooltip data") end
     if not WoW.gear[slot] then return nil end
+    if WoW.gear[slot].tipSecret then
+        -- A secret keeps its type on the client: a real table, marked secret.
+        local t = { repairCost = gearField(slot, "cost") }
+        WoW.MarkSecret(t)
+        return t
+    end
     return { repairCost = gearField(slot, "cost") }
 end }
 
--- Containers: WoW.bags[bag] = { slots, free, family, name }.
-C_Container = {
-    GetContainerNumSlots = function(bag) local b = WoW.bags[bag]; return b and b.slots or 0 end,
-    GetContainerNumFreeSlots = function(bag)
-        local b = WoW.bags[bag]
-        if not b then return 0, 0 end
-        if b.free == "secret" then return WoW.Secret("free"), b.family end
-        return b.free, b.family
-    end,
-    GetBagName = function(bag) local b = WoW.bags[bag]; return b and (b.name or ("Bag " .. bag)) or nil end,
-}
-function ToggleAllBags() WoW.bagToggles = WoW.bagToggles + 1 end
-
+-- Quest log: WoW.quests = { { questID = n, xp = n, complete = bool, isHeader = bool }, ... }
 C_QuestLog = {
     GetNumQuestLogEntries = function() return #WoW.quests, #WoW.quests end,
     GetInfo = function(i)

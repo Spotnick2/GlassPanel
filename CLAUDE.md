@@ -25,7 +25,7 @@ number*. Then check that API against the Forever dump, because Titan targets TBC
 Don't reuse its structure: no global button names, no `TitanGetVar` store, no XML, no
 per-plugin option menus, no multiple bars. Titan ships its own license. Write our own code.
 
-**Status: early.** `Glass Panel [Core]` plus the XP+, Gold and Clock plugins. Work goes through
+**Status: early.** `Glass Panel [Core]` plus plugins; `Plugins\` is the inventory. Work goes through
 GitHub issues and PRs at `github.com/Spotnick2/GlassPanel` (private).
 
 ## Layout
@@ -102,8 +102,9 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   screen; `Bar.Layout` marks them dirty when they come back.
 - **`Plugins\Gold`, `Plugins\Clock`**: gold (secret-safe) and the clock (hides Blizzard's
   minimap clock). Plugins use the **public** API only, the same one third-party plugins get.
-- **`Plugins\Durability`** (#12): lowest durability and repair cost. Everything is measured
-  once per event into a cache (tooltip data is heavy); the cost comes from
+- **`Plugins\Durability`** (#12): lowest durability and repair cost. Events only mark the
+  cache stale; it's rebuilt at most once per repaint (tooltip data is heavy, and only for damaged
+  items). An unreadable item marks the figure with a grey `?` and makes the cost unknown; the cost comes from
   `C_TooltipInfo.GetInventoryItem(...).repairCost` (TitanRepair's Retail path, not in the dump:
   unknown is shown as unknown). Secret numbers keep type `"number"` on the client, so
   `type(x) == "number"` is no secrecy check: `API.Plain` first.
