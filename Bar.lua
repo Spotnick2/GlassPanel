@@ -98,6 +98,7 @@ function Bar.Attach(block)
     b.label = fs
 
     block.widget = b
+    b:Hide()   -- off screen until its first layout decides
     if block.build then Engine.Call(block, "build", block.build, block) end
     Engine.MarkDirty(block)
 end
@@ -105,7 +106,12 @@ end
 -- True if the text changed (the caller relayouts only then).
 function Bar.SetText(block, text)
     local b = block.widget
-    if not b or b.text == text then return false end
+    if not b then return false end
+    -- The first paint always counts as a change: a new widget's text is nil
+    -- too, and a first nil must still reach Bar.Layout to hide it (and to
+    -- tell its onShown), e.g. a plugin registering after startup.
+    if b.painted and b.text == text then return false end
+    b.painted = true
     b.text = text
     b.label:SetText(text or "")
     return true

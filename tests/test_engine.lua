@@ -155,6 +155,22 @@ WoW.tick()
 check(GlassPanel.failures["event:NOT_A_REAL_EVENT"], "unknown event recorded")
 eq(textOf("badevent"), "ok", "block still painted")
 
+-- A block registered after startup whose first text is nil: hidden on its
+-- first flush, and told so, with built content hidden too (Codex, PR #5).
+loadAddon()
+WoW.tick(); WoW.tick()   -- everything clean
+local shownCalls = {}
+local late = register({ id = "latenil", text = function() return nil end,
+                        onShown = function(_, v) shownCalls[#shownCalls + 1] = v end })
+local content
+local lateG = register({ id = "lategraph", width = 80, text = function() return nil end,
+                         build = function(blk) content = CreateFrame("Frame", nil, blk.widget) end })
+WoW.tick()
+eq(late.widget._shown, false, "late nil-text block hidden on its first flush")
+eq(shownCalls[1], false, "and its onShown heard it")
+eq(lateG.widget._shown, false, "late graphical block with nil text hidden")
+eq(content:IsVisible(), false, "its built content isn't visible")
+
 -- Graphical blocks: width, build, paint.
 loadAddon()
 check(register({ id = "w1", text = function() end, width = 5 }) == nil, "refused: width too small")
