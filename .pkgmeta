@@ -13,6 +13,7 @@ move-folders:
   GlassPanel/Plugins/Clock: GlassPanelClock
   GlassPanel/Plugins/Durability: GlassPanelDurability
   GlassPanel/Plugins/Bags: GlassPanelBags
+  GlassPanel/Plugins/PvP: GlassPanelPvP
 
 manual-changelog:
   filename: CHANGELOG.md

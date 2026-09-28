@@ -64,7 +64,8 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   - one event frame for all blocks; `onEvent` runs immediately and marks the block dirty;
   - dirty blocks repaint **once per rendered frame** (the flush frame is shown only while work
     is pending);
-  - one shared 1 s clock drives `interval` blocks;
+  - one shared 1 s clock drives `interval` blocks; a function `interval` is asked again after
+    every repaint, so it can react to what the event changed;
   - every block callback runs under `pcall` via `Engine.Call`;
   - `text` must return a plain string. Secrets and non-strings are refused and recorded.
   - A relayout runs only when some text changed.
@@ -106,6 +107,8 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   screen; `Bar.Layout` marks them dirty when they come back.
 - **`Plugins\Gold`, `Plugins\Clock`**: gold (secret-safe) and the clock (hides Blizzard's
   minimap clock). Plugins use the **public** API only, the same one third-party plugins get.
+- **`Plugins\PvP`** (#14): flagged / FFA / off and the flag's countdown (`GetPVPTimer` ms); a
+  function `interval` (1 s while the timer runs, else 30 s). Left-click: `C_PvP.TogglePVP`.
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable
   bag (free count or family) is left out and flagged with a grey `?`. Left-click: `ToggleAllBags`.
@@ -196,6 +199,9 @@ python Tools\make_textures.py                                      # regenerate 
 `tests\` follows GlassUnitFrames': plain Lua 5.1, `tests\wow_stubs.lua` (driven through `WoW`),
 `tests\harness.lua` (`check` / `eq` / `loadAddon` / `block` / `textOf`), and `tests\run.ps1`.
 
+- **Each plugin's stubs live in `tests\stubs\<plugin>.lua`**, loaded automatically, with a
+  `WoW.resetHooks` entry for per-session state, so plugins built in parallel don't all edit
+  `wow_stubs.lua`.
 - **The stub is an allowlist**, with strict globals. Before stubbing a global, confirm it's in
   the dump and copy its signature. Defining something Forever lacks lets a broken call pass.
 - Event names are validated against the dump. `test_methods.lua` checks every widget method

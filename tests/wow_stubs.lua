@@ -76,7 +76,11 @@ end
 -- State
 --------------------------------------------------------------------------------
 
+-- Plugin stub files (tests/stubs/*.lua) add their state resets here.
+WoW.resetHooks = {}
+
 function WoW.reset()
+    for _, fn in ipairs(WoW.resetHooks) do fn() end
     WoW.frames = {}
     WoW.chat = {}
     WoW.methodsCalled = {}
@@ -441,6 +445,17 @@ function WoW.tick(elapsed)
     for _, w in ipairs(list) do
         local fn = w._scripts.OnUpdate
         if fn and Methods.IsVisible(w) then fn(w, elapsed) end
+    end
+end
+
+-- Each plugin's client APIs live in their own file, tests/stubs/<plugin>.lua,
+-- so plugins developed in parallel don't all edit this one. A stub file adds
+-- its globals and, for per-session state, a WoW.resetHooks entry.
+do
+    local p = io.popen('dir /b tests\\stubs\\*.lua 2>nul')
+    if p then
+        for f in p:lines() do dofile("tests/stubs/" .. f) end
+        p:close()
     end
 end
 

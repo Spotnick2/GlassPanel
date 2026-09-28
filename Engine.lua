@@ -70,6 +70,9 @@ local function paint(block)
         text = res
     end
     local changed = GlassPanel.Bar ~= nil and GlassPanel.Bar.SetText(block, text)
+    -- A function interval is asked again after every repaint: what it
+    -- depends on (PvP's flag timer) may have changed with the event.
+    if type(block.interval) == "function" then block._due = Engine.NextInterval(block) end
     -- Not while hidden (the user's /gpanel hide, or the bar toggled off):
     -- Bar.Layout marks the block dirty again when it comes back on screen.
     if block.paint and text ~= nil and text ~= ERROR_TEXT and GlassPanel.Bar.OnScreen(block) then

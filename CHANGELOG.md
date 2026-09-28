@@ -20,5 +20,6 @@
   Left-click opens or closes your bags.
 - Gold captions before values, Titan-style ("Bags: 45/74"). `/gpanel labels on|off`, or
   `/gpanel label <id> on|off|default` for one block.
+- PvP: whether you're flagged, with the countdown before the flag drops. Left-click toggles it.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.
