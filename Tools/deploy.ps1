@@ -1,10 +1,12 @@
 <#
-    deploy.ps1 - Copy GlassPanel and its plugins into the Forever AddOns folder.
+    deploy.ps1 - Copy GlassPanel [Core] and its [plugins] into the Forever AddOns folder.
 
     The core always deploys as AddOns\GlassPanel, whatever the repo folder is
     called: the folder name is the addon name, and Glass.MEDIA is built from it.
-    Each Plugins\<Name>\ becomes its own top-level AddOns\<Name>: the client only
-    discovers addons as top-level folders.
+    Each Plugins\<Name>\ becomes its own top-level AddOns\<toc name> (e.g.
+    AddOns\GlassPanelXP): the client only discovers addons as top-level folders.
+    The core's stale-file sweep also removes the old Blocks\*.lua left over from
+    before the plugins split (#7).
 
     The repo keeps "## Version: @project-version@" for the packager; the deployed
     copy gets "dev". The repo copy is never modified.

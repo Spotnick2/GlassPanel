@@ -21,6 +21,45 @@ for _, f in ipairs(tocFiles()) do
     seen[f] = true
 end
 
+-- [Core] and its grouped plugins (#7), AtlasLoot-style in the AddOns list,
+-- AltStable-style on disk: Plugins\<Name>\GlassPanel<Name>.toc.
+check(toc:find("## Title: |cff7fd4ffGlass|r Panel |cFF22B14C[Core]|r", 1, true), "core title says [Core]")
+check(toc:find("## Group: GlassPanel", 1, true), "core in the GlassPanel group")
+local icon = toc:match("## IconTexture: ([^\r\n]+)")
+check(icon, "core has an icon")
+local pkgmeta = io.open(".pkgmeta"):read("*a")
+local list = plugins()
+check(#list >= 3, "plugins found (" .. #list .. ")")
+for _, p in ipairs(list) do
+    local t = io.open(p.dir .. p.toc):read("*a")
+    local name = p.name
+    check(name:match("^GlassPanel%u"), name .. ": AltStable-style name GlassPanel<Name>")
+    check(t:find("## Interface: 16001", 1, true), name .. ": interface 16001")
+    check(t:find("## Version: @project-version@", 1, true), name .. ": version token")
+    check(t:find("## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[", 1, true), name .. ": title 'Glass Panel [X]'")
+    check(t:find("## Group: GlassPanel", 1, true), name .. ": grouped under the core")
+    check(t:find("## Dependencies: GlassPanel\r?\n") or t:find("## Dependencies: GlassPanel$"), name .. ": depends on the core")
+    eq(t:match("## IconTexture: ([^\r\n]+)"), icon, name .. ": the core's icon")
+    local files = tocFiles(p.toc, p.dir)
+    check(#files > 0, name .. ": lists its files")
+    for _, f in ipairs(files) do
+        local src = io.open(f, "r")
+        check(src ~= nil, name .. ": file exists: " .. f)
+        if src then
+            check(src:read("*a"):find("\nGlassPanel = GlassPanel or {}\n", 1, true), "starts with the namespace line: " .. f)
+            src:close()
+        end
+    end
+    local folder = p.dir:gsub("/$", "")
+    check(pkgmeta:find("GlassPanel/" .. folder .. ": " .. name, 1, true), name .. ": packager moves " .. folder .. " out")
+end
+
+-- The core runs alone: every plugin can be switched off.
+loadAddon({ plugins = false })
+eq(#GlassPanel.Engine.blocks, 0, "core alone registers no blocks")
+check(next(GlassPanel.failures) == nil, "core alone: no failures")
+GlassPanel._test.slash("list")
+
 -- Two places that must agree, never derived from each other.
 loadAddon()
 eq(GlassPanel.MEASURED_ON_BUILD, "1.60.1.70009", "MEASURED_ON_BUILD")

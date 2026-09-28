@@ -18,12 +18,31 @@ function done(name)
     os.exit(failed == 0 and 0 or 1)
 end
 
--- Lua files listed in the TOC, in load order.
-function tocFiles()
+-- The plugins under Plugins\, in name order: { name, dir, toc }. The TOC's
+-- base name is the addon name, as deploy and the packager make it.
+function plugins()
+    local out = {}
+    local p = io.popen('dir /b /ad Plugins 2>nul')
+    for d in p:lines() do
+        local dir = "Plugins/" .. d .. "/"
+        local q = io.popen('dir /b "Plugins\\' .. d .. '\\*.toc" 2>nul')
+        local toc = q:read("*l")
+        q:close()
+        if toc then out[#out + 1] = { name = toc:gsub("%.toc$", ""), dir = dir, toc = toc } end
+    end
+    p:close()
+    table.sort(out, function(a, b) return a.name < b.name end)
+    return out
+end
+
+-- Lua files listed in a TOC (default: the core's), in load order, as paths
+-- from the repo root.
+function tocFiles(toc, dir)
+    toc, dir = toc or "GlassPanel.toc", dir or ""
     local files = {}
-    for line in io.lines("GlassPanel.toc") do
+    for line in io.lines(dir .. toc) do
         line = line:gsub("\r", "")
-        if line:match("%.lua$") and not line:match("^#") then files[#files + 1] = (line:gsub("\\", "/")) end
+        if line:match("%.lua$") and not line:match("^#") then files[#files + 1] = dir .. (line:gsub("\\", "/")) end
     end
     return files
 end
@@ -47,6 +66,19 @@ function loadAddon(opts)
     WoW.fire("ADDON_LOADED", "GlassPanel")
     -- The client sizes the bar from its anchors; the stub can't.
     -- (The stub computes the bar's width and rect from its anchors.)
+    -- Then each plugin, the way the client does it: after the core's
+    -- ADDON_LOADED (## Dependencies: GlassPanel), so its blocks register
+    -- onto a bar that already exists. opts.plugins = false: the core alone.
+    if opts.plugins ~= false then
+        for _, p in ipairs(plugins()) do
+            local pns = {}
+            for _, file in ipairs(tocFiles(p.toc, p.dir)) do
+                local chunk = assert(loadfile(file))
+                chunk(p.name, pns)
+            end
+            WoW.fire("ADDON_LOADED", p.name)
+        end
+    end
     WoW.fire("PLAYER_LOGIN")
     WoW.fire("PLAYER_ENTERING_WORLD", true, false)
     WoW.tick()

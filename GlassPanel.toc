@@ -1,8 +1,10 @@
 ## Interface: 16001
-## Title: |cff7fd4ffGlass|r Panel
-## Notes: A liquid-glass info bar across the top of the screen, with a small plugin API. /gpanel
+## Title: |cff7fd4ffGlass|r Panel |cFF22B14C[Core]|r
+## Notes: A liquid-glass info bar across the top of the screen. The blocks are the grouped [plugins]; turn off any you don't want. /gpanel
 ## Author: Spotnick
 ## Version: @project-version@
+## Group: GlassPanel
+## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
 ## SavedVariables: GlassPanelDB
 
 Compat.lua
@@ -11,7 +13,4 @@ Engine.lua
 Layout.lua
 Bar.lua
 Room.lua
-Plugins\XP\XP.lua
-Plugins\Gold\Gold.lua
-Plugins\Clock\Clock.lua
 GlassPanel.lua

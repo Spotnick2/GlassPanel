@@ -1,4 +1,4 @@
--- Blocks/XP.lua: XP+, a port of the owner's TBC TitanPanelXPP (#3).
+-- Plugins/XP/XP.lua: XP+, a port of the owner's TBC TitanPanelXPP (#3).
 --
 -- A glass XP bar on the panel with four layers, back to front: rested (the
 -- host Glass.Bar's own fill), incomplete-quest XP, completed-quest XP, XP.

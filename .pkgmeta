@@ -2,12 +2,15 @@ package-as: GlassPanel
 
 enable-nolib-creation: no
 
-# One CurseForge project, one addon folder per plugin. WoW only discovers
-# addons as top-level folders under Interface/AddOns, so plugins cannot ship
-# nested inside GlassPanel/: the packager moves them out (AltStable's pattern).
-# Add a line here with each new Plugins/<Name>.
-# move-folders:
-#   GlassPanel/Plugins/GearScore: GlassPanelGearScore
+# One CurseForge project, one addon folder per plugin (#7). WoW only
+# discovers addons as top-level folders under Interface/AddOns, so plugins
+# cannot ship nested inside GlassPanel/: the packager moves them out
+# (AltStable's pattern). The destination is the plugin's TOC name.
+# Add a line here with each new Plugins/<Name>; tests/test_toc.lua checks.
+move-folders:
+  GlassPanel/Plugins/XP: GlassPanelXP
+  GlassPanel/Plugins/Gold: GlassPanelGold
+  GlassPanel/Plugins/Clock: GlassPanelClock
 
 manual-changelog:
   filename: CHANGELOG.md

@@ -23,35 +23,30 @@ bar, no auto-hide, no LibDataBroker host (yet).
 | `Engine.lua` | block registry, event fan-out, one repaint per frame, 1 s interval clock, `pcall` isolation |
 | `Layout.lua` | free lanes (#6): anchors as fractions of the width, drop to join or start a lane |
 | `Bar.lua` | the strip, one plain Button per block, placement and drag and drop, width follows text |
-| `Blocks\*.lua` | built-in blocks, registered through the same public API as plugins |
+| `Room.lua` | the bar stops short of Blizzard's top frames (#2) |
 | `GlassPanel.lua` | SavedVariables, `/gpanel`, boot |
-| `Plugins\<Name>\` | separate addons (`## Dependencies: GlassPanel`), moved out by the packager |
+| `Plugins\<Name>\` | **every block**: its own addon `GlassPanel<Name>`, grouped under `[Core]` (#7) |
 
 Contract: `docs/PLUGINS.md`.
 
-## Roadmap: one issue each
+## Roadmap: one issue each, every block a plugin (#7)
 
-Built-in blocks (core):
-1. **XP+**: port of `C:\Projects\TitanPanelXPP` as a block that draws a `Glass.Bar` (XP, rested,
-   completed and incomplete quest XP), XP/hr, time to level, the tooltip breakdown. Hidden at
-   max level (`UnitXPMax` returns 0 there, and 0 is truthy). **In progress (#3)**: the contract
-   grew `width`, `build` and `paint`.
-2. **Location**: zone, subzone and coordinates (`C_Map.GetBestMapForUnit` +
-   `C_Map.GetPlayerMapPosition`; check what they return inside instances).
-3. **Durability**: lowest percentage across equipped slots (`GetInventoryItemDurability`), and
-   repair cost in the tooltip if an API for it exists here.
-4. **Bags**: free and total slots (`C_Container.GetContainerNumFreeSlots` /
-   `GetContainerNumSlots`, bags 0–4).
-5. Performance (FPS/latency)? Only if the owner wants it.
+Done: **XP+** (#3), **Gold**, **Clock**. **Location** is dropped: the minimap already shows it.
 
-Plugins (separate addons, ported from the owner's Titan plugins):
-6. **GearScore**: `C:\Projects\TitanGearScore`. `GetItemInfo` → `C_Item.GetItemInfo`.
-7. **Professions**: `C:\Projects\TitanProfessions`. `GetSkillLineInfo` →
-   `C_SkillInfo.GetSkillLineInfo`, which returns **a table** (porting guide "False friends").
-   `GetProfessions` exists but returns `nil`s.
-8. **Layer**: `C:\Projects\TitanLayer`. **Blocked on an in-game measurement**: does a creature
-   GUID's zone field (`Creature-0-<server>-<instance>-<zoneUID>-…`) differ between layers on
-   Forever, and is `UnitGUID` on an NPC plain? If not, drop the plugin.
+The owner's TBC Titan bar, still to port:
+- **Durability** (#12): lowest % and repair cost. Data reference: `TitanRepair`.
+- **Bags** (#13): used/total, special bags apart. Data reference: `TitanBag`.
+- **Professions** (#15): `C:\Projects\TitanProfessions`. `C_SkillInfo.GetSkillLineInfo` returns **a table**;
+  `GetProfessions` returns `nil`s.
+- **GearScore / iLvl** (#16): `C:\Projects\TitanGearScore`. Vanilla item levels are small.
+- **Guild** (#18): online/total, who's online, click opens the guild panel. Data reference:
+  `_classic_\Interface\AddOns\TitanClassicGuild`.
+- **Layer** (#17): **blocked** on a second-layer `UnitGUID` reading (zone field 18 on the first).
+
+New:
+- **PvP flag** (#14): flagged or not, and the time left on the flag.
+
+Also: an opt-in Edit Mode layout for a full-width bar (#10); hiding Blizzard's XP bar safely (#9).
 
 ## Open questions (measure in game)
 

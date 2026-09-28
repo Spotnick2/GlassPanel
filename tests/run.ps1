@@ -16,7 +16,7 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 
 Push-Location $RepoRoot
 try {
-    # The TOC is the list, so a new file cannot go unchecked. Plugins' TOCs too.
+    # The TOC is the list, so a new file cannot go unchecked. Every plugin's TOC too.
     $luac = Join-Path (Split-Path -Parent $Lua) "luac.exe"
     $tocs = @("GlassPanel.toc") + (Get-ChildItem "Plugins" -Recurse -Filter "*.toc" -ErrorAction SilentlyContinue |
         ForEach-Object { Resolve-Path -Relative $_.FullName })
