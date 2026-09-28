@@ -27,10 +27,30 @@ check(toc:find("## Title: |cff7fd4ffGlass|r Panel |cFF22B14C[Core]|r", 1, true),
 check(toc:find("## Group: GlassPanel", 1, true), "core in the GlassPanel group")
 local icon = toc:match("## IconTexture: ([^\r\n]+)")
 check(icon, "core has an icon")
-local pkgmeta = io.open(".pkgmeta"):read("*a")
+-- .pkgmeta's move-folders block, parsed: only uncommented "  src: dst" lines
+-- between "move-folders:" and the next top-level key count.
+local moves = {}
+do
+    local inBlock = false
+    for line in io.lines(".pkgmeta") do
+        line = line:gsub("\r", "")
+        if line:match("^move%-folders:%s*$") then
+            inBlock = true
+        elseif line:match("^[^%s#]") then
+            inBlock = false
+        elseif inBlock then
+            local src, dst = line:match("^  ([^#%s][^:]*):%s*(%S+)%s*$")
+            if src then moves[src] = dst end
+        end
+    end
+end
 local list = plugins()
 check(#list >= 3, "plugins found (" .. #list .. ")")
 for _, p in ipairs(list) do
+    check(p.toc, "Plugins/" .. p.folder .. " has a TOC (without one it never loads or ships)")
+end
+for _, p in ipairs(list) do
+  if p.toc then
     local t = io.open(p.dir .. p.toc):read("*a")
     local name = p.name
     check(name:match("^GlassPanel%u"), name .. ": AltStable-style name GlassPanel<Name>")
@@ -51,14 +71,18 @@ for _, p in ipairs(list) do
         end
     end
     local folder = p.dir:gsub("/$", "")
-    check(pkgmeta:find("GlassPanel/" .. folder .. ": " .. name, 1, true), name .. ": packager moves " .. folder .. " out")
+    eq(moves["GlassPanel/" .. folder], name, name .. ": .pkgmeta move-folders moves " .. folder .. " out")
+  end
 end
 
 -- The core runs alone: every plugin can be switched off.
 loadAddon({ plugins = false })
 eq(#GlassPanel.Engine.blocks, 0, "core alone registers no blocks")
 check(next(GlassPanel.failures) == nil, "core alone: no failures")
+WoW.chat = {}
 GlassPanel._test.slash("list")
+check(WoW.chat[1] and WoW.chat[1]:find("drag a block", 1, true), "core alone: /gpanel list prints its header")
+eq(#WoW.chat, 1, "core alone: and no lanes")
 
 -- Two places that must agree, never derived from each other.
 loadAddon()

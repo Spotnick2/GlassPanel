@@ -18,20 +18,25 @@ function done(name)
     os.exit(failed == 0 and 0 or 1)
 end
 
--- The plugins under Plugins\, in name order: { name, dir, toc }. The TOC's
--- base name is the addon name, as deploy and the packager make it.
+-- Every folder under Plugins\, in name order: { name, folder, dir, toc }.
+-- The TOC's base name is the addon name, as deploy and the packager make it;
+-- a folder with no TOC has toc = nil, and test_toc fails on it. Listed once
+-- per test run: loadAddon runs many times and this spawns processes.
+local pluginList
 function plugins()
+    if pluginList then return pluginList end
     local out = {}
     local p = io.popen('dir /b /ad Plugins 2>nul')
     for d in p:lines() do
-        local dir = "Plugins/" .. d .. "/"
         local q = io.popen('dir /b "Plugins\\' .. d .. '\\*.toc" 2>nul')
         local toc = q:read("*l")
         q:close()
-        if toc then out[#out + 1] = { name = toc:gsub("%.toc$", ""), dir = dir, toc = toc } end
+        out[#out + 1] = { folder = d, dir = "Plugins/" .. d .. "/", toc = toc,
+                          name = toc and (toc:gsub("%.toc$", "")) or d }
     end
     p:close()
     table.sort(out, function(a, b) return a.name < b.name end)
+    pluginList = out
     return out
 end
 
@@ -49,8 +54,9 @@ end
 
 -- Load the addon the way the client does: every TOC file with (name, ns),
 -- then ADDON_LOADED, PLAYER_LOGIN, PLAYER_ENTERING_WORLD, and one frame.
--- opts.before(): runs after the files load but before ADDON_LOADED, where a
--- plugin that loads early would register.
+-- opts.before(): runs after the core's files load but before its ADDON_LOADED:
+-- a block registered there takes the early path (attached at Bar.Build).
+-- Real plugins load after it (below), so don't use this to stand in for one.
 function loadAddon(opts)
     opts = opts or {}
     -- A fresh session each call; client data (WoW.money, ...) set by the test stays.
@@ -64,19 +70,20 @@ function loadAddon(opts)
     if opts.db then GlassPanelDB = opts.db end
     if opts.before then opts.before() end
     WoW.fire("ADDON_LOADED", "GlassPanel")
-    -- The client sizes the bar from its anchors; the stub can't.
     -- (The stub computes the bar's width and rect from its anchors.)
     -- Then each plugin, the way the client does it: after the core's
     -- ADDON_LOADED (## Dependencies: GlassPanel), so its blocks register
     -- onto a bar that already exists. opts.plugins = false: the core alone.
     if opts.plugins ~= false then
         for _, p in ipairs(plugins()) do
-            local pns = {}
-            for _, file in ipairs(tocFiles(p.toc, p.dir)) do
-                local chunk = assert(loadfile(file))
-                chunk(p.name, pns)
+            if p.toc then
+                local pns = {}
+                for _, file in ipairs(tocFiles(p.toc, p.dir)) do
+                    local chunk = assert(loadfile(file))
+                    chunk(p.name, pns)
+                end
+                WoW.fire("ADDON_LOADED", p.name)
             end
-            WoW.fire("ADDON_LOADED", p.name)
         end
     end
     WoW.fire("PLAYER_LOGIN")

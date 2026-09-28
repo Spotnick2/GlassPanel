@@ -167,7 +167,9 @@ python Tools\make_textures.py                                      # regenerate 
 
 ## Addon basics
 
-- One plain `GlassPanel.toc`, `## Interface: 16001` (**`11601` is a transposed-digit bug**).
+- One TOC per addon: the core's `GlassPanel.toc` and each plugin's
+  `Plugins\<Name>\GlassPanel<Name>.toc`. No `_Forever`/`_Camelot` suffix; every one has
+  `## Interface: 16001` (**`11601` is a transposed-digit bug**) and `## Version: @project-version@`.
 - One global namespace table, `GlassPanel`. Every file starts `GlassPanel = GlassPanel or {}`.
 - Plugins reach the core only through `GlassPanel.RegisterBlock`, `GlassPanel.Refresh`,
   `GlassPanel.API` and `GlassPanel.Glass`. Anything else is internal and may change. Bump
