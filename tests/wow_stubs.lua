@@ -146,6 +146,8 @@ function CreateFrame(ftype, name, parent, template)
     local w = newWidget(ftype, parent, name)
     w._template = template
     if ftype == "StatusBar" then w._min, w._max, w._value = 0, 1, 0 end
+    -- The template's bar, shown by default as on the client (#36).
+    if template == "UIPanelScrollFrameTemplate" then w.ScrollBar = newWidget("Slider", w) end
     table.insert(WoW.frames, w)
     if name then rawset(_G, name, w) end
     return w
@@ -232,7 +234,11 @@ function Methods.UnregisterEvent(w, e) w._events[e] = nil end
 function Methods.IsEventRegistered(w, e) return w._events[e] == true end
 
 -- Regions.
-function Methods.CreateTexture(w) return newWidget("Texture", w) end
+function Methods.CreateTexture(w, name, layer, template, sublevel)
+    local t = newWidget("Texture", w)
+    t._layer, t._sublevel = layer, sublevel
+    return t
+end
 function Methods.CreateMaskTexture(w) return newWidget("MaskTexture", w) end
 function Methods.CreateFontString(w) return newWidget("FontString", w) end
 function Methods.CreateAnimationGroup(w) return newWidget("AnimationGroup", w) end
@@ -277,6 +283,9 @@ function Methods.SetStatusBarTexture(b, file)
     return true
 end
 function Methods.GetStatusBarTexture(b) return b._fill end
+
+-- ScrollFrame: the range a test sets (w._yrange).
+function Methods.GetVerticalScrollRange(w) return w._yrange or 0 end
 
 -- Buttons: enabled state. EditBox: focus and selection, recorded.
 function Methods.Enable(b) b._disabled = false end

@@ -141,3 +141,19 @@ function API.Button(parent, text, width, onClick)
     b:SetScript("OnClick", onClick)
     return b
 end
+
+-- UIPanelScrollFrameTemplate shows its bar (arrows, thumb) even with
+-- nothing to scroll: show it only while the content is taller than the view
+-- (as GlassUnitFrames' options panel does). Seen in game (#36). The range is
+-- floored like the template's own ScrollFrame_OnScrollRangeChanged: under 1
+-- unit (a fractional UI scale) is nothing to scroll. (The template's
+-- scrollBarHideable flag would do this too, but isn't measured on Forever.)
+function API.AutoHideScrollBar(scroll)
+    local bar = scroll.ScrollBar
+    if not bar then return end
+    local function sync(self, _, yrange)
+        bar:SetShown(math.floor(yrange or self:GetVerticalScrollRange() or 0) > 0)
+    end
+    scroll:HookScript("OnScrollRangeChanged", sync)
+    sync(scroll)
+end

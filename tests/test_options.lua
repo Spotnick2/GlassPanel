@@ -21,6 +21,15 @@ eq(WoW.settings.opened, 4242, "/gpanel options opens it")
 
 open()
 local rows, c = O().rows, O().controls
+-- The scroll bar shows only when there's something to scroll (#36).
+local sc = O().scroll
+eq(sc.ScrollBar._shown, false, "nothing to scroll: no scroll bar")
+sc._scripts.OnScrollRangeChanged(sc, 0, 120)
+eq(sc.ScrollBar._shown, true, "taller content: scroll bar")
+sc._scripts.OnScrollRangeChanged(sc, 0, 0)
+eq(sc.ScrollBar._shown, false, "fits again: hidden")
+sc._scripts.OnScrollRangeChanged(sc, 0, 0.4)
+eq(sc.ScrollBar._shown, false, "under a unit (fractional scale): nothing to scroll, as the template rounds")
 -- One row per loaded plugin, in name order.
 check(rows.gold and rows.clock and rows.bags and rows.xp, "a row per plugin")
 local order = {}
