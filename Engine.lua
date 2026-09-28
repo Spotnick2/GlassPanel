@@ -169,7 +169,8 @@ end
 -- The public entry point. Returns the block (the spec itself) or nil.
 -- Required: id (unique string), text = function(block) -> string|nil.
 -- Optional: label (also the gold caption before the value, unless
---   showLabel = false), icon, side ("left"|"center"|"right": the default lane),
+--   showLabel = false), caption(block) -> string (a caption that changes,
+--   re-read on every repaint; nil or "" falls back to label), icon, side ("left"|"center"|"right": the default lane),
 --   order (number, default 100),
 --   events = { "EVENT", ... }, onEvent(block, event, ...),
 --   unitEvents = { EVENT = "player" } (only that unit's firing of the event),
@@ -211,7 +212,7 @@ function GlassPanel.RegisterBlock(spec)
     if spec.width ~= nil and (type(spec.width) ~= "number" or spec.width ~= spec.width or spec.width < 16) then
         return invalid(spec, "width must be a number of pixels, at least 16")
     end
-    for _, key in ipairs({ "onEvent", "tooltip", "onClick", "onInit", "onShown", "build", "paint" }) do
+    for _, key in ipairs({ "onEvent", "tooltip", "onClick", "onInit", "onShown", "build", "paint", "caption" }) do
         if spec[key] ~= nil and type(spec[key]) ~= "function" then return invalid(spec, key .. " must be a function") end
     end
 

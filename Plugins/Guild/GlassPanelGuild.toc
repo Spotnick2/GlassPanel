@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[Guild]|r
+## Notes: Guild members online out of the total, and who is online. Click opens the guild panel.
+## Author: Spotnick
+## Version: @project-version@
+## Group: GlassPanel
+## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
+## Dependencies: GlassPanel
+
+Guild.lua

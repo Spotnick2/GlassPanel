@@ -44,6 +44,7 @@ GlassPanel.RegisterBlock({
     id       = "gearscore",            -- required, unique; also the /gpanel show|hide name
     label    = "GearScore",            -- the gold caption "GearScore: " and /gpanel list (default: id)
     showLabel = true,                  -- false: no caption by default (the user can still turn it on)
+    caption  = function(block) end,    -- a caption that changes ("Olympus: " for Guild); nil/"" = label
     icon     = 132627,                 -- file ID or path; optional
     side     = "left",                 -- default lane: "left", "center" or "right" (users drag it anywhere)
     order    = 60,                     -- in the default lane, lower sits nearer the bar's end (default 100)
