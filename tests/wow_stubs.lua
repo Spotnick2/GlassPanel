@@ -135,8 +135,9 @@ local function newWidget(wtype, parent, name)
                           _width = 0, _height = 0, _name = name }, widgetMT)
 end
 
-function CreateFrame(ftype, name, parent)
+function CreateFrame(ftype, name, parent, template)
     local w = newWidget(ftype, parent, name)
+    w._template = template
     if ftype == "StatusBar" then w._min, w._max, w._value = 0, 1, 0 end
     table.insert(WoW.frames, w)
     if name then rawset(_G, name, w) end

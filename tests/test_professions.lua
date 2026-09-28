@@ -146,7 +146,7 @@ for _, b in ipairs(pal.buttons) do
     if b._shown then
         spells[#spells + 1] = b:GetAttribute("spell")
         eq(b:GetAttribute("type"), "spell", "secure spell button")
-        eq(b._template, nil, "(the stub doesn't record templates)")
+        eq(b._template, "SecureActionButtonTemplate", "a secure action button")
         eq(table.concat(b._clicks, ","), "AnyUp,AnyDown", "both mouse edges")
     end
 end
@@ -185,6 +185,46 @@ WoW.chat = {}
 pb._scripts.OnClick(pb, "LeftButton")
 eq(pal._shown, false, "no window to open: stays closed")
 check(WoW.chat[1] and WoW.chat[1]:find("none of your professions", 1, true), "explained")
+
+-- Review round (#32).
+WoW.combat = false
+WoW.skills = {
+    { skillID = 171, name = "Alchimie", rank = 300, maxRank = 300 },
+    { skillID = 164, name = "secret", rank = 100, maxRank = 150 },   -- client name unreadable
+}
+changed()
+pb._rect = { 700, 746, 120, 18 }
+pb._scripts.OnClick(pb, "LeftButton")
+spells = {}
+for _, b in ipairs(pal.buttons) do if b._shown then spells[#spells + 1] = b:GetAttribute("spell") end end
+eq(table.concat(spells, ","), "Alchimie", "an unreadable client name isn't guessed in English: left out")
+-- The down edge doesn't close it (with key-down off the spell casts on the up edge).
+pal.buttons[1]._scripts.PostClick(pal.buttons[1], "LeftButton", true)
+eq(pal._shown, true, "down edge: still open (the up click must reach the button)")
+pal.buttons[1]._scripts.PostClick(pal.buttons[1], "LeftButton", false)
+eq(pal._shown, false, "up edge: closed")
+-- Open when combat starts: a click says it closes after combat, and it does.
+pb._scripts.OnClick(pb, "LeftButton")
+WoW.combat = true
+WoW.chat = {}
+pb._scripts.OnClick(pb, "LeftButton")
+check(WoW.chat[1] and WoW.chat[1]:find("closes when combat ends", 1, true), "in combat, open: explained")
+eq(pal._shown, true, "still open in combat")
+WoW.combat = false
+WoW.fire("PLAYER_REGEN_ENABLED"); WoW.tick()
+eq(pal._shown, false, "closed when combat ends")
+-- Skills changing while it's open close it (its list is stale).
+pb._scripts.OnClick(pb, "LeftButton")
+WoW.skills[1].rank = 300
+changed()
+eq(pal._shown, false, "stale palette closed on SKILL_LINES_CHANGED")
+-- Skills unreadable: say so, not "none of your professions has a window".
+WoW.skillCount = "secret"
+changed()
+WoW.chat = {}
+pb._scripts.OnClick(pb, "LeftButton")
+check(WoW.chat[1] and WoW.chat[1]:find("can't be read right now", 1, true), "unreadable skills: honest message")
+WoW.skillCount = nil
 
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_professions")

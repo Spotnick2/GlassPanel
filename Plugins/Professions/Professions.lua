@@ -84,6 +84,9 @@ local function scan()
                 local entry = {
                     id = id,
                     name = type(name) == "string" and name ~= "" and name or prof.name,
+                    -- Only the client's own name is a spell name on this client's
+                    -- language: the English fallback isn't castable everywhere.
+                    clientName = type(name) == "string" and name ~= "",
                     icon = ICONS .. prof.icon,
                     rank = rank and max and rank or nil,   -- both readable, or neither
                     max = rank and max and max or nil,
@@ -132,12 +135,14 @@ local function iconText(e) return "|T" .. e.icon .. ":14:14:0:0|t" end
 --------------------------------------------------------------------------------
 
 local SIZE, GAP, PAD = 30, 4, 6
+local FALLBACK_TOP = 28   -- px below the screen top when the block has no position yet
 local palette
+local closeAfterCombat   -- it was open when combat started: close it when it ends
 
 -- The spell that opens entry e's window, or nil.
 local function spellFor(e)
     local opens = PROFESSIONS[e.id].opens
-    if opens == "self" then return e.name end
+    if opens == "self" then return e.clientName and e.name or nil end
     if type(opens) == "number" and C_Spell and C_Spell.GetSpellName then
         local ok, name = pcall(C_Spell.GetSpellName, opens)
         name = ok and P(name) or nil
@@ -173,8 +178,13 @@ local function paletteButton(i)
         GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    -- Done: close it (only possible out of combat).
-    b:SetScript("PostClick", function() if not InCombatLockdown() then palette:Hide() end end)
+    -- Done: close it on the UP edge, whatever ActionButtonUseKeyDown says: the
+    -- spell is cast on the down edge (key-down on) or the up edge (off), and
+    -- hiding on the down edge would eat the up click that casts. Only out of
+    -- combat (a protected frame can't hide in combat).
+    b:SetScript("PostClick", function(_, _, down)
+        if not down and not InCombatLockdown() then palette:Hide() end
+    end)
     palette.buttons[i] = b
     return b
 end
@@ -183,7 +193,12 @@ end
 -- attributes, size and position can't change in combat.
 local function togglePalette(block)
     if InCombatLockdown() then
-        API.Print("Professions: the palette can't open in combat.")
+        if palette and palette:IsShown() then
+            closeAfterCombat = true
+            API.Print("Professions: the palette closes when combat ends.")
+        else
+            API.Print("Professions: the palette can't open in combat.")
+        end
         return
     end
     if palette and palette:IsShown() then palette:Hide() return end
@@ -196,7 +211,11 @@ local function togglePalette(block)
         end
     end
     if #list == 0 then
-        API.Print("Professions: none of your professions has a window to open.")
+        if state.hidden or state.unreadable > 0 then
+            API.Print("Professions: your skills can't be read right now.")
+        else
+            API.Print("Professions: none of your professions has a window to open.")
+        end
         return
     end
     palette = palette or buildPalette()
@@ -216,26 +235,38 @@ local function togglePalette(block)
     local w = block.widget
     local l, bottom, width = w:GetRect()
     l, bottom, width = P(l), P(bottom), P(width)
-    local s = P(w:GetEffectiveScale()) and P(UIParent:GetEffectiveScale())
-        and w:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    local ws, us = P(w:GetEffectiveScale()), P(UIParent:GetEffectiveScale())
+    local s = ws and us and us > 0 and ws / us
     palette:ClearAllPoints()
     if l and bottom and width and s then
         palette:SetPoint("TOP", UIParent, "BOTTOMLEFT", (l + width / 2) * s, bottom * s - 4)
     else
         -- Not laid out yet: under the middle of the bar.
-        palette:SetPoint("TOP", UIParent, "TOP", 0, -(GlassPanel.Bar.HEIGHT + 4))
+        palette:SetPoint("TOP", UIParent, "TOP", 0, -FALLBACK_TOP)
     end
     palette:Show()
 end
 
-GlassPanel.RegisterBlock({
+local block = GlassPanel.RegisterBlock({
     id = "professions",
     label = "Professions",
     showLabel = false,   -- the icons say it (no caption on the TBC bar either)
     side = "right",
     order = 150,
-    events = { "PLAYER_ENTERING_WORLD", "SKILL_LINES_CHANGED", "CHAT_MSG_SKILL" },
-    onEvent = function() stale = true end,
+    events = { "PLAYER_ENTERING_WORLD", "SKILL_LINES_CHANGED", "CHAT_MSG_SKILL", "PLAYER_REGEN_ENABLED" },
+    onEvent = function(_, event)
+        if event == "PLAYER_REGEN_ENABLED" then
+            if closeAfterCombat and palette then palette:Hide() end
+            closeAfterCombat = nil
+            return
+        end
+        stale = true
+        -- A palette listing yesterday's professions is stale: close it (out of
+        -- combat; it reopens with the new list).
+        if event == "SKILL_LINES_CHANGED" and palette and palette:IsShown() and not InCombatLockdown() then
+            palette:Hide()
+        end
+    end,
     text = function()
         ensure()
         if state.hidden then return "|cff888888hidden|r" end
@@ -279,5 +310,4 @@ GlassPanel.RegisterBlock({
     end,
 })
 
-local registered = GlassPanel.Engine.byId.professions
-if registered then registered._test = { palette = function() return palette end } end
+if block then block._test = { palette = function() return palette end } end
