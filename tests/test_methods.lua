@@ -45,6 +45,15 @@ do
     win.action._scripts.OnClick(win.action)
     win.close._scripts.OnClick(win.close)
 end
+do
+    local o = GlassPanel.Options._test
+    o.panel:Hide(); o.panel:Show()
+    local r = o.rows.gold
+    r.shown._scripts.OnClick(r.shown); r.caption._scripts.OnClick(r.caption)
+    o.controls.labels._scripts.OnClick(o.controls.labels)
+    o.controls.font[2]._scripts.OnClick(o.controls.font[2])
+    GlassPanel._test.slash("options")
+end
 WoW.tick(1.1); WoW.tick()
 
 local ANIMATION_TYPES = { Animation = true, Alpha = true, Translation = true, Scale = true, Rotation = true }

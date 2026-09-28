@@ -80,6 +80,7 @@ local COMMANDS = {
     { "hide <id>", "hide a block" },
     { "toggle", "show or hide the whole bar" },
     { "font arial|friz", "bar font" },
+    { "options", "open the options panel (Options > AddOns > Glass Panel)" },
     { "export", "the whole setup as a string, to copy to another account" },
     { "import", "paste a setup exported on another account" },
     { "failures", "errors recorded from blocks and event registration" },
@@ -161,6 +162,8 @@ local function slash(msg)
         if not Settings.SetFont(arg:lower()) then say("fonts: arial, friz") end
     elseif cmd == "room" then
         if not Settings.SetRoom(arg:lower()) then say("room: auto or full (now " .. db.room .. ")") end
+    elseif cmd == "options" then
+        if not GlassPanel.Options.Open() then say("find the options under Game Menu > Options > AddOns > Glass Panel") end
     elseif cmd == "export" then
         GlassPanel.Share.Open("export")
     elseif cmd == "import" then
