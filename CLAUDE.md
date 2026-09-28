@@ -47,8 +47,13 @@ core's `ADDON_LOADED`.
   `Fail(key, err)` (**the one failure recorder**, `GlassPanel.failures`, read by
   `/gpanel failures`), `CoinText`, and `Suppressor(globalName)`, which hides a Blizzard frame
   while our block replaces it and only restores what it hid (the clock's
-  `TimeManagerClockButton`). **Only for plain frames**: not Edit Mode system frames like
-  `MainStatusTrackingBarContainer` (#9). `API.Plain(v)` is the one "secret becomes nil" guard;
+  `TimeManagerClockButton`). **Only for plain frames.** Edit Mode system frames
+  (`MainStatusTrackingBarContainer`, #9) go through `SystemHider(globalName)`: reparented to a
+  hidden frame, **never `Hide()`** (protected `SetShownBase`), on a timer (never inside Blizzard's
+  call), never while `EditModeManagerFrame` is shown, after combat if protected; Blizzard's own
+  `SetParent` (Edit Mode) is noticed via `hooksecurefunc` and undone the same way; `Set(false)`
+  gives it back to the parent Blizzard last gave it. `Button(parent, text, width, onClick)` is the
+  one push-button helper. `API.Plain(v)` is the one "secret becomes nil" guard;
   use it at every read. `API.Returned(v)` asks "did the client return anything" without comparing:
   **never write `raw ~= nil` on a raw read**, since comparing a secret (even with nil) throws on
   the client, and the offline stub can't catch it. The global `GetCoinTextureString` is **absent** on 70009;
@@ -114,7 +119,10 @@ core's `ADDON_LOADED`.
   Mode layout setup is #10.
 - **`Plugins\XP\XP.lua`**: XP+ (#3), the only graphical block so far (`width`/`build`/`paint`).
   Four layered bars on one `Glass.Bar` host. A level crossing is detected by the level or max
-  changing (not by XP going down). Blizzard's XP bar is left alone (#9).
+  changing (not by XP going down). **Plugin option "Hide Blizzard's XP bar"** (#9, off by default,
+  `GlassPanelXPDB.hideBlizzard`): `MainStatusTrackingBarContainer` is hidden through
+  `API.SystemHider` only while XP+ is on screen (`onShown`), and given back otherwise (the cap: a
+  rep bar may show there).
   `/played` is requested with `TIME_PLAYED_MSG` muted on the chat frames, one request at a time
   (a token ties the unmute, the next frame after the answer or after 10 s, to its own request),
   **never** by replacing `ChatFrame_DisplayTimePlayed`. Graphical blocks aren't painted while off

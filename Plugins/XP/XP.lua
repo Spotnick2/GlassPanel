@@ -309,6 +309,33 @@ local function tooltip(_, tt)
 end
 
 --------------------------------------------------------------------------------
+-- Blizzard's XP bar (#9)
+--------------------------------------------------------------------------------
+
+-- Optional, off by default (TitanPanelXPP's "hide the default XP bar"):
+-- hidden only while XP+ is on screen, and given back whenever it isn't (the
+-- level cap, XP disabled, the block or the bar hidden), so Blizzard shows
+-- whatever it wants there then (a reputation bar at 60). Through
+-- API.SystemHider: it's an Edit Mode system, reparented when safe, never
+-- Hide(). The setting lives in GlassPanelXPDB (this plugin's SavedVariables;
+-- first read in onShown, which runs on the first layout, after they load).
+local blizzardBar = API.SystemHider("MainStatusTrackingBarContainer")
+local onScreen = false
+
+local function db()
+    local d = rawget(_G, "GlassPanelXPDB")
+    if type(d) ~= "table" then
+        d = {}
+        GlassPanelXPDB = d
+    end
+    return d
+end
+
+local function applyBlizzardBar()
+    blizzardBar.Set(onScreen and db().hideBlizzard == true)
+end
+
+--------------------------------------------------------------------------------
 -- The block
 --------------------------------------------------------------------------------
 
@@ -352,6 +379,19 @@ local block = GlassPanel.RegisterBlock({
     build = build,
     paint = paint,
     tooltip = tooltip,
+    onShown = function(_, visible)
+        onScreen = visible
+        applyBlizzardBar()
+    end,
+    options = {
+        { label = "Hide Blizzard's XP bar",
+          note = "Only while XP+ shows; it comes back at the level cap.",
+          get = function() return db().hideBlizzard == true end,
+          set = function(on)
+              db().hideBlizzard = on or nil
+              applyBlizzardBar()
+          end },
+    },
     onClick = function(_, button)
         if button == "RightButton" then
             resetSession()
@@ -363,4 +403,6 @@ local block = GlassPanel.RegisterBlock({
     end,
 })
 
-if block then block._test = { S = S, duration = duration, pending = function() return pending end } end
+if block then
+    block._test = { S = S, duration = duration, pending = function() return pending end, blizzardBar = blizzardBar }
+end

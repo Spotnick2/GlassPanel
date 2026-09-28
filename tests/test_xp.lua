@@ -182,6 +182,81 @@ WoW.fire("PLAYER_XP_UPDATE", "player"); WoW.tick()
 check(tooltipHas("not available"), "tooltip says so")
 check(next(GlassPanel.failures) == nil, "no failures while secret")
 
+-- Hiding Blizzard's XP bar (#9): off by default; on, while XP+ shows.
+WoW.player = { level = 30, maxLevel = 60, xp = 100, maxXP = 1000, xpDisabled = false }
+GlassPanelXPDB = nil
+local container
+loadAddon({ before = function() container = blizzardXPBar() end })
+local hider = T().blizzardBar
+container.Hide = function(self) self._hideCalls = (self._hideCalls or 0) + 1 end
+container.SetShown = function(self) self._hideCalls = (self._hideCalls or 0) + 1 end
+WoW.flushTimers()
+eq(container._parent, UIParent, "off by default: Blizzard's bar left alone")
+-- The option, through the options panel.
+local panel = GlassPanel.Options._test.panel
+panel:Hide(); panel:Show()
+local opt = GlassPanel.Options._test.controls["options:xp:1"]
+check(opt ~= nil, "XP+ option on the panel")
+eq(opt:GetChecked(), false, "unchecked")
+opt:SetChecked(true); opt._scripts.OnClick(opt)
+eq(GlassPanelXPDB.hideBlizzard, true, "saved in XP+'s own SavedVariables")
+eq(container._parent, UIParent, "not reparented synchronously (never inside a caller)")
+WoW.flushTimers()
+check(container._parent ~= UIParent and container._parent._shown == false, "reparented to a hidden frame")
+eq(container._hideCalls, nil, "never Hide() (protected SetShownBase on Edit Mode systems)")
+check(hider.IsHidden(), "hidden by us")
+-- Blizzard (Edit Mode) reparents it: undone on a timer, not inside its call.
+local layoutParent = CreateFrame("Frame", nil, UIParent)
+container:SetParent(layoutParent)
+eq(container._parent, layoutParent, "not undone inside Blizzard's SetParent")
+WoW.flushTimers()
+check(hider.IsHidden(), "re-hidden on the next frame")
+-- Edit Mode open: nothing touched until it closes.
+local em = CreateFrame("Frame", "EditModeManagerFrame", UIParent)
+container:SetParent(layoutParent)
+WoW.flushTimers(0)
+eq(container._parent, layoutParent, "Edit Mode open: waits")
+em._shown = false
+WoW.flushTimers()
+check(hider.IsHidden(), "re-hidden once Edit Mode closed")
+rawset(_G, "EditModeManagerFrame", nil)
+-- Protected in combat: waits for combat to end.
+container._protected = true
+container:SetParent(layoutParent)
+WoW.combat = true
+WoW.flushTimers()
+eq(container._parent, layoutParent, "protected in combat: waits")
+WoW.combat = false
+WoW.fire("PLAYER_REGEN_ENABLED"); WoW.flushTimers()
+check(hider.IsHidden(), "done after combat")
+container._protected = false
+-- Level cap: XP+ goes, Blizzard gets its bar back (where it last put it).
+WoW.player = { level = 60, maxLevel = 60, xp = 0, maxXP = 0, xpDisabled = false }
+WoW.fire("PLAYER_LEVEL_UP", 60); WoW.tick(); WoW.flushTimers()
+eq(xpBlock().widget._shown, false, "(XP+ gone at the cap)")
+eq(container._parent, layoutParent, "Blizzard's bar given back, to its last parent")
+-- The whole bar hidden: given back too; shown again: hidden again.
+WoW.player = { level = 30, maxLevel = 60, xp = 100, maxXP = 1000, xpDisabled = false }
+WoW.fire("PLAYER_XP_UPDATE", "player"); WoW.tick(); WoW.flushTimers()
+check(hider.IsHidden(), "XP+ back: hidden again")
+GlassPanel._test.slash("toggle"); WoW.flushTimers()
+eq(container._parent, layoutParent, "bar toggled off: given back")
+GlassPanel._test.slash("toggle"); WoW.tick(); WoW.flushTimers()
+check(hider.IsHidden(), "bar toggled on: hidden")
+-- Turned off: given back.
+opt:SetChecked(false); opt._scripts.OnClick(opt); WoW.flushTimers()
+eq(container._parent, layoutParent, "option off: given back")
+eq(GlassPanelXPDB.hideBlizzard, nil, "off is the default: nothing stored")
+-- Saved on: applied after a reload, once XP+'s SavedVariables are in.
+GlassPanelXPDB = { hideBlizzard = true }
+local c2
+rawset(_G, "MainStatusTrackingBarContainer", nil)
+loadAddon({ before = function() c2 = blizzardXPBar() end })
+WoW.flushTimers()
+check(T().blizzardBar.IsHidden() and c2._parent ~= UIParent, "saved setting applied at login")
+GlassPanelXPDB = nil
+check(next(GlassPanel.failures) == nil, "no failures (Blizzard XP bar)")
+
 -- Durations.
 local d = T().duration
 eq(d(nil), "--", "unknown duration")

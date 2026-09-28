@@ -157,3 +157,85 @@ function API.AutoHideScrollBar(scroll)
     scroll:HookScript("OnScrollRangeChanged", sync)
     sync(scroll)
 end
+
+-- Hide a Blizzard Edit Mode system frame while one of our blocks replaces it
+-- (#9: MainStatusTrackingBarContainer, Blizzard's XP bar), and give it back.
+-- Not API.Suppressor (plain frames only): on these, Hide() goes through a
+-- protected SetShownBase that a later combat show turns into
+-- ADDON_ACTION_BLOCKED, and changing them inside Edit Mode's own calls taints
+-- it. The references' way (ElvUI, EllesmereUI; GlassUnitFrames' unit and
+-- cast bars): reparent to a hidden frame, never Hide(). Every change is
+-- deferred to a timer (never inside Blizzard's call), never made while Edit
+-- Mode is open (retried every 0.25 s), and waits for combat to end if the
+-- frame is protected. Blizzard reparenting it (Edit Mode does) is noticed
+-- through hooksecurefunc and undone the same deferred way. Giving it back
+-- restores the parent Blizzard last gave it, so it shows whatever Blizzard
+-- wants (a rep bar at the level cap, nothing at all).
+--   local h = API.SystemHider("MainStatusTrackingBarContainer")
+--   h.Set(true)   -- hide, when safe;   h.Set(false)   -- give it back
+local systemParent
+function API.SystemHider(globalName)
+    local h = { want = false }
+    local frame, home, hooked, scheduled
+    local waiter = CreateFrame("Frame")
+    local sync
+
+    local function editModeOpen()
+        local em = rawget(_G, "EditModeManagerFrame")
+        return type(em) == "table" and em.IsShown ~= nil and API.Plain(em:IsShown()) == true
+    end
+
+    local function later(seconds)
+        if scheduled then return end
+        scheduled = true
+        C_Timer.After(seconds, function() scheduled = false; sync() end)
+    end
+    function h.request() later(0) end
+
+    waiter:SetScript("OnEvent", function(self)
+        self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+        h.request()
+    end)
+
+    sync = function()
+        frame = frame or rawget(_G, globalName)
+        if type(frame) ~= "table" or not frame.SetParent then return end
+        if editModeOpen() then later(0.25) return end
+        if API.Plain(InCombatLockdown()) ~= false and API.Plain((frame:IsProtected())) ~= false then
+            API.RegisterEvent(waiter, "PLAYER_REGEN_ENABLED", "hide " .. globalName)
+            return
+        end
+        if not systemParent then
+            systemParent = CreateFrame("Frame", nil, UIParent)
+            systemParent:Hide()
+        end
+        local parent = frame:GetParent()
+        if h.want then
+            if not hooked then
+                hooked = true
+                hooksecurefunc(frame, "SetParent", function(_, p)
+                    if h.want and p ~= systemParent then h.request() end
+                end)
+            end
+            if parent ~= systemParent then
+                home = parent   -- where Blizzard last put it
+                frame:SetParent(systemParent)
+            end
+        elseif parent == systemParent and home then
+            frame:SetParent(home)
+        end
+    end
+
+    -- Hide (true) or give back (false), when it's safe.
+    function h.Set(want)
+        want = want and true or false
+        if want == h.want then return end
+        h.want = want
+        h.request()
+    end
+    -- Whether it's hidden by us right now.
+    function h.IsHidden()
+        return frame ~= nil and systemParent ~= nil and frame:GetParent() == systemParent
+    end
+    return h
+end

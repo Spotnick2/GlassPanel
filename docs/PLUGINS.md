@@ -57,6 +57,12 @@ GlassPanel.RegisterBlock({
     tooltip  = function(block, tt) tt:AddLine("GearScore") end,  -- tt is GameTooltip
     onClick  = function(block, mouseButton) end,
     onShown  = function(block, visible) end,     -- appeared on / left the screen (hide, empty text, bar toggle)
+    options  = {                                 -- on/off settings of your own, shown as checkboxes under
+        { label = "Hide Blizzard's XP bar",      -- "Plugin options" in Options > AddOns > Glass Panel
+          note  = "Only while XP+ shows.",       -- optional grey line under it
+          get   = function() return MyDB.hide end,
+          set   = function(on) MyDB.hide = on end },  -- store it in YOUR SavedVariables
+    },
 })
 ```
 

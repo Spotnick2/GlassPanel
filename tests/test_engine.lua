@@ -231,6 +231,17 @@ eq(w.caption._text, "Durability: ", "default: back to the block's own choice")
 GlassPanel._test.slash("label xp on")
 eq(block("xp").widget.caption._text, "", "never on a graphical block, even when asked")
 
+-- Plugin options: validated.
+check(register({ id = "o1", text = function() end, options = "yes" }) == nil, "options must be a list")
+check(register({ id = "o2", text = function() end, options = { { label = 1, get = print, set = print } } }) == nil,
+      "option label must be a string")
+check(register({ id = "o3", text = function() end, options = { { label = "x", get = print } } }) == nil,
+      "option needs set")
+check(register({ id = "o4", text = function() end, options = { { label = "x", get = print, set = print, note = 5 } } }) == nil,
+      "option note must be a string")
+check(register({ id = "o5", text = function() end, options = { { label = "x", get = print, set = print } } }) ~= nil,
+      "a valid option list is accepted")
+
 -- Icons (#24): shown by default; turned off per block, the text moves left.
 local ic = register({ id = "iconic", label = "Iconic", icon = "Interface\Icons\INV_Misc_Bag_08",
                       text = function() return "12" end })

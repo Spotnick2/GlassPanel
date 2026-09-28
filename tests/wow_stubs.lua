@@ -206,6 +206,7 @@ function Methods.GetTop(w) if w._rect then return w._rect[2] + w._rect[4] end en
 function Methods.GetDebugName(w) return w._name or ("<" .. w._type .. ">") end
 function Methods.IsForbidden(w) return false end
 function Methods.GetParent(w) return w._parent end
+function Methods.SetParent(w, p) w._parent = p end
 -- Frames made with CreateFrame whose parent is w, in creation order.
 function Methods.GetChildren(w)
     local out = {}

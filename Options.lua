@@ -185,6 +185,35 @@ end
 
 local left
 
+-- Plugin options: a block's own on/off settings (spec.options), under
+-- "Plugin options" in the left column, one group per plugin, added the
+-- first time the panel opens after the plugin registered. get/set are the
+-- plugin's code: both run under pcall, a throw is recorded, never raised.
+local optionBlocks = {}   -- block id -> true once its options are on the panel
+local optionsHeader = false
+local function addPluginOptions()
+    for _, block in ipairs(Engine.blocks) do
+        if block.options and #block.options > 0 and not optionBlocks[block.id] then
+            optionBlocks[block.id] = true
+            if not optionsHeader then
+                optionsHeader = true
+                header(left, "Plugin options")
+            end
+            place(left, label(block.label or block.id, "GameFontNormal"), 22, 4)
+            for i, o in ipairs(block.options) do
+                local key = "options:" .. block.id .. ":" .. i
+                widgets[key] = checkbox(left, o.label,
+                    function() return o.get() end,
+                    function(v)
+                        local ok, err = pcall(o.set, v)
+                        if not ok then API.Fail(key, err) end
+                    end)
+                if o.note then note(left, o.note) end
+            end
+        end
+    end
+end
+
 local function build()
     local title = label("Glass Panel", "GameFontNormalHuge")
     title:SetPoint("TOPLEFT", content, "TOPLEFT", 16, -16)
@@ -235,6 +264,7 @@ panel:SetScript("OnShow", function(self)
         build()
     end
     layoutRows()
+    addPluginOptions()
     content:SetHeight(math.max(-left.y, -pluginCol.y) + 16)
     refreshAll()
 end)
