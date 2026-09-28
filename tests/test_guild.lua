@@ -186,5 +186,17 @@ WoW.fire("GUILD_ROSTER_UPDATE", false); WoW.tick()
 check(table.concat(GameTooltip._lines, "\n"):find("Online\t4 of 500", 1, true), "tooltip redrawn with the new roster")
 GameTooltip._shown = false
 
+-- Unreadable members don't count towards the early stop: two unreadable
+-- (really offline) rows before the only online member must not end the scan.
+WoW.guild.members = {
+    member("Ghost1", 5, "Nowhere", "secret", "MAGE"),
+    member("Ghost2", 5, "Nowhere", "secret", "MAGE"),
+    member("Real", 40, "Stormwind", true, "PRIEST"),
+}
+WoW.guild.total, WoW.guild.online = 3, 1
+WoW.fire("GUILD_ROSTER_UPDATE", false); WoW.tick()
+check(tip():find("Real", 1, true), "the online member after unreadable rows is found")
+WoW.guild.total, WoW.guild.online = nil, nil
+
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_guild")

@@ -89,8 +89,10 @@ local function scan()
     local onlineCount, total = counts()
     for i = 1, total or 0 do
         -- Every online member found: the rest are offline (a big guild would
-        -- otherwise cost one call per member per hover).
-        if onlineCount and #members + unreadable >= onlineCount then break end
+        -- otherwise cost one call per member per hover). Only READABLE online
+        -- members count: an unreadable one may be offline, so counting it
+        -- could stop before a real online member (Codex review).
+        if onlineCount and #members >= onlineCount then break end
         local name, _, _, level, _, rawZone, _, _, isOnline, status, classFile = GetGuildRosterInfo(i)
         local online = P(isOnline)
         if online == true then
