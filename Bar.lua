@@ -23,6 +23,12 @@ local EDGE = 8          -- from the bar's ends to the first block
 
 local function db() return GlassPanelDB end
 
+-- Whether the block is (or, when not yet laid out, may be) on screen: not
+-- hidden by the user, and the bar shown.
+function Bar.OnScreen(block)
+    return not Bar.IsHidden(block) and Bar.frame ~= nil and Bar.frame:IsShown()
+end
+
 function Bar.IsHidden(block)
     local d = db()
     return d and d.hidden and d.hidden[block.id] == true
@@ -82,20 +88,32 @@ function Bar.Attach(block)
         x = PAD + ICON + PAD
     end
     b.textX = x
-    local fs = Glass.Font(b, Bar.FONT_SIZE, "LEFT")
+    -- The label sits on its own layer ABOVE anything a graphical block builds
+    -- (the XP bar goes up to +6), so an error mark is never covered by it.
+    local top = CreateFrame("Frame", nil, b)
+    top:SetAllPoints(b)
+    top:SetFrameLevel(b:GetFrameLevel() + 10)
+    local fs = Glass.Font(top, Bar.FONT_SIZE, "LEFT")
     fs:SetPoint("LEFT", b, "LEFT", x, 0)
     b.label = fs
 
     block.widget = b
+    b:Hide()   -- off screen until its first layout decides
+    if block.build then Engine.Call(block, "build", block.build, block) end
     Engine.MarkDirty(block)
 end
 
 -- True if the text changed (the caller relayouts only then).
 function Bar.SetText(block, text)
     local b = block.widget
-    if not b or b.text == text then return false end
+    if not b then return false end
+    -- The first paint always counts as a change: a new widget's text is nil
+    -- too, and a first nil must still reach Bar.Layout to hide it (and to
+    -- tell its onShown), e.g. a plugin registering after startup.
+    if b.painted and b.text == text then return false end
+    b.painted = true
     b.text = text
-    b.label:SetText(text)
+    b.label:SetText(text or "")
     return true
 end
 
@@ -121,15 +139,18 @@ function Bar.Layout()
         local offset = EDGE
         for _, block in ipairs(sorted(side)) do
             local b = block.widget
-            local show = not Bar.IsHidden(block) and b.text ~= nil and b.text ~= ""
+            -- nil never shows; "" shows only for a fixed-width (graphical) block.
+            local show = not Bar.IsHidden(block) and b.text ~= nil and (b.text ~= "" or block.width ~= nil)
             b:SetShown(show)
             local visible = show and barShown
-            if block.onShown and b.visible ~= visible then
-                Engine.Call(block, "onShown", block.onShown, block, visible)
+            if b.visible ~= visible then
+                if block.onShown then Engine.Call(block, "onShown", block.onShown, block, visible) end
+                -- Paint was skipped while off screen: catch up now.
+                if visible and block.paint then Engine.MarkDirty(block) end
             end
             b.visible = visible
             if show then
-                local w = b.textX + math.ceil(b.label:GetStringWidth()) + PAD
+                local w = block.width or (b.textX + math.ceil(b.label:GetStringWidth()) + PAD)
                 b:SetWidth(w)
                 b:ClearAllPoints()
                 if side == "left" then

@@ -36,7 +36,7 @@ function loadAddon(opts)
     opts = opts or {}
     -- A fresh session each call; client data (WoW.money, ...) set by the test stays.
     GlassPanel, GlassPanelDB = nil, nil
-    WoW.frames, WoW.chat = {}, {}
+    WoW.frames, WoW.chat, WoW.timers = {}, {}, {}   -- a dead session's timers die with it
     local ns = {}
     for _, file in ipairs(tocFiles()) do
         local chunk = assert(loadfile(file))

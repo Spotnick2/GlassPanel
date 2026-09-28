@@ -155,4 +155,55 @@ WoW.tick()
 check(GlassPanel.failures["event:NOT_A_REAL_EVENT"], "unknown event recorded")
 eq(textOf("badevent"), "ok", "block still painted")
 
+-- A block registered after startup whose first text is nil: hidden on its
+-- first flush, and told so, with built content hidden too (Codex, PR #5).
+loadAddon()
+WoW.tick(); WoW.tick()   -- everything clean
+local shownCalls = {}
+local late = register({ id = "latenil", text = function() return nil end,
+                        onShown = function(_, v) shownCalls[#shownCalls + 1] = v end })
+local content
+local lateG = register({ id = "lategraph", width = 80, text = function() return nil end,
+                         build = function(blk) content = CreateFrame("Frame", nil, blk.widget) end })
+WoW.tick()
+eq(late.widget._shown, false, "late nil-text block hidden on its first flush")
+eq(shownCalls[1], false, "and its onShown heard it")
+eq(lateG.widget._shown, false, "late graphical block with nil text hidden")
+eq(content:IsVisible(), false, "its built content isn't visible")
+
+-- Graphical blocks: width, build, paint.
+loadAddon()
+check(register({ id = "w1", text = function() end, width = 5 }) == nil, "refused: width too small")
+check(register({ id = "w3", text = function() end, width = 0 / 0 }) == nil, "refused: width NaN")
+check(register({ id = "w2", text = function() end, build = true }) == nil, "refused: build not a function")
+local builds, paints, txt = 0, 0, ""
+local g = register({ id = "graph", width = 120, text = function() return txt end,
+                     build = function(blk) builds = builds + 1; check(blk.widget ~= nil, "build sees the widget") end,
+                     paint = function() paints = paints + 1 end })
+WoW.tick()
+eq(builds, 1, "build runs once")
+eq(paints, 1, "paint runs after the repaint")
+eq(g.widget._shown, true, "fixed-width block with empty text shows")
+eq(g.widget._width, 120, "fixed width used")
+txt = nil
+GlassPanel.Refresh("graph"); WoW.tick()
+eq(g.widget._shown, false, "nil text hides it")
+eq(paints, 1, "no paint while hidden")
+register({ id = "badpaint", width = 50, text = function() return "" end, paint = function() error("p") end })
+WoW.tick()
+check(GlassPanel.failures["badpaint:paint"], "paint error recorded")
+-- A graphical block's error mark is drawn above whatever it built.
+local covered
+register({ id = "badgraph", width = 60, text = function() error("t") end,
+           build = function(blk)
+               covered = CreateFrame("Frame", nil, blk.widget)
+               covered:SetFrameLevel(blk.widget:GetFrameLevel() + 6)
+           end })
+WoW.tick()
+check(textOf("badgraph"):find("error"), "error text set")
+check(block("badgraph").widget.label._parent._level > covered._level, "error label above the block's own frames")
+register({ id = "badbuild", width = 50, text = function() return "" end, build = function() error("b") end })
+WoW.tick()
+check(GlassPanel.failures["badbuild:build"], "build error recorded, block still registered")
+
 done("test_engine")
