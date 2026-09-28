@@ -231,4 +231,33 @@ eq(w.caption._text, "Durability: ", "default: back to the block's own choice")
 GlassPanel._test.slash("label xp on")
 eq(block("xp").widget.caption._text, "", "never on a graphical block, even when asked")
 
+-- Icons (#24): shown by default; turned off per block, the text moves left.
+local ic = register({ id = "iconic", label = "Iconic", icon = "Interface\Icons\INV_Misc_Bag_08",
+                      text = function() return "12" end })
+WoW.tick()
+local iw = ic.widget
+eq(iw.icon._shown, true, "icon shown by default")
+eq(iw.textX, 4 + 14 + 4, "text starts after the icon")
+local wide = iw._width
+GlassPanel._test.slash("icon iconic off")
+eq(iw.icon._shown, false, "/gpanel icon off hides it")
+eq(iw.textX, 4, "the text starts at the edge")
+eq(iw.caption._points[1][4], 4, "the caption is re-anchored there")
+eq(iw._width, wide - 18, "and the block narrows by the icon")
+eq(GlassPanelDB.iconsFor.iconic, false, "saved as false")
+GlassPanel._test.slash("icon iconic on")
+eq(iw.icon._shown, true, "back on")
+eq(GlassPanelDB.iconsFor.iconic, nil, "on is the default: nothing stored")
+eq(iw._width, wide, "full width again")
+WoW.chat = {}
+GlassPanel._test.slash("icon dura off")
+check((WoW.chat[1] or ""):find("has no icon", 1, true), "a block without an icon says so")
+eq(GlassPanelDB.iconsFor.dura, nil, "and stores nothing")
+-- Saved off before the block registers: it comes up without its icon.
+GlassPanelDB.iconsFor.late = false
+local late = register({ id = "late", icon = "x", text = function() return "1" end })
+WoW.tick()
+eq(late.widget.icon._shown, false, "saved setting honoured at attach")
+eq(late.widget.textX, 4, "and the text starts at the edge")
+
 done("test_engine")

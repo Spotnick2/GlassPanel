@@ -75,6 +75,7 @@ local COMMANDS = {
     { "layout reset", "forget the arrangement: blocks go back to their default lanes" },
     { "labels on|off", "the gold captions before values (\"Bags: \"), for every block" },
     { "label <id> on|off|default", "one block's caption" },
+    { "icon <id> on|off", "one block's icon" },
     { "show <id>", "show a block" },
     { "hide <id>", "hide a block" },
     { "toggle", "show or hide the whole bar" },
@@ -140,6 +141,14 @@ local function slash(msg)
         elseif v == "off" then Settings.SetLabelFor(block.id, false)
         elseif v == "default" then Settings.SetLabelFor(block.id, nil)
         else say("label <id> on|off|default") end
+    elseif cmd == "icon" then
+        local id, v = arg:match("^(%S+)%s+(%S+)$")
+        local block = findBlock(id)
+        if not block then return end
+        v = v:lower()
+        if v ~= "on" and v ~= "off" then say("icon <id> on|off") return end
+        if not block.icon then say(block.id .. " has no icon") return end
+        Settings.SetIconFor(block.id, v == "on")
     elseif cmd == "show" or cmd == "hide" then
         local block = findBlock(arg)
         if not block then return end

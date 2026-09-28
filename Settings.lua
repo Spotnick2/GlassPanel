@@ -21,6 +21,7 @@ function Settings.EnsureDefaults()
     end
     if type(d.hidden) ~= "table" then d.hidden = {} end
     if type(d.labelsFor) ~= "table" then d.labelsFor = {} end
+    if type(d.iconsFor) ~= "table" then d.iconsFor = {} end
     if not Glass.FONTS[d.font] then d.font = Settings.DEFAULTS.font end
     if d.room ~= "auto" and d.room ~= "full" then d.room = Settings.DEFAULTS.room end
     return d
@@ -57,6 +58,12 @@ end
 function Settings.SetLabelFor(id, value)
     db().labelsFor[id] = value
     Bar.RefreshCaptions()
+end
+
+-- One block's icon; only "off" is stored (a block shows its icon by default).
+function Settings.SetIconFor(id, shown)
+    if shown then db().iconsFor[id] = nil else db().iconsFor[id] = false end
+    Bar.RefreshIcons()
 end
 
 function Settings.SetHidden(id, hidden)
