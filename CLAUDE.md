@@ -133,6 +133,11 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   a client with no `MenuUtil` gets the fallback, a click that cycles the role (never from an
   unreadable one). A picked role stays pending until `ROLE_CHANGED_INFORM` /
   `PLAYER_ROLES_ASSIGNED` (5 s). A refused or throwing `UnitSetRole` prints one line.
+- **`Plugins\Layer`** (#17): the zone field of creature GUIDs (target, mouseover, nameplates;
+  not in combat, on a taxi or in an instance; secret GUIDs skipped), numbered by rank among the
+  zone ids seen **on the same uiMapID**. `GlassPanelLayerDB.maps[map][zone] = GetServerTime()`,
+  forgotten after 2 h. Group, map and player phase changes make it unknown. No NWB listener (#26).
+  Left-click forgets the current map's layers.
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable
   bag (free count or family) is left out and flagged with a grey `?`. Left-click: `ToggleAllBags`.
