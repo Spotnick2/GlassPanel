@@ -104,6 +104,12 @@ function WoW.reset()
     -- "secret" for free/family: comes back secret).
     WoW.bags = { [0] = { slots = 16, free = 4, family = 0 } }
     WoW.bagToggles = 0
+    -- Units by token: { guid, isPlayer } (guid "secret": comes back secret;
+    -- a token absent: no unit). The player's map, realm and server time.
+    WoW.units = {}
+    WoW.map = 1429
+    WoW.realm = "Doomhowl"
+    WoW.serverTime = 100000
 end
 
 --------------------------------------------------------------------------------
@@ -351,6 +357,29 @@ C_CurrencyInfo = { GetCoinTextureString = function(copper)
 end }
 function GetGameTime() return WoW.gameTime[1], WoW.gameTime[2] end
 function GetTime() return WoW.now end
+function GetServerTime() return WoW.serverTime end
+function GetRealmName() return WoW.realm end
+function UnitGUID(unit)
+    local u = WoW.units[unit]
+    if not u then return nil end
+    if u.guid == "secret" then return WoW.Secret("guid." .. unit) end
+    return u.guid
+end
+function UnitIsPlayer(unit) return WoW.units[unit] ~= nil and WoW.units[unit].isPlayer == true end
+C_Map = { GetBestMapForUnit = function(unit) return unit == "player" and WoW.map or nil end }
+-- FrameXML's string split (not Lua's): every piece, or at most `pieces`
+-- with the rest left in the last.
+function strsplit(delim, str, pieces)
+    local out, pos = {}, 1
+    while not pieces or #out < pieces - 1 do
+        local a, b = string.find(str, delim, pos, true)
+        if not a then break end
+        out[#out + 1] = str:sub(pos, a - 1)
+        pos = b + 1
+    end
+    out[#out + 1] = str:sub(pos)
+    return unpack(out)
+end
 -- Timers keep their delay: WoW.flushTimers(upTo) runs those due within upTo
 -- seconds (all when nil) and keeps the rest, so a fallback timer can't mask a
 -- missing immediate one.

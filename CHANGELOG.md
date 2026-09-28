@@ -30,5 +30,8 @@
   Damage or No Role.
 - Layer: which layer of the realm you're on, detected from the NPCs you target, mouse over or pass
   (nameplates), and numbered per zone. Left-click forgets the layers seen in your zone.
+- Layer: which layer of the realm you're on, detected from the NPCs you target or mouse over
+  (nameplates confirm a known layer), numbered per zone and per realm. Left-click forgets the
+  layers seen in your zone.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.
