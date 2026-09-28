@@ -31,6 +31,7 @@ scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -26, 4)
 local content = CreateFrame("Frame", nil, scroll)
 content:SetSize(660, 600)
 scroll:SetScrollChild(content)
+API.AutoHideScrollBar(scroll)
 
 --------------------------------------------------------------------------------
 -- Widgets
@@ -273,5 +274,6 @@ local reg = CreateFrame("Frame")
 API.RegisterEvent(reg, "PLAYER_LOGIN", "options")
 reg:SetScript("OnEvent", register)
 
+panel.scroll = scroll
 Options._test = { panel = panel, controls = widgets, refreshers = refreshers, rows = rows,
                   category = function() return category end }

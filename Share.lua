@@ -358,6 +358,15 @@ local function build()
     local special = rawget(_G, "UISpecialFrames")
     if type(special) == "table" then table.insert(special, "GlassPanelShareWindow") end
     Glass.Apply(win, "small")
+    -- The glass is made to sit over the world; this window opens over the
+    -- Settings panel, whose text showed through (#36). An opaque backing
+    -- above the shadow and under the glass tint, inside the rounded corners.
+    local inset = Glass.Inset("small")
+    local backing = win:CreateTexture(nil, "BACKGROUND", nil, -7)
+    backing:SetPoint("TOPLEFT", win, "TOPLEFT", inset, -inset)
+    backing:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -inset, inset)
+    backing:SetColorTexture(0.05, 0.06, 0.08, 0.96)
+    win.backing = backing
 
     win.title = Glass.Font(win, 14, "LEFT")
     win.title:SetPoint("TOPLEFT", win, "TOPLEFT", 14, -12)
@@ -374,6 +383,8 @@ local function build()
     edit:SetFontObject("ChatFontNormal")
     edit:SetWidth(420)
     scroll:SetScrollChild(edit)
+    API.AutoHideScrollBar(scroll)
+    win.scroll = scroll
     edit:SetScript("OnEscapePressed", function() win:Hide() end)
     edit:SetScript("OnTextChanged", function(self, userInput)
         if win.mode == "export" then

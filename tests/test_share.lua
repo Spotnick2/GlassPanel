@@ -186,6 +186,12 @@ slash("export")
 T = S()._test
 local win = T.window()
 eq(win._shown, true, "export window open")
+-- Readable over the Settings panel: an opaque backing under the glass,
+-- inside its corners (#36); no scroll bar for a string that fits.
+local bk = win.backing
+check(bk and bk._color and bk._color[4] >= 0.9, "opaque backing")
+eq(bk and bk._points[1][4], GlassPanel.Glass.Inset("small"), "inside the rounded corners")
+eq(win.scroll.ScrollBar._shown, false, "no scroll bar while the string fits")
 local listed = false
 for _, name in ipairs(UISpecialFrames) do if name == "GlassPanelShareWindow" then listed = true end end
 check(listed, "Escape closes it (UISpecialFrames)")
