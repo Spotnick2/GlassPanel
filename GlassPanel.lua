@@ -5,7 +5,7 @@ GlassPanel = GlassPanel or {}
 local API, Glass, Engine, Bar, Layout = GlassPanel.API, GlassPanel.Glass, GlassPanel.Engine, GlassPanel.Bar, GlassPanel.Layout
 local say = API.Print
 
-local DEFAULTS = { font = "arial", shown = true }
+local DEFAULTS = { font = "arial", shown = true, room = "auto" }
 
 -- Read settings, fill missing keys. Nothing may REQUIRE a value to have
 -- survived: SavedVariables were broken on builds before 70009.
@@ -17,6 +17,7 @@ local function ensureDefaults()
     end
     if type(db.hidden) ~= "table" then db.hidden = {} end
     if not Glass.FONTS[db.font] then db.font = DEFAULTS.font end
+    if db.room ~= "auto" and db.room ~= "full" then db.room = DEFAULTS.room end
     return db
 end
 
@@ -79,6 +80,7 @@ local COMMANDS = {
     { "toggle", "show or hide the whole bar" },
     { "font arial|friz", "bar font" },
     { "failures", "errors recorded from blocks and event registration" },
+    { "room auto|full", "auto: the bar ends short of Blizzard's top frames (default); full: always full width" },
     { "covered", "list the frames under the bar (#2 measurement)" },
 }
 
@@ -143,6 +145,11 @@ local function slash(msg)
         else
             say("fonts: arial, friz")
         end
+    elseif cmd == "room" then
+        arg = arg:lower()
+        if arg ~= "auto" and arg ~= "full" then say("room: auto or full (now " .. db.room .. ")") return end
+        db.room = arg
+        GlassPanel.Room.Update()
     elseif cmd == "covered" then
         local list = coveredFrames()
         say(#list .. " frame(s) under the bar (name, strata, protected, mouse, px from the screen top):")

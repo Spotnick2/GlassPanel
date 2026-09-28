@@ -160,6 +160,7 @@ function Methods.SetAlpha(w, a) w._alpha = a end
 -- Rect: set w._rect = { left, bottom, width, height } in a test; the bar gets
 -- one from the harness.
 function Methods.GetRect(w) if w._rect then return unpack(w._rect) end end
+function Methods.GetTop(w) if w._rect then return w._rect[2] + w._rect[4] end end
 function Methods.GetDebugName(w) return w._name or ("<" .. w._type .. ">") end
 function Methods.IsForbidden(w) return false end
 function Methods.GetParent(w) return w._parent end
@@ -247,6 +248,7 @@ function Methods.AddDoubleLine(tt, l, r) table.insert(tt._lines, l .. "\t" .. r)
 
 UIParent = newWidget("Frame", nil, "UIParent")
 UIParent._level = 0
+UIParent._width, UIParent._rect = 1000, { 0, 0, 1000, 768 }
 GameTooltip = newWidget("GameTooltip", UIParent, "GameTooltip")
 GameTooltip._shown = false
 

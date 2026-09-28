@@ -30,7 +30,7 @@ issues and PRs (the repo name will be GlassPanel).
 
 ## Layout
 
-TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` → `Blocks\*.lua` →
+TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` → `Room.lua` → `Blocks\*.lua` →
 `GlassPanel.lua`.
 
 - **`Compat.lua`**: `GlassPanel.API`, the only route to client APIs that moved or may be absent.
@@ -73,6 +73,13 @@ TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` �
   `Layout.lua`, and dragging: a marker shows the drop slot, shift-drag moves a lane by the
   cursor's displacement, a drag under 10 px is a wobbly click (no move), the release that ends a
   drag isn't a click, and the drop target is recomputed after any relayout mid-drag. Hidden and empty blocks take no space. **Nothing is secure**, so the bar may be touched in combat.
+- **`Room.lua`**: making room for Blizzard's top frames (#2) **without moving any of them**. The
+  bar measures a short watch list (`Room.WATCH`: minimap cluster, buffs, debuffs, ticket status,
+  unit frames) and pulls its ends in to stop short of any that reach into its band. Pure
+  `Room.Insets`; read-only `GetRect`/`IsVisible` under pcall, secrets skipped. Checked on layout,
+  scale and display events and once a second. `/gpanel room full` opts out. Moving Blizzard's
+  frames at runtime was rejected after research and a Codex review (see #2 and the porting
+  guide's Edit Mode note); an opt-in Edit Mode layout setup is its own issue.
 - **`Blocks\XP.lua`**: XP+ (#3), the only graphical block so far (`width`/`build`/`paint`).
   Four layered bars on one `Glass.Bar` host. A level crossing is detected by the level or max
   changing (not by XP going down). Blizzard's XP bar is left alone (#9).

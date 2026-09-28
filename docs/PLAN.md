@@ -55,10 +55,9 @@ Plugins (separate addons, ported from the owner's Titan plugins):
 
 ## Open questions (measure in game)
 
-- The bar covers the top 24 units of the screen. Titan shifts Blizzard frames down to make
-  room. Does Forever's default layout put anything there (buffs, minimap cluster), and is Edit
-  Mode enough to move it? Decide after seeing it in game; don't port Titan's frame-adjust code
-  first.
+- Room for Blizzard's top frames (#2): the bar adapts (`Room.lua`); tune `Room.WATCH` from
+  `/gpanel covered` on a Blizzard preset. An opt-in Edit Mode layout for a full-width bar is
+  separate.
 - Strata `MEDIUM`: check that it sits above the world UI and below bags and dialogs.
 - The glass rim is a rounded rect. Does a full-width strip read well with rounded ends at the
   screen edges, or should the bar be inset a few pixels?

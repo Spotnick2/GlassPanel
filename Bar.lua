@@ -293,6 +293,18 @@ function Bar.Build()
     for _, block in ipairs(Engine.blocks) do Bar.Attach(block) end
 end
 
+-- Pull the bar's ends in (UIParent units) to make room for Blizzard's top
+-- frames (Room.lua, #2). Our own frame, not protected: fine in combat.
+-- OnSizeChanged relays out the lanes for the new width.
+function Bar.SetInsets(left, right)
+    local f = Bar.frame
+    if not f then return end
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", UIParent, "TOPLEFT", left, 0)
+    f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -right, 0)
+    Bar.insets = { left, right }
+end
+
 function Bar.SetShown(shown)
     if not Bar.frame then return end
     Bar.frame:SetShown(shown)
