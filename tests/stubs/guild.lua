@@ -51,12 +51,4 @@ end }
 
 function ToggleGuildFrame() WoW.guildToggles = WoW.guildToggles + 1 end
 
--- Ambiguate(fullName, context): the realm dropped for a same-realm name.
-function Ambiguate(fullName, context) return (fullName:gsub("%-.*$", "")) end
-
--- A colour object with r, g, b fields (a ColorMixin on the client).
-C_ClassColor = C_ClassColor or { GetClassColor = function(className)
-    local c = ({ WARRIOR = { 0.78, 0.61, 0.43 }, MAGE = { 0.25, 0.78, 0.92 }, PRIEST = { 1, 1, 1 } })[className]
-    if not c then return nil end
-    return CreateColor(c[1], c[2], c[3], 1)
-end }
+-- Ambiguate and C_ClassColor come from wow_stubs.lua (shared by several plugins).
