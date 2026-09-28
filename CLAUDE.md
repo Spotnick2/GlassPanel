@@ -139,8 +139,9 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   id is filed only from the target or mouseover, never when known on another map; nameplates only
   confirm (border creatures). `GlassPanelLayerDB.realms[realm][map][zone] = GetServerTime()`
   (nil time: nothing saved), forgotten after 2 h. Rescans target > mouseover > nameplates on
-  entering the world, combat end, taxi end and 5/15/30 s after a group change. Map and player
-  phase changes make it unknown. No NWB listener (#26). Left-click forgets the current map's layers.
+  entering the world, combat end, taxi end, a uiMapID change (`ZONE_CHANGED[_INDOORS]`) and
+  5/15/30 s after a group change. The current layer holds only while the live uiMapID is the one it
+  was seen on (checked at every read). Map and player phase changes make it unknown. No NWB listener (#26). Left-click forgets the current map's layers.
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable
   bag (free count or family) is left out and flagged with a grey `?`. Left-click: `ToggleAllBags`.

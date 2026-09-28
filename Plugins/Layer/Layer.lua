@@ -24,6 +24,9 @@
 --   player's "2" may be your "1" (#26, sharing sightings, would fix that).
 --   Known ids live in GlassPanelLayerDB.realms[realm][uiMapID][zoneId] =
 --   GetServerTime() of the last sighting, forgotten after 2 hours.
+-- - The current layer holds only while C_Map.GetBestMapForUnit("player") is
+--   the map it was seen on (checked at every read: a uiMapID change may come
+--   with ZONE_CHANGED / ZONE_CHANGED_INDOORS rather than ZONE_CHANGED_NEW_AREA).
 -- - A group change, a new map or a phase change may move you: the current
 --   layer is unknown again until the next creature is seen. After a group
 --   change the hop comes a little later with no event, so the target and
@@ -105,6 +108,19 @@ local function rank(map, zone)
     return nil
 end
 
+-- The player's uiMapID now, or nil.
+local function liveMap()
+    local m = P(C_Map.GetBestMapForUnit("player"))
+    return type(m) == "number" and m or nil
+end
+
+-- The current layer's zone id, only while you're still on the map it was
+-- seen on: a map change doesn't always come with ZONE_CHANGED_NEW_AREA.
+local function currentZone(map)
+    if current.zone and map and current.map == map then return current.zone end
+    return nil
+end
+
 local function zoneOf(unit)
     local guid = P(UnitGUID(unit))
     if type(guid) ~= "string" then return nil end
@@ -129,9 +145,9 @@ local function see(unit, confirmOnly)
     if P(UnitOnTaxi("player")) == true or P(IsInInstance()) == true then return false end
     if P(UnitIsPlayer(unit)) == true then return false end
     local zone = zoneOf(unit)
-    local map = P(C_Map.GetBestMapForUnit("player"))
+    local map = liveMap()
     local t = now()
-    if not zone or type(map) ~= "number" or not t then return false end
+    if not zone or not map or not t then return false end
     local all = maps()
     local known = all[map] and all[map][zone] and t - all[map][zone] < EXPIRE
     if not known and (confirmOnly or elsewhere(zone, map, t)) then return false end
@@ -218,7 +234,8 @@ GlassPanel.RegisterBlock({
     order = 180,
     events = { "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_CONTROL_GAINED",
                "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED",
-               "GROUP_JOINED", "GROUP_LEFT", "ZONE_CHANGED_NEW_AREA", "UNIT_PHASE" },
+               "GROUP_JOINED", "GROUP_LEFT", "ZONE_CHANGED_NEW_AREA", "ZONE_CHANGED", "ZONE_CHANGED_INDOORS",
+               "UNIT_PHASE" },
     unitEvents = { UNIT_PHASE = "player" },
     onEvent = function(_, event, arg)
         if event == "ADDON_LOADED" then
@@ -231,22 +248,31 @@ GlassPanel.RegisterBlock({
             rescan()
         elseif event == "GROUP_JOINED" or event == "GROUP_LEFT" then
             regroup()
+        elseif event == "ZONE_CHANGED" or event == "ZONE_CHANGED_INDOORS" then
+            -- Mostly subzones (same map): only a new uiMapID resets it.
+            if current.zone and current.map ~= liveMap() then
+                forget()
+                rescan()
+            end
         else
             forget()   -- ZONE_CHANGED_NEW_AREA, the player's UNIT_PHASE
         end
     end,
     text = function()
-        local n = current.zone and rank(current.map, current.zone)
+        local map = liveMap()
+        local zone = currentZone(map)
+        local n = zone and rank(map, zone)
         return n and tostring(n) or "|cff888888?|r"
     end,
     tooltip = function(_, tt)
         tt:AddLine("Layer")
-        local map = current.map or P(C_Map.GetBestMapForUnit("player"))
-        local list = type(map) == "number" and layers(map) or {}
+        local map = liveMap()
+        local cur = currentZone(map)
+        local list = map and layers(map) or {}
         local n
-        for i, zone in ipairs(list) do if zone == current.zone then n = i end end
+        for i, zone in ipairs(list) do if zone == cur then n = i end end
         if n then
-            tt:AddDoubleLine("Current layer", n .. "  |cff888888(zone " .. current.zone .. ")|r", 1, 0.82, 0, 1, 1, 1)
+            tt:AddDoubleLine("Current layer", n .. "  |cff888888(zone " .. cur .. ")|r", 1, 0.82, 0, 1, 1, 1)
         else
             tt:AddDoubleLine("Current layer", "unknown", 1, 0.82, 0, 0.7, 0.7, 0.7)
         end
@@ -256,7 +282,7 @@ GlassPanel.RegisterBlock({
             tt:AddLine("Layers seen on this map")
             local ids = maps()[map]
             for i, zone in ipairs(list) do
-                local mark = zone == current.zone and "|cff40ff40> |r" or ""
+                local mark = zone == cur and "|cff40ff40> |r" or ""
                 tt:AddDoubleLine(mark .. "Layer " .. i, "zone " .. zone .. ", " .. age(t - ids[zone]) .. " ago",
                     1, 1, 1, 0.7, 0.7, 0.7)
             end
@@ -269,8 +295,9 @@ GlassPanel.RegisterBlock({
     end,
     onClick = function(_, button)
         if button ~= "LeftButton" then return end
-        local map = current.map or P(C_Map.GetBestMapForUnit("player"))
-        if type(map) == "number" then maps()[map] = nil end
+        -- The map you're on, not the one the last sighting was on.
+        local map = liveMap()
+        if map then maps()[map] = nil end
         invalidate()
         forget()
         API.Print("Layer: forgot the layers seen on this map.")

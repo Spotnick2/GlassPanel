@@ -207,6 +207,48 @@ eq(textOf("layer"), "2", "15 s later: the new layer, with no event")
 WoW.flushTimers(); WoW.tick()
 WoW.units.nameplate7 = nil
 
+-- A new uiMapID without ZONE_CHANGED_NEW_AREA (Codex review): the old
+-- sighting doesn't carry over, even with no creature to read.
+WoW.fire("ZONE_CHANGED_NEW_AREA"); WoW.tick()
+target(creature(76067))
+eq(textOf("layer"), "2", "baseline on 1429")
+WoW.units = {}
+WoW.map = 1453
+WoW.fire("ZONE_CHANGED_INDOORS"); WoW.fire("PLAYER_TARGET_CHANGED"); WoW.tick()
+eq(textOf("layer"), GREY_Q, "map changed through ZONE_CHANGED_INDOORS: unknown")
+local t2 = tip()
+check(t2:find("Current layer\tunknown", 1, true), "tooltip: unknown")
+check(not t2:find("zone 76067", 1, true), "tooltip: the old map's layers aren't listed")
+-- Even with no event at all, the next repaint checks the live map.
+WoW.map = 1429
+WoW.fire("ZONE_CHANGED"); WoW.tick()
+target(creature(76067))
+WoW.map = 1453
+GlassPanel.Refresh("layer"); WoW.tick()
+eq(textOf("layer"), GREY_Q, "map changed silently: unknown at the next repaint")
+local t3 = tip()
+check(t3:find("Current layer	unknown", 1, true), "silent change: tooltip unknown")
+check(not t3:find("zone 76067", 1, true), "silent change: the old map's layers aren't listed")
+-- The reset forgets the map you're on, not the last sighting's.
+local b1429 = DB()[1429]
+local blk = block("layer").widget
+blk._scripts.OnClick(blk, "LeftButton"); WoW.tick()
+check(DB()[1429] == b1429 and b1429 ~= nil, "left-click on 1453 keeps 1429's layers")
+eq(DB()[1453], nil, "and forgets 1453's")
+-- A subzone change on the same map keeps the layer (nothing to re-read).
+WoW.map = 1429
+target(creature(76067))
+WoW.units = {}
+WoW.fire("ZONE_CHANGED"); WoW.tick()
+eq(textOf("layer"), "2", "subzone change, same map: kept")
+-- A new map through ZONE_CHANGED re-reads what's on screen.
+WoW.map = 1453
+WoW.units.target = { guid = creature(80500) }
+WoW.fire("ZONE_CHANGED"); WoW.tick()
+eq(textOf("layer"), "1", "map change: the target is read again")
+WoW.units = {}
+WoW.map = 1429
+
 -- Unreadable server time: nothing saved, nothing ranked (never a made-up 0).
 local st = WoW.serverTime
 WoW.serverTime = WoW.Secret("time")
