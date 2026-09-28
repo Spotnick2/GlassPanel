@@ -74,3 +74,44 @@ function API.CoinText(copper)
     end
     return string.format("%dg %ds %dc", math.floor(copper / 10000), math.floor(copper / 100) % 100, copper % 100)
 end
+
+-- Hide a Blizzard frame (by global name) while one of our blocks replaces it,
+-- and give it back afterwards. Used by the clock (TimeManagerClockButton) and
+-- XP (MainStatusTrackingBarContainer).
+--   s.Want(true|false)  -- our block is visible / not
+--   s.Sync()            -- retry, e.g. when a load-on-demand Blizzard addon loads
+-- We only ever Show() the frame again if we were the ones who hid it, so a
+-- frame the user or Blizzard had hidden stays hidden. Blizzard re-shows these
+-- frames (settings, Edit Mode), so an OnShow hook re-hides while wanted. The
+-- state lives in locals, never as a field on their frame: writing into a
+-- Blizzard frame's table taints it. Only for frames that are not protected.
+-- Not handled: the user turning the frame OFF in Settings while we hide it
+-- (hidden either way, nothing to observe), so it comes back when ours goes.
+function API.Suppressor(globalName)
+    local s = { want = false }
+    local hid, hooked = false, false
+    function s.Sync()
+        local f = rawget(_G, globalName)
+        if not f then return end
+        if not hooked then
+            -- Hiding a frame that was just shown (by Blizzard, or by the user
+            -- in Settings) makes it ours to give back.
+            f:HookScript("OnShow", function(self)
+                if s.want then hid = true; self:Hide() end
+            end)
+            hooked = true
+        end
+        if s.want then
+            if f:IsShown() then hid = true end
+            f:Hide()
+        elseif hid then
+            hid = false
+            f:Show()
+        end
+    end
+    function s.Want(visible)
+        s.want = visible
+        s.Sync()
+    end
+    return s
+end
