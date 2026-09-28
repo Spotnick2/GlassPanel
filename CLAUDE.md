@@ -25,7 +25,7 @@ number*. Then check that API against the Forever dump, because Titan targets TBC
 Don't reuse its structure: no global button names, no `TitanGetVar` store, no XML, no
 per-plugin option menus, no multiple bars. Titan ships its own license. Write our own code.
 
-**Status: early.** `Glass Panel [Core]` plus the XP+, Gold and Clock plugins. Work goes through
+**Status: early.** `Glass Panel [Core]` plus plugins; `Plugins\` is the inventory. Work goes through
 GitHub issues and PRs at `github.com/Spotnick2/GlassPanel` (private).
 
 ## Layout
@@ -48,7 +48,9 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   while our block replaces it and only restores what it hid (the clock's
   `TimeManagerClockButton`). **Only for plain frames**: not Edit Mode system frames like
   `MainStatusTrackingBarContainer` (#9). `API.Plain(v)` is the one "secret becomes nil" guard;
-  use it at every read. The global `GetCoinTextureString` is **absent** on 70009;
+  use it at every read. `API.Returned(v)` asks "did the client return anything" without comparing:
+  **never write `raw ~= nil` on a raw read**, since comparing a secret (even with nil) throws on
+  the client, and the offline stub can't catch it. The global `GetCoinTextureString` is **absent** on 70009;
   use `C_CurrencyInfo`'s. `MEASURED_ON_BUILD` lives here too.
 - **`Glass.lua`**: the material, **copied** from GlassUnitFrames' **`main`** branch
   (`git -C ..\GlassUnitFrames show main:Glass.lua`), with only the namespace lines and header
@@ -102,6 +104,12 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   screen; `Bar.Layout` marks them dirty when they come back.
 - **`Plugins\Gold`, `Plugins\Clock`**: gold (secret-safe) and the clock (hides Blizzard's
   minimap clock). Plugins use the **public** API only, the same one third-party plugins get.
+- **`Plugins\Durability`** (#12): lowest durability and repair cost. Events only mark the
+  cache stale; it's rebuilt at most once per repaint (tooltip data is heavy, and only for damaged
+  items). An unreadable item marks the figure with a grey `?` and makes the cost unknown; the cost comes from
+  `C_TooltipInfo.GetInventoryItem(...).repairCost` (TitanRepair's Retail path, not in the dump:
+  unknown is shown as unknown). Secret numbers keep type `"number"` on the client, so
+  `type(x) == "number"` is no secrecy check: `API.Plain` first.
 - **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`). The bar is built at
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles
   `list | move <id> <lane> [n] | layout reset | show <id> | hide <id> | toggle | font | room |
@@ -190,6 +198,9 @@ python Tools\make_textures.py                                      # regenerate 
 - Secrets are `newproxy` userdata that throw on use. `WoW.moneySecret = true` makes `GetMoney`
   secret. No Lua 5.1 value can make a truth test or `==` throw, so those misuses are caught only
   in game and in review.
+- `loadAddon()` loads the core, then every plugin (after the core's `ADDON_LOADED`). A test file
+  that asserts on lanes sets `PLUGINS = { ... }` to pin which plugins load, so a new plugin
+  doesn't reshuffle them; `opts.plugins = false` loads the core alone.
 - `loadAddon()` starts a fresh session (new namespace, new frames) and keeps client data the
   test set on `WoW`. `opts.before` runs between file load and `ADDON_LOADED`.
 - **Mutation-test a new test**: break the behaviour and confirm it goes red.

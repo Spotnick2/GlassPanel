@@ -1,6 +1,7 @@
 -- Making room for the bar (#2).
 dofile("tests/wow_stubs.lua")
 dofile("tests/harness.lua")
+PLUGINS = { "GlassPanelXP", "GlassPanelGold", "GlassPanelClock" }   -- the lanes these tests assert on
 
 -- /gpanel covered: what the bar sits on, outermost frames only.
 loadAddon()

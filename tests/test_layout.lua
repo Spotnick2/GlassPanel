@@ -1,6 +1,7 @@
 -- Free lanes and drag and drop (#6).
 dofile("tests/wow_stubs.lua")
 dofile("tests/harness.lua")
+PLUGINS = { "GlassPanelXP", "GlassPanelGold", "GlassPanelClock" }   -- the lanes these tests assert on
 
 local L
 local function lanes()

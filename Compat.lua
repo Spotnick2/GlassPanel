@@ -28,6 +28,14 @@ function API.Plain(v)
     return v
 end
 
+-- Did the client return anything at all (a value, readable or secret)?
+-- Use this instead of `raw ~= nil` on a raw read: on the client, comparing a
+-- secret, even with nil, throws, and the offline stub can't catch that (no
+-- Lua 5.1 value can make == throw).
+function API.Returned(v)
+    return API.IsSecret(v) or v ~= nil
+end
+
 function API.ClientBuild()
     local version, build = GetBuildInfo()
     return tostring(version) .. "." .. tostring(build)

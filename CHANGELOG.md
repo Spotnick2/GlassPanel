@@ -14,5 +14,7 @@
   `/gpanel room full` keeps it full width always.
 - Every block is its own addon, grouped under Glass Panel [Core] in the AddOns list: switch off the
   ones you don't want.
+- Durability: the lowest durability among your equipped items, coloured, with the repair cost;
+  the tooltip lists damaged items.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.

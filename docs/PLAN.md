@@ -34,7 +34,7 @@ Contract: `docs/PLUGINS.md`.
 Done: **XP+** (#3), **Gold**, **Clock**. **Location** is dropped: the minimap already shows it.
 
 The owner's TBC Titan bar, still to port:
-- **Durability** (#12): lowest % and repair cost. Data reference: `TitanRepair`.
+- **Durability** (#12): lowest % and repair cost. **In progress.**
 - **Bags** (#13): used/total, special bags apart. Data reference: `TitanBag`.
 - **Professions** (#15): `C:\Projects\TitanProfessions`. `C_SkillInfo.GetSkillLineInfo` returns **a table**;
   `GetProfessions` returns `nil`s.

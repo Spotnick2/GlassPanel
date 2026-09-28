@@ -91,6 +91,10 @@ function WoW.reset()
     WoW.cursor = { 0, 0 }     -- screen pixels, as GetCursorPosition returns them
     WoW.uiScale = 1
     WoW.shift = false
+    -- Equipped items: slot -> { cur, max, cost } (cost nil: tooltip has no repairCost;
+    -- "secret" for cur/max/cost: comes back secret). Slots absent: no durability.
+    WoW.gear = {}
+    WoW.noTooltipInfo = false
 end
 
 --------------------------------------------------------------------------------
@@ -344,6 +348,32 @@ function BreakUpLargeNumbers(n)
     local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
     return (out:gsub("^,", ""))
 end
+
+-- Durability. A field set to "secret" comes back secret; tipSecret = true
+-- makes the whole tooltip-data table secret.
+local function gearField(slot, k)
+    local g = WoW.gear[slot]
+    if not g then return nil end
+    if g[k] == "secret" then return WoW.Secret("gear." .. k) end
+    return g[k]
+end
+function GetInventoryItemDurability(slot)
+    if not WoW.gear[slot] then return nil end
+    return gearField(slot, "cur"), gearField(slot, "max")
+end
+WoW.tooltipReads = 0
+C_TooltipInfo = { GetInventoryItem = function(unit, slot)
+    WoW.tooltipReads = WoW.tooltipReads + 1
+    if WoW.noTooltipInfo then error("no tooltip data") end
+    if not WoW.gear[slot] then return nil end
+    if WoW.gear[slot].tipSecret then
+        -- A secret keeps its type on the client: a real table, marked secret.
+        local t = { repairCost = gearField(slot, "cost") }
+        WoW.MarkSecret(t)
+        return t
+    end
+    return { repairCost = gearField(slot, "cost") }
+end }
 
 -- Quest log: WoW.quests = { { questID = n, xp = n, complete = bool, isHeader = bool }, ... }
 C_QuestLog = {
