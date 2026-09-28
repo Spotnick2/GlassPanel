@@ -32,7 +32,7 @@ for size, S in pairs(GlassPanel.Glass.SIZES) do
         check(io.open(f, "rb") ~= nil, size .. " texture exists: " .. f)
     end
 end
-for _, t in ipairs({ "bar_mask", "bar_fill", "gloss", "bar_edge", "grain", "sheen2" }) do
+for _, t in ipairs({ "bar_mask", "bar_fill", "gloss", "bar_edge", "grain", "sheen2", "track_fade" }) do
     check(io.open("Media/" .. t .. ".tga", "rb") ~= nil, "texture exists: " .. t)
 end
 
