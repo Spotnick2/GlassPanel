@@ -231,16 +231,21 @@ eq(w.caption._text, "Durability: ", "default: back to the block's own choice")
 GlassPanel._test.slash("label xp on")
 eq(block("xp").widget.caption._text, "", "never on a graphical block, even when asked")
 
--- Plugin options: validated.
-check(register({ id = "o1", text = function() end, options = "yes" }) == nil, "options must be a list")
-check(register({ id = "o2", text = function() end, options = { { label = 1, get = print, set = print } } }) == nil,
-      "option label must be a string")
-check(register({ id = "o3", text = function() end, options = { { label = "x", get = print } } }) == nil,
-      "option needs set")
-check(register({ id = "o4", text = function() end, options = { { label = "x", get = print, set = print, note = 5 } } }) == nil,
-      "option note must be a string")
-check(register({ id = "o5", text = function() end, options = { { label = "x", get = print, set = print } } }) ~= nil,
-      "a valid option list is accepted")
+-- Plugin options: validated; a malformed list drops the options (recorded),
+-- never the block.
+local function badOptions(id, options, what)
+    local b = register({ id = id, text = function() end, options = options })
+    check(b ~= nil, what .. ": the block still registers")
+    eq(b and b.options, nil, what .. ": its options dropped")
+    check(GlassPanel.failures[id .. ":options"] ~= nil, what .. ": recorded")
+    GlassPanel.failures[id .. ":options"] = nil
+end
+badOptions("o1", "yes", "options not a list")
+badOptions("o2", { { label = 1, get = print, set = print } }, "label not a string")
+badOptions("o3", { { label = "x", get = print } }, "no set")
+badOptions("o4", { { label = "x", get = print, set = print, note = 5 } }, "note not a string")
+local o5 = register({ id = "o5", text = function() end, options = { { label = "x", get = print, set = print } } })
+check(o5 ~= nil and o5.options ~= nil, "a valid option list is kept")
 
 -- Icons (#24): shown by default; turned off per block, the text moves left.
 local ic = register({ id = "iconic", label = "Iconic", icon = "Interface\Icons\INV_Misc_Bag_08",

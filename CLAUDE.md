@@ -47,12 +47,14 @@ core's `ADDON_LOADED`.
   `Fail(key, err)` (**the one failure recorder**, `GlassPanel.failures`, read by
   `/gpanel failures`), `CoinText`, and `Suppressor(globalName)`, which hides a Blizzard frame
   while our block replaces it and only restores what it hid (the clock's
-  `TimeManagerClockButton`). **Only for plain frames.** Edit Mode system frames
-  (`MainStatusTrackingBarContainer`, #9) go through `SystemHider(globalName)`: reparented to a
-  hidden frame, **never `Hide()`** (protected `SetShownBase`), on a timer (never inside Blizzard's
-  call), never while `EditModeManagerFrame` is shown, after combat if protected; Blizzard's own
-  `SetParent` (Edit Mode) is noticed via `hooksecurefunc` and undone the same way; `Set(false)`
-  gives it back to the parent Blizzard last gave it. `Button(parent, text, width, onClick)` is the
+  `TimeManagerClockButton`). **Only for plain frames.** Frames Blizzard manages (#9) go through
+  `SystemHider(globalName)`: reparented to a hidden frame, **never `Hide()`** (protected
+  `SetShownBase` on Edit Mode systems), on a timer (never inside Blizzard's call), never while
+  `EditModeManagerFrame` is shown (resumed from its `OnHide` hook), after combat if protected,
+  re-checked on `EDIT_MODE_LAYOUTS_UPDATED`; Blizzard's own `SetParent` is noticed via
+  `hooksecurefunc` and undone the same way; `Set(false)` gives it back to the parent Blizzard last
+  gave it. **Never reparent a frame whose children call it through `GetParent()`** (Edit Mode's
+  status bar containers do). `Button(parent, text, width, onClick)` is the
   one push-button helper. `API.Plain(v)` is the one "secret becomes nil" guard;
   use it at every read. `API.Returned(v)` asks "did the client return anything" without comparing:
   **never write `raw ~= nil` on a raw read**, since comparing a secret (even with nil) throws on
@@ -120,9 +122,11 @@ core's `ADDON_LOADED`.
 - **`Plugins\XP\XP.lua`**: XP+ (#3), the only graphical block so far (`width`/`build`/`paint`).
   Four layered bars on one `Glass.Bar` host. A level crossing is detected by the level or max
   changing (not by XP going down). **Plugin option "Hide Blizzard's XP bar"** (#9, off by default,
-  `GlassPanelXPDB.hideBlizzard`): `MainStatusTrackingBarContainer` is hidden through
-  `API.SystemHider` only while XP+ is on screen (`onShown`), and given back otherwise (the cap: a
-  rep bar may show there).
+  `GlassPanelXPDB.hideBlizzard`): `StatusTrackingBarManager` is hidden through `API.SystemHider`
+  only while XP+ is on screen (`onShown`), and given back otherwise. **Not
+  `MainStatusTrackingBarContainer`** (measured: its `UpdateShownState` calls
+  `GetParent():CheckForLayoutChange()`, so under our frame Edit Mode threw a nil call); the manager
+  doesn't use its parent. A watched rep bar (the secondary container) hides with it, as in Titan.
   `/played` is requested with `TIME_PLAYED_MSG` muted on the chat frames, one request at a time
   (a token ties the unmute, the next frame after the answer or after 10 s, to its own request),
   **never** by replacing `ChatFrame_DisplayTimePlayed`. Graphical blocks aren't painted while off

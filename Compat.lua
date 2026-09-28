@@ -158,20 +158,24 @@ function API.AutoHideScrollBar(scroll)
     sync(scroll)
 end
 
--- Hide a Blizzard Edit Mode system frame while one of our blocks replaces it
--- (#9: MainStatusTrackingBarContainer, Blizzard's XP bar), and give it back.
--- Not API.Suppressor (plain frames only): on these, Hide() goes through a
--- protected SetShownBase that a later combat show turns into
--- ADDON_ACTION_BLOCKED, and changing them inside Edit Mode's own calls taints
--- it. The references' way (ElvUI, EllesmereUI; GlassUnitFrames' unit and
--- cast bars): reparent to a hidden frame, never Hide(). Every change is
--- deferred to a timer (never inside Blizzard's call), never made while Edit
--- Mode is open (retried every 0.25 s), and waits for combat to end if the
--- frame is protected. Blizzard reparenting it (Edit Mode does) is noticed
--- through hooksecurefunc and undone the same deferred way. Giving it back
--- restores the parent Blizzard last gave it, so it shows whatever Blizzard
--- wants (a rep bar at the level cap, nothing at all).
---   local h = API.SystemHider("MainStatusTrackingBarContainer")
+-- Hide a Blizzard frame that Blizzard manages (and may show again itself)
+-- while one of our blocks replaces it, and give it back (#9: XP+ hides
+-- StatusTrackingBarManager, which holds Blizzard's XP and rep bars).
+-- The references' way (ElvUI, EllesmereUI; GlassUnitFrames' unit and cast
+-- bars): reparent to a hidden frame, never Hide() (on Edit Mode systems it
+-- goes through a protected SetShownBase that a later combat show turns into
+-- ADDON_ACTION_BLOCKED). Every change is deferred to a timer (never inside
+-- Blizzard's call), never made while Edit Mode is open (resumed when it
+-- closes), and waits for combat to end if the frame is protected. Blizzard
+-- reparenting it is noticed through hooksecurefunc and undone the same
+-- deferred way; a layout change (EDIT_MODE_LAYOUTS_UPDATED) re-checks.
+-- Giving it back restores the parent Blizzard last gave it.
+-- Pick the frame with care: one whose children call its methods through
+-- GetParent() can't be reparented under ours. Measured on 70009: Edit Mode
+-- threw "attempt to call a nil value" from MainStatusTrackingBarContainer
+-- (its UpdateShownState calls GetParent():CheckForLayoutChange()), so XP+
+-- hides the manager above it instead, which doesn't use its own parent.
+--   local h = API.SystemHider("StatusTrackingBarManager")
 --   h.Set(true)   -- hide, when safe;   h.Set(false)   -- give it back
 local systemParent
 function API.SystemHider(globalName)
@@ -192,15 +196,31 @@ function API.SystemHider(globalName)
     end
     function h.request() later(0) end
 
-    waiter:SetScript("OnEvent", function(self)
-        self:UnregisterEvent("PLAYER_REGEN_ENABLED")
-        h.request()
+    waiter:SetScript("OnEvent", function(self, event)
+        if event == "PLAYER_REGEN_ENABLED" then self:UnregisterEvent(event) end
+        if h.want or (frame and systemParent and frame:GetParent() == systemParent) then h.request() end
     end)
+    API.RegisterEvent(waiter, "EDIT_MODE_LAYOUTS_UPDATED", "hide " .. globalName)
+
+    -- Resume when Edit Mode closes (a hook: it only schedules, never acts
+    -- inside Edit Mode's own Hide).
+    local emHooked = false
+    local function afterEditMode()
+        if emHooked then return end
+        local em = rawget(_G, "EditModeManagerFrame")
+        if type(em) == "table" and em.HookScript then
+            emHooked = true
+            em:HookScript("OnHide", function() h.request() end)
+        end
+    end
 
     sync = function()
         frame = frame or rawget(_G, globalName)
-        if type(frame) ~= "table" or not frame.SetParent then return end
-        if editModeOpen() then later(0.25) return end
+        if type(frame) ~= "table" or not frame.SetParent then
+            if h.want then API.Fail("hide " .. globalName, "no such frame on this client") end
+            return
+        end
+        if editModeOpen() then afterEditMode() return end
         if API.Plain(InCombatLockdown()) ~= false and API.Plain((frame:IsProtected())) ~= false then
             API.RegisterEvent(waiter, "PLAYER_REGEN_ENABLED", "hide " .. globalName)
             return

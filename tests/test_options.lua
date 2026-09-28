@@ -143,9 +143,11 @@ eq(ob:GetChecked(), false, "reads get()")
 click(ob, true)
 eq(flag, true, "click calls set()")
 local bad = c["options:opty:2"]
+check(GlassPanel.failures["options:opty:2:get"] ~= nil, "a throwing get is recorded, under its own key")
+eq(bad:GetChecked(), false, "and shows unchecked")
+GlassPanel.failures["options:opty:2:get"] = nil
 click(bad, true)
 check(GlassPanel.failures["options:opty:2"] ~= nil, "a throwing set is recorded")
-check(next(GlassPanel.failures) ~= nil, "(a throwing get too)")
 for k in pairs(GlassPanel.failures) do GlassPanel.failures[k] = nil end
 
 -- A category whose GetID throws: /gpanel options falls back to the hint.

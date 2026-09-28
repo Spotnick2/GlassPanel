@@ -314,12 +314,15 @@ end
 
 -- Optional, off by default (TitanPanelXPP's "hide the default XP bar"):
 -- hidden only while XP+ is on screen, and given back whenever it isn't (the
--- level cap, XP disabled, the block or the bar hidden), so Blizzard shows
--- whatever it wants there then (a reputation bar at 60). Through
--- API.SystemHider: it's an Edit Mode system, reparented when safe, never
--- Hide(). The setting lives in GlassPanelXPDB (this plugin's SavedVariables;
--- first read in onShown, which runs on the first layout, after they load).
-local blizzardBar = API.SystemHider("MainStatusTrackingBarContainer")
+-- level cap, XP disabled, the block or the bar hidden). Through
+-- API.SystemHider on StatusTrackingBarManager, as TitanPanelXPP did on
+-- Retail: its two Edit Mode containers (XP while levelling, since Blizzard
+-- ranks it first; reputation) call it through GetParent(), so hiding one
+-- container under our frame broke Edit Mode (measured), and the manager goes
+-- instead. A watched reputation bar hides with it while XP+ shows. The
+-- setting lives in GlassPanelXPDB (this plugin's SavedVariables; first read
+-- in onShown, which runs on the first layout, after they load).
+local blizzardBar = API.SystemHider("StatusTrackingBarManager")
 local onScreen = false
 
 local function db()
@@ -385,7 +388,7 @@ local block = GlassPanel.RegisterBlock({
     end,
     options = {
         { label = "Hide Blizzard's XP bar",
-          note = "Only while XP+ shows; it comes back at the level cap.",
+          note = "And the reputation bar under it, while XP+ shows; both come back at the level cap.",
           get = function() return db().hideBlizzard == true end,
           set = function(on)
               db().hideBlizzard = on or nil

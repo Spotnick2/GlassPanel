@@ -20,7 +20,7 @@ local function chatFrame(i)
     return f
 end
 local function blizzardXPBar()
-    return CreateFrame("Frame", "MainStatusTrackingBarContainer", UIParent)
+    return CreateFrame("Frame", "StatusTrackingBarManager", UIParent)
 end
 
 -- The bar: four layers, texts. Blizzard's XP bar is left alone (#9).
@@ -216,10 +216,21 @@ local em = CreateFrame("Frame", "EditModeManagerFrame", UIParent)
 container:SetParent(layoutParent)
 WoW.flushTimers(0)
 eq(container._parent, layoutParent, "Edit Mode open: waits")
-em._shown = false
 WoW.flushTimers()
-check(hider.IsHidden(), "re-hidden once Edit Mode closed")
+eq(container._parent, layoutParent, "no polling while Edit Mode stays open")
+em:Hide()
+WoW.flushTimers()
+check(hider.IsHidden(), "re-hidden once Edit Mode closed (its OnHide)")
 rawset(_G, "EditModeManagerFrame", nil)
+-- An Edit Mode layout change re-checks (a move the SetParent hook didn't see).
+container._parent = layoutParent
+WoW.fire("EDIT_MODE_LAYOUTS_UPDATED"); WoW.flushTimers()
+check(hider.IsHidden(), "re-hidden after a layout change")
+-- A frame this client doesn't have: recorded, nothing thrown.
+local ghost = GlassPanel.API.SystemHider("NoSuchBlizzardFrame")
+ghost.Set(true); WoW.flushTimers()
+check(GlassPanel.failures["hide NoSuchBlizzardFrame"] ~= nil, "missing frame recorded")
+GlassPanel.failures["hide NoSuchBlizzardFrame"] = nil
 -- Protected in combat: waits for combat to end.
 container._protected = true
 container:SetParent(layoutParent)
@@ -250,7 +261,7 @@ eq(GlassPanelXPDB.hideBlizzard, nil, "off is the default: nothing stored")
 -- Saved on: applied after a reload, once XP+'s SavedVariables are in.
 GlassPanelXPDB = { hideBlizzard = true }
 local c2
-rawset(_G, "MainStatusTrackingBarContainer", nil)
+rawset(_G, "StatusTrackingBarManager", nil)
 loadAddon({ before = function() c2 = blizzardXPBar() end })
 WoW.flushTimers()
 check(T().blizzardBar.IsHidden() and c2._parent ~= UIParent, "saved setting applied at login")

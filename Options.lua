@@ -203,7 +203,11 @@ local function addPluginOptions()
             for i, o in ipairs(block.options) do
                 local key = "options:" .. block.id .. ":" .. i
                 widgets[key] = checkbox(left, o.label,
-                    function() return o.get() end,
+                    function()
+                        local ok, v = pcall(o.get)
+                        if not ok then API.Fail(key .. ":get", v) return false end
+                        return v
+                    end,
                     function(v)
                         local ok, err = pcall(o.set, v)
                         if not ok then API.Fail(key, err) end

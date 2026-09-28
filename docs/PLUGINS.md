@@ -105,9 +105,20 @@ data changed without an event. `GlassPanel.API_VERSION` is `1`.
 `RegisterEvent(frame, name, owner)` for the rare plugin that must own a frame, and `Fail(key, err)`
 to record into `/gpanel failures`, and `Suppressor(globalName)` to hide a Blizzard frame your block
 replaces while it's on screen (`s.Want(visible)` from `onShown`, `s.Sync()` when a load-on-demand
-Blizzard addon loads). It only shows the frame again if it hid it. Use it only for plain frames,
-never for Edit Mode system frames (taint risk, #9). `Plain(v)` returns `v`, or `nil` when it's
-secret: use it at every read before comparing or doing arithmetic.
+Blizzard addon loads). It only shows the frame again if it hid it. Use it only for plain frames
+Blizzard doesn't show again itself.
+
+For a frame Blizzard manages (Edit Mode, or one it shows and hides itself), use
+`SystemHider(globalName)`: `h.Set(true)` hides it by reparenting to a hidden frame, never `Hide()`,
+on a timer, never while Edit Mode is open, after combat if protected, and undoes Blizzard putting it
+back; `h.Set(false)` gives it back to its last parent; `h.IsHidden()`. Drive it from `onShown`, as
+XP+ does. **Pick the frame with care:** a frame whose children call its methods through
+`GetParent()` breaks when reparented (XP+ hides `StatusTrackingBarManager`, not the Edit Mode
+container under it, which broke Edit Mode that way). `Button(parent, text, width, onClick)` makes a
+standard push button.
+
+`Plain(v)` returns `v`, or `nil` when it's secret: use it at every read before comparing or doing
+arithmetic.
 
 `GlassPanel.Glass` is the material (`Apply`, `Bar`, `Font`, …) for a block that draws more than
 text, such as the XP bar. See `..\GlassUnitFrames\docs\GLASS-MATERIAL.md`.
