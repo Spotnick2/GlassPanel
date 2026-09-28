@@ -131,6 +131,13 @@ GlassPanel.RegisterBlock({
     order = 170,
     events = { "PLAYER_ENTERING_WORLD", "PLAYER_GUILD_UPDATE", "GUILD_ROSTER_UPDATE" },
     interval = REFRESH,
+    -- The caption is the guild's name ("Olympus: 12/148"); "Guild" when
+    -- there's none or it can't be read.
+    caption = function()
+        if not inGuild() then return nil end
+        local name = P((GetGuildInfo("player")))
+        return type(name) == "string" and name or nil
+    end,
     onEvent = function(_, event)
         stale = true
         if event ~= "GUILD_ROSTER_UPDATE" and inGuild() then request(TOOLTIP_REQUEST) end

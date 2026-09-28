@@ -40,10 +40,26 @@ function Bar.ShowsCaption(block)
     return block.showLabel ~= false
 end
 
+-- The caption's words: the block's caption(block) when it gives a plain,
+-- non-empty string (Guild: the guild's name), else its label.
+local function captionWords(block)
+    if block.caption then
+        local ok, res = Engine.Call(block, "caption", block.caption, block)
+        res = ok and API.Plain(res) or nil
+        if type(res) == "string" and res ~= "" then return res end
+    end
+    return block.label
+end
+
+-- Set the caption; true if it changed (its width moves what follows).
 function Bar.UpdateCaption(block)
     local b = block.widget
-    if not b then return end
-    b.caption:SetText(Bar.ShowsCaption(block) and (block.label .. ": ") or "")
+    if not b then return false end
+    local words = Bar.ShowsCaption(block) and (captionWords(block) .. ": ") or ""
+    if b.captionText == words then return false end
+    b.captionText = words
+    b.caption:SetText(words)
+    return true
 end
 
 -- After a caption setting changes: every block, then the layout.
@@ -242,7 +258,10 @@ function Bar.SetText(block, text)
     -- The first paint always counts as a change: a new widget's text is nil
     -- too, and a first nil must still reach Bar.Layout to hide it (and to
     -- tell its onShown), e.g. a plugin registering after startup.
-    if b.painted and b.text == text then return false end
+    -- A dynamic caption is re-read on every repaint (it can change without
+    -- the value changing).
+    local captionChanged = block.caption ~= nil and Bar.UpdateCaption(block)
+    if b.painted and b.text == text then return captionChanged end
     b.painted = true
     b.text = text
     b.label:SetText(text or "")

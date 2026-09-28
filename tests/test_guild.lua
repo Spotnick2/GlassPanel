@@ -118,5 +118,32 @@ WoW.guild.inGuild = "secret"
 WoW.fire("PLAYER_GUILD_UPDATE", "player"); WoW.tick()
 eq(textOf("guild"), "|cff888888?|r", "secret guild state: ?")
 
+-- The caption is the guild's name (owner request), re-read on each repaint.
+WoW.guild.inGuild, WoW.guild.name = true, "Forever Friends"
+loadAddon()
+eq(block("guild").widget.caption._text, "Forever Friends: ", "caption: the guild's name")
+WoW.guild.name = "Olympus"
+WoW.fire("PLAYER_GUILD_UPDATE", "player"); WoW.tick()
+eq(block("guild").widget.caption._text, "Olympus: ", "follows a rename without a count change")
+WoW.guild.name = "secret"
+WoW.fire("PLAYER_GUILD_UPDATE", "player"); WoW.tick()
+eq(block("guild").widget.caption._text, "Guild: ", "unreadable name: falls back to the label")
+WoW.MarkSecret("Hidden Guild")   -- a client secret keeps its type: a string
+WoW.guild.name = "Hidden Guild"
+WoW.fire("PLAYER_GUILD_UPDATE", "player"); WoW.tick()
+eq(block("guild").widget.caption._text, "Guild: ", "a secret string name isn't shown")
+WoW.guild.name = "Forever Friends"
+GlassPanel._test.slash("label guild off")
+eq(block("guild").widget.caption._text, "", "the label switch still applies")
+GlassPanel._test.slash("label guild default")
+check(GlassPanel.RegisterBlock({ id = "badcap", text = function() end, caption = "x" }) == nil,
+      "caption must be a function")
+-- The bar itself refuses a secret caption (defence in depth for any plugin).
+WoW.MarkSecret("Leaky")
+GlassPanel.RegisterBlock({ id = "leaky", label = "Leaky Label", text = function() return "1" end,
+                           caption = function() return "Leaky" end })
+WoW.tick()
+eq(block("leaky").widget.caption._text, "Leaky Label: ", "a secret caption falls back to the label")
+
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_guild")
