@@ -25,13 +25,13 @@ Layout.SNAP = 40       -- px: a drop this close to a gap joins it, or to an end 
 local SIDE_X = { left = 0, center = 0.5, right = 1 }
 Layout.SIDE_X = SIDE_X   -- the named lanes, for /gpanel move
 
--- The saved lanes, validated: bad entries dropped, and an id kept only in the
--- first place it appears (a hand-edited file could list it twice).
-local function saved()
-    local d = GlassPanelDB
-    if type(d) ~= "table" or type(d.layout) ~= "table" then return {} end
+-- Lanes validated: bad entries dropped, and an id kept only in the first
+-- place it appears (a hand-edited file, or an imported setup, could list it
+-- twice). Always a fresh table.
+function Layout.Clean(layout)
+    if type(layout) ~= "table" then return {} end
     local out, seen = {}, {}
-    for _, lane in ipairs(d.layout) do
+    for _, lane in ipairs(layout) do
         if type(lane) == "table" and type(lane.x) == "number" and lane.x >= 0 and lane.x <= 1
             and type(lane.ids) == "table" then
             local ids = {}
@@ -45,6 +45,12 @@ local function saved()
         end
     end
     return out
+end
+
+-- The saved lanes, validated.
+local function saved()
+    local d = GlassPanelDB
+    return Layout.Clean(type(d) == "table" and d.layout or nil)
 end
 
 local function byX(a, b) return a.x < b.x end
