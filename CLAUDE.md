@@ -229,6 +229,10 @@ includes Titan's code and the owner's TBC plugins.
 - `C:\Projects\References\forever-api-1.60.1.70009.md` is the full API dump: functions, events,
   **widget methods** (the only list of those) and the `_G` walk. It proves a name exists, not
   that it works. `GetProfessions` is listed but returns `nil x7`.
+- `C:\Projects\wow-ui-source` is Blizzard's UI source (Gethe/wow-ui-source), on the **`forever`**
+  branch: the client's own FrameXML, with the same paths and line numbers as BugSack traces. Read the
+  exact Blizzard line there before guessing, and check what a Blizzard frame expects of its parent
+  before hiding or reparenting it (#39). Other sessions share it, so check the branch first.
 - In game: `/api search <name>`.
 
 ## Forever facts that matter for a data bar
