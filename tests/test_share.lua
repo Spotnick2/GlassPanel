@@ -101,6 +101,7 @@ local function rejected(text, what, reason)
     if reason then check(err and err:find(reason, 1, true), what .. ": " .. reason .. " (got " .. tostring(err) .. ")") end
     check(deepEq(S().Current(), snapshot), what .. ": nothing changed")
 end
+GlassPanel.Settings.SetFont("friz")
 rejected("", "empty", "nothing to import")
 rejected("hello there", "garbage", "not a GlassPanel setup string")
 rejected("GP2:AAAA", "a newer version", "newer GlassPanel")
@@ -134,6 +135,13 @@ rejected(pack({ layout = { { x = 0, ids = { 42 } } } }), "id not a string", "bad
 rejected(pack({ layout = { { x = 0, ids = { "bags" } }, { x = 1, ids = { "bags" } } } }), "a block twice", "twice")
 rejected(pack({ layout = { { x = 0, ids = { a = "gold" } } } }), "ids not a list", "bad lane 1")
 rejected(pack({ layout = { x = 0 } }), "layout not a list of lanes", "layout")
+-- Sparse lists padded to fool #t: rejected, never half-read (Codex review).
+rejected(pack({ layout = { { x = 0, ids = { [1] = "gold", [3] = "bags", [4] = false, extra = "padding" } } } }),
+    "sparse ids with an extra key", "bad lane 1")
+rejected(pack({ layout = { [1] = { x = 0, ids = { "gold" } }, [3] = { x = 1, ids = { 5 } }, [4] = true, pad = 1 } }),
+    "sparse lanes with an extra key", "layout")
+rejected(pack({ layout = { { x = 0, ids = { [1] = "gold", [1.5] = "bags", [3] = "clock" } } } }),
+    "fractional index in range", "bad lane 1")
 rejected(pack("just a string"), "not a table", "not a setup")
 -- Empty lanes are left out (nothing wrong, nothing to place).
 local s3 = S().Decode(pack({ layout = { { x = 0, ids = {} }, { x = 1, ids = { "bags" } } } }))

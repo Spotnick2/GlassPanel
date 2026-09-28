@@ -207,11 +207,16 @@ local function validId(id)
     return type(id) == "string" and id ~= ""
 end
 
--- A table whose keys are exactly 1..n.
+-- A table whose keys are exactly 1..n. Checked key by key: in Lua 5.1 a
+-- sparse table's #t can equal its key count while ipairs stops at the
+-- first hole, skipping (and never validating) what follows (Codex review).
 local function isList(t)
     local n = 0
     for _ in pairs(t) do n = n + 1 end
-    return n == #t
+    for k in pairs(t) do
+        if type(k) ~= "number" or k < 1 or k > n or k % 1 ~= 0 then return false end
+    end
+    return true
 end
 
 -- id -> value map where every value passes `ok`; nil and why otherwise.
