@@ -127,6 +127,10 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   member is found; the tooltip's roster scan runs only after `GUILD_ROSTER_UPDATE` marks it stale.
   Names through `Ambiguate(name, "guild")`, never split on spaces. Left-click: `ToggleGuildFrame`. Its caption is
   the guild's name (`caption`, re-read on every repaint; `Bar.UpdateCaption`, secrets refused).
+- **`Plugins\Role`** (#20): the group role (`UnitGroupRolesAssigned`) with its inline icon, hidden
+  when not `IsInGroup`. Left-click: a `MenuUtil.CreateContextMenu` of radio items (Tank, Healer,
+  Damage, No Role) calling `UnitSetRole`; without a menu (absent or throwing) a click cycles the
+  role. A refused or throwing `UnitSetRole` prints one line.
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable
   bag (free count or family) is left out and flagged with a grey `?`. Left-click: `ToggleAllBags`.

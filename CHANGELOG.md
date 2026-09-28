@@ -26,5 +26,7 @@
 - Professions: an icon and your skill level for each primary profession, coloured by how close it is to
   the cap; the tooltip adds Cooking, First Aid and Fishing. Left-click (out of combat) opens a small
   palette: click a profession to open it.
+- Role: your group role with its icon, while you're in a group. Left-click to set Tank, Healer,
+  Damage or No Role.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.
