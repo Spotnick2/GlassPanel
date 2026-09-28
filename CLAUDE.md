@@ -75,11 +75,16 @@ TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` �
   drag isn't a click, and the drop target is recomputed after any relayout mid-drag. Hidden and empty blocks take no space. **Nothing is secure**, so the bar may be touched in combat.
 - **`Room.lua`**: making room for Blizzard's top frames (#2) **without moving any of them**. The
   bar measures a short watch list (`Room.WATCH`: minimap cluster, buffs, debuffs, ticket status,
-  unit frames) and pulls its ends in to stop short of any that reach into its band. Pure
-  `Room.Insets`; read-only `GetRect`/`IsVisible` under pcall, secrets skipped. Checked on layout,
-  scale and display events and once a second. `/gpanel room full` opts out. Moving Blizzard's
-  frames at runtime was rejected after research and a Codex review (see #2 and the porting
-  guide's Edit Mode note); an opt-in Edit Mode layout setup is its own issue.
+  unit frames) and pulls its ends in to stop short of any that reach into its band. A frame hidden
+  **on its own** (no target, no buffs) still counts, so the width doesn't jump; one whose
+  **parent** is hidden has been replaced by an addon and doesn't. Frames centred in the middle
+  fifth are ignored. Pure `Room.Insets`; read-only `GetRect`/`IsShown`/`IsVisible` under pcall,
+  every number through `API.Plain`; `Room.Update` never throws (failures go to `API.Fail`).
+  Checked on layout, scale and display events and on the engine's clock (`Engine.EverySecond`:
+  one clock for everything). `/gpanel room full` opts out; `/gpanel covered` lists frames in the
+  band as "under" or "beside" the bar. Moving Blizzard's frames at runtime was rejected after
+  research and a Codex review (see #2 and the porting guide's Edit Mode note); an opt-in Edit
+  Mode layout setup is #10.
 - **`Blocks\XP.lua`**: XP+ (#3), the only graphical block so far (`width`/`build`/`paint`).
   Four layered bars on one `Glass.Bar` host. A level crossing is detected by the level or max
   changing (not by XP going down). Blizzard's XP bar is left alone (#9).

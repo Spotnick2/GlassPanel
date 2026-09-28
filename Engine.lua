@@ -105,6 +105,13 @@ end)
 
 -- One shared clock for interval blocks. Always running, but it does nothing
 -- more than add `elapsed` until a second has passed.
+-- Core code that needs a once-a-second check (Room.lua) hooks in here, so
+-- there is one clock. Each runs under pcall; a throw is recorded by key.
+Engine.everySecond = {}   -- { { key, fn } }
+function Engine.EverySecond(key, fn)
+    Engine.everySecond[#Engine.everySecond + 1] = { key = key, fn = fn }
+end
+
 local clockFrame = CreateFrame("Frame")
 local acc = 0
 clockFrame:SetScript("OnUpdate", function(_, elapsed)
@@ -120,6 +127,10 @@ clockFrame:SetScript("OnUpdate", function(_, elapsed)
                 Engine.MarkDirty(block)
             end
         end
+    end
+    for _, e in ipairs(Engine.everySecond) do
+        local ok, err = pcall(e.fn)
+        if not ok then API.Fail(e.key, err) end
     end
 end)
 

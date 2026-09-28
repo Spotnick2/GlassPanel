@@ -143,7 +143,26 @@ function Methods.IsVisible(w)
     while p do if not p._shown then return false end; p = p._parent end
     return true
 end
-function Methods.SetPoint(w, ...) table.insert(w._points, { ... }) end
+-- The one layout the stub computes: a frame stretched across UIParent by a
+-- TOPLEFT and a TOPRIGHT point (the bar). Its width and rect follow the x
+-- offsets, and OnSizeChanged fires when the width changes, as on the client.
+local function stretchAcrossUIParent(w)
+    local l, r
+    for _, p in ipairs(w._points) do
+        if p[2] == UIParent and p[1] == "TOPLEFT" then l = p[4] or 0 end
+        if p[2] == UIParent and p[1] == "TOPRIGHT" then r = p[4] or 0 end
+    end
+    if not (l and r) then return end
+    local width, h = UIParent._width - l + r, w._height or 0
+    local changed = w._width ~= width
+    w._width = width
+    w._rect = { l, UIParent._rect[4] - h, width, h }
+    if changed and w._scripts.OnSizeChanged then w._scripts.OnSizeChanged(w, width, h) end
+end
+function Methods.SetPoint(w, ...)
+    table.insert(w._points, { ... })
+    if (select(2, ...)) == UIParent then stretchAcrossUIParent(w) end
+end
 function Methods.ClearAllPoints(w) w._points = {} end
 function Methods.GetPoint(w, i)
     local p = w._points[i or 1]
@@ -154,7 +173,7 @@ function Methods.SetSize(w, x, y) w._width, w._height = x, y end
 function Methods.SetWidth(w, x) w._width = x end
 function Methods.SetHeight(w, y) w._height = y end
 function Methods.GetWidth(w) return w._width end
-function Methods.GetLeft(w) return 0 end
+function Methods.GetLeft(w) return w._rect and w._rect[1] or 0 end
 function Methods.GetEffectiveScale(w) return WoW.uiScale end
 function Methods.SetAlpha(w, a) w._alpha = a end
 -- Rect: set w._rect = { left, bottom, width, height } in a test; the bar gets

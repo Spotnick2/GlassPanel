@@ -302,7 +302,6 @@ function Bar.SetInsets(left, right)
     f:ClearAllPoints()
     f:SetPoint("TOPLEFT", UIParent, "TOPLEFT", left, 0)
     f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -right, 0)
-    Bar.insets = { left, right }
 end
 
 function Bar.SetShown(shown)

@@ -24,7 +24,7 @@ eq(table.concat(names, ","), "BuffFrame,MinimapCluster", "covered frames: outerm
 
 GlassPanel._test.slash("covered")
 local found = false
-for _, l in ipairs(WoW.chat) do if l:find("BuffFrame  MEDIUM PROTECTED", 1, true) then found = true end end
+for _, l in ipairs(WoW.chat) do if l:find("under   BuffFrame  MEDIUM PROTECTED", 1, true) then found = true end end
 check(found, "/gpanel covered prints strata and protection")
 
 -- Room.Insets, pure: which end of the bar each frame in the band pushes in.
@@ -66,12 +66,19 @@ mc._rect = { 800, 400, 200, 208 }
 WoW.tick(1.1)
 eq(point("TOPRIGHT")[4], 0, "full width once the cluster is out of the band")
 
--- Hidden, unreadable (secret) and absent frames are ignored.
+-- Hidden ON ITS OWN still counts (the width doesn't jump when a target frame
+-- or the buffs come and go); hidden with its parent (replaced by an addon)
+-- doesn't; unreadable (secret) geometry doesn't, and nothing throws.
 mc._rect = { 800, 560, 200, 208 }
 mc._shown = false
 R.Update()
-eq(point("TOPRIGHT")[4], 0, "hidden cluster ignored")
+eq(point("TOPRIGHT")[4], -(1000 - 800 + R.MARGIN), "hidden on its own: still counts")
 mc._shown = true
+local hiddenParent = CreateFrame("Frame", nil, UIParent); hiddenParent._shown = false
+mc._parent = hiddenParent
+R.Update()
+eq(point("TOPRIGHT")[4], 0, "reparented to a hidden frame (replaced): ignored")
+mc._parent = UIParent
 mc._rect = { WoW.Secret("left"), 560, 200, 208 }
 R.Update()
 eq(point("TOPRIGHT")[4], 0, "secret geometry ignored, nothing thrown")
@@ -91,11 +98,50 @@ R.Update()
 eq(point("TOPRIGHT")[4], -(1000 - 800 + R.MARGIN / 0.5), "same frame position in UIParent units at another scale")
 WoW.uiScale = 1
 
--- Lanes follow the narrower bar (OnSizeChanged).
-bar._width = 1000 - (1000 - 800 + R.MARGIN)
-bar._scripts.OnSizeChanged(bar)
+-- Lanes follow the narrower bar (the stub fires OnSizeChanged like the client).
+R.Update()
+eq(bar._width, 1000 - (1000 - 800 + R.MARGIN), "bar narrowed")
 check(block("clock").widget.left + block("clock").widget._width <= bar._width - 8 + 0.5,
       "the right lane packs against the bar's new right end")
+
+-- A target frame appearing doesn't change the width: it counted while hidden.
+local tf = blizzard("TargetFrame", { 20, 600, 200, 168 }); tf._shown = false
+R.Update()
+local l0 = point("TOPLEFT")[4]
+eq(l0, 220 + R.MARGIN, "target frame's spot reserved while there is no target")
+tf._shown = true
+R.Update()
+eq(point("TOPLEFT")[4], l0, "and nothing moves when a target appears")
+rawset(_G, "TargetFrame", nil)
+
+-- A frame centred in the middle fifth is ignored (the ends can't route around it).
+local l2, r2 = R.Insets(1000, 768, 744, { rect(420, 560, 768, 700) })
+eq(l2 + r2, 0, "centred frame ignored")
+l2, r2 = R.Insets(1000, 768, 744, { rect(300, 440, 768, 700) })
+eq(l2, 440 + R.MARGIN, "just left of the middle fifth still counts")
+
+-- An error in Room is recorded, never thrown out of the clock.
+R.Update()
+local realGetTop = UIParent.GetTop
+UIParent.GetTop = function() error("boom") end
+check(pcall(R.Update), "Room.Update itself never throws (the event path calls it bare)")
+check(GlassPanel.failures["room"], "room failure recorded")
+UIParent.GetTop = nil   -- back to the stub's method
+GlassPanel.failures["room"] = nil
+
+-- /gpanel covered: frames in the band are "under" the bar or "beside" it.
+R.Update()   -- bar stops short of the minimap cluster
+local e2 = GlassPanel._test.coveredFrames()
+local mark = {}
+for _, e in ipairs(e2) do mark[e.name] = e.under end
+eq(mark.MinimapCluster, false, "the cluster is beside the narrowed bar")
+-- The full-screen cutoff uses the SCREEN width, not the narrowed bar's.
+local wide = blizzard("WideTopThing", { 20, 700, 750, 60 })   -- 75% of the screen, 94% of the narrowed bar
+e2 = GlassPanel._test.coveredFrames()
+local seen = false
+for _, e in ipairs(e2) do if e.name == "WideTopThing" then seen = true end end
+check(seen, "a 750 px frame isn't mistaken for a full-screen layer on a narrowed bar")
+rawset(_G, "WideTopThing", nil)
 
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_room")

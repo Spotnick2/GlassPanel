@@ -27,36 +27,49 @@ local function findBlock(id)
     return block
 end
 
--- /gpanel covered (#2): every visible frame whose screen rectangle overlaps
--- the bar's, outermost only (a covered frame's covered children are implied).
--- Screen pixels throughout (rect * effective scale), since frames differ in
--- scale. Read-only: nothing is moved, and forbidden frames are skipped.
+-- /gpanel covered (#2): every visible frame in the bar's band (the top
+-- Bar.HEIGHT of the screen), outermost only (a listed frame's children are
+-- implied), marked "under" when the bar is drawn over it and "beside" when
+-- the bar already stops short of it (Room.lua). Screen pixels throughout
+-- (rect * effective scale), since frames differ in scale. Read-only: nothing
+-- is moved, forbidden frames are skipped, every number goes through API.Plain.
+local P = API.Plain
+
+-- Screen rect { l, r, top, bottom } of f, or nil. Called under pcall.
+local function screenRect(f)
+    local l, b, w, h = f:GetRect()
+    l, b, w, h = P(l), P(b), P(w), P(h)
+    local s = P(f:GetEffectiveScale())
+    if not (l and b and w and h and s) then return nil end
+    return { l = l * s, r = (l + w) * s, top = (b + h) * s, bottom = b * s }
+end
+
+local function coveredEntry(f, bar, band, screenW)
+    if f:IsForbidden() or not f:IsVisible() or f == bar or f:GetParent() == bar then return nil end
+    local r = screenRect(f)
+    if not r then return nil end
+    local width, height = r.r - r.l, r.top - r.bottom
+    if width < 2 or height < 2 or width >= screenW * 0.9 then return nil end   -- specks and full-screen layers
+    if r.bottom >= band.top or r.top <= band.bottom then return nil end
+    local name = f:GetDebugName()
+    if type(name) ~= "string" or name:find("^GlassPanel") then return nil end
+    local under = r.r > band.l and r.l < band.r
+    return { frame = f, name = name, strata = f:GetFrameStrata(), protected = (f:IsProtected()),
+             mouse = f:IsMouseEnabled(), under = under, depth = math.floor(band.top - r.top + 0.5) }
+end
+
 local function coveredFrames()
     local bar = Bar.frame
     if not bar then return {} end
-    local s = bar:GetEffectiveScale()
-    local bl, bb, bw, bh = bar:GetRect()
-    if not bl then return {} end
-    local barTop, barBottom = (bb + bh) * s, bb * s
-    local screenW = bw * s
+    local okBar, band = pcall(screenRect, bar)
+    local okUI, ui = pcall(screenRect, UIParent)
+    if not (okBar and band and okUI and ui) then return {} end
+    local screenW = ui.r - ui.l
     local hits, isHit = {}, {}
     local f = EnumerateFrames()
     while f do
-        local ok, entry = pcall(function()
-            if f:IsForbidden() or not f:IsVisible() or f == bar or f:GetParent() == bar then return nil end
-            local l, b, w, h = f:GetRect()
-            if not l or API.IsSecret(l) or API.IsSecret(h) then return nil end
-            local fs = f:GetEffectiveScale()
-            local top, bottom, width = (b + h) * fs, b * fs, w * fs
-            if width < 2 or h * fs < 2 or width >= screenW * 0.9 then return nil end   -- specks and full-screen layers
-            if bottom >= barTop or top <= barBottom then return nil end
-            local name = f:GetDebugName()
-            if name:find("^GlassPanel") then return nil end
-            return { frame = f, name = name, strata = f:GetFrameStrata(),
-                     protected = (f:IsProtected()), mouse = f:IsMouseEnabled(),
-                     depth = math.floor(barTop - top + 0.5) }
-        end)
-        if ok and entry then hits[#hits + 1] = entry; isHit[f] = true end
+        local fine, entry = pcall(coveredEntry, f, bar, band, screenW)
+        if fine and entry then hits[#hits + 1] = entry; isHit[f] = true end
         f = EnumerateFrames(f)
     end
     local out = {}
@@ -152,11 +165,11 @@ local function slash(msg)
         GlassPanel.Room.Update()
     elseif cmd == "covered" then
         local list = coveredFrames()
-        say(#list .. " frame(s) under the bar (name, strata, protected, mouse, px from the screen top):")
+        say(#list .. " frame(s) in the bar's band (under = drawn over, beside = the bar stops short):")
         for i, e in ipairs(list) do
             if i > 30 then say("  ...") break end
-            say(string.format("  %s  %s%s%s  %d", e.name, e.strata, e.protected and " PROTECTED" or "",
-                e.mouse and " mouse" or "", e.depth))
+            say(string.format("  %s  %s  %s%s%s  %d", e.under and "under " or "beside", e.name, e.strata,
+                e.protected and " PROTECTED" or "", e.mouse and " mouse" or "", e.depth))
         end
     elseif cmd == "failures" then
         local n = 0
