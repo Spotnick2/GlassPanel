@@ -1,16 +1,17 @@
 -- Bar.lua: the glass strip across the top of the screen, one button per block,
 -- and the layout. It knows how to draw a block, never what a block means.
 --
--- Blocks sit in two lanes: "left" packs from the left edge, "right" from the
--- right edge. Within a lane, `order` then registration order decides. A
--- block's width follows its text, so a relayout runs after any flush that
+-- Where blocks go is Layout.lua's model (free lanes, #6); this file places
+-- the widgets, and lets the user drag them: drop near a gap to join that
+-- lane, on empty space to start a lane, shift-drag to move a whole lane.
+-- A block's width follows its text, so a relayout runs after any flush that
 -- repainted something.
 --
 -- Nothing here is secure: the bar parents no secure frame, so it can be
 -- shown, hidden and relaid out in combat.
 
 GlassPanel = GlassPanel or {}
-local API, Glass, Engine = GlassPanel.API, GlassPanel.Glass, GlassPanel.Engine
+local API, Glass, Engine, Layout = GlassPanel.API, GlassPanel.Glass, GlassPanel.Engine, GlassPanel.Layout
 local Bar = {}
 GlassPanel.Bar = Bar
 
@@ -18,8 +19,6 @@ Bar.HEIGHT = 24         -- UIParent units; the screen is 768 tall at default sca
 Bar.FONT_SIZE = 12
 local ICON = 14
 local PAD = 4           -- inside a block, around icon and text
-local GAP = 8           -- between blocks
-local EDGE = 8          -- from the bar's ends to the first block
 
 local function db() return GlassPanelDB end
 
@@ -39,7 +38,9 @@ local function onEnter(button)
     if not block.tooltip then return end
     GameTooltip:SetOwner(button, "ANCHOR_NONE")
     GameTooltip:ClearAllPoints()
-    if block.side == "right" then
+    -- The side the block's centre is on (a wide block's left edge can be left
+    -- of the middle while most of it is right of it).
+    if (button.left or 0) + button:GetWidth() / 2 > Bar.frame:GetWidth() / 2 then
         GameTooltip:SetPoint("TOPRIGHT", button, "BOTTOMRIGHT", 0, -4)
     else
         GameTooltip:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 0, -4)
@@ -56,7 +57,98 @@ local function onLeave(button)
     if GameTooltip:GetOwner() == button then GameTooltip:Hide() end
 end
 
+--------------------------------------------------------------------------------
+-- Dragging
+--------------------------------------------------------------------------------
+
+local drag            -- { button, block, lane = shift-drag, startX, grab } while dragging
+local lastDragStop = -1
+local STILL = 10      -- px: a drag that moved less than this is a wobbly click
+
+-- The cursor's x in bar coordinates.
+local function cursorX()
+    local x = GetCursorPosition()
+    return x / Bar.frame:GetEffectiveScale() - (Bar.frame:GetLeft() or 0)
+end
+
+-- What a drop at the cursor would do. Cached per cursor x (the marker asks
+-- every frame); Bar.Layout clears the cache, since a relayout mid-drag moves
+-- the slots under a still cursor.
+--   { none }  moved less than STILL px: a click that wobbled also starts a
+--             drag, and must leave everything where it was;
+--   { laneX } shift-drag: the whole lane moves by the cursor's displacement;
+--   otherwise Layout.DropTarget, with the block released where the hand
+--   left it (the cursor minus the grab offset), not centred on the cursor.
+local function dropTarget()
+    local cx = cursorX()
+    if drag.cachedX == cx then return drag.cached end
+    local W = Bar.frame:GetWidth()
+    local t
+    if math.abs(cx - drag.startX) < STILL then
+        t = { none = true }
+    elseif drag.lane then
+        t = Layout.LaneTarget(Bar.geometry or {}, W, drag.block.id, cx - drag.startX)
+    else
+        t = Layout.DropTarget(Bar.geometry or {}, W, cx, drag.block.id, cx - drag.grab,
+            drag.button:GetWidth())
+    end
+    drag.cachedX, drag.cached = cx, t
+    return t
+end
+
+local function updateMarker()
+    local t = dropTarget()
+    Bar.marker:SetShown(not t.none)
+    if t.none then return end
+    Bar.marker:ClearAllPoints()
+    Bar.marker:SetPoint("CENTER", Bar.content, "LEFT", t.slotX, 0)
+end
+
+local function onDragStart(button)
+    local cx = cursorX()
+    drag = { button = button, block = button.block, lane = IsShiftKeyDown(),
+             startX = cx, grab = cx - (button.left or 0) }
+    button:SetAlpha(0.4)
+    GameTooltip:Hide()
+    Bar.dragFrame:Show()
+end
+
+-- Put everything back to rest. `relayout` is false when called from an
+-- OnHide that Bar.Layout itself may have caused.
+local function endDrag(relayout)
+    if not drag then return end
+    drag.button:SetAlpha(1)
+    Bar.marker:Hide()
+    Bar.dragFrame:Hide()
+    drag = nil
+    lastDragStop = GetTime()
+    if relayout then Bar.Layout() end
+end
+
+local function onDragStop()
+    if not drag then return end
+    local t = dropTarget()
+    local id, W = drag.block.id, Bar.frame:GetWidth()
+    if t.laneX then
+        Layout.MoveLane(id, t.laneX, W)
+    elseif t.x then
+        Layout.Move(id, { x = t.x }, W)
+    elseif not t.none then
+        Layout.Move(id, { lane = t.lane, index = t.index }, W)
+    end
+    endDrag(true)
+end
+
+-- A hidden frame may never get OnDragStop: end the drag when the dragged
+-- block (its text went empty) or the whole bar is hidden mid-drag, so the
+-- marker and the click guard can't get stuck.
+local function onHide(button)
+    if drag and drag.button == button then endDrag(false) end
+end
+
 local function onClick(button, mouseButton)
+    -- The release that ends a drag is not a click.
+    if drag or GetTime() - lastDragStop < 0.2 then return end
     local block = button.block
     if block.onClick then Engine.Call(block, "onClick", block.onClick, block, mouseButton) end
 end
@@ -71,6 +163,10 @@ function Bar.Attach(block)
     b:SetScript("OnEnter", onEnter)
     b:SetScript("OnLeave", onLeave)
     b:SetScript("OnClick", onClick)
+    b:RegisterForDrag("LeftButton")
+    b:SetScript("OnDragStart", onDragStart)
+    b:SetScript("OnDragStop", onDragStop)
+    b:SetScript("OnHide", onHide)
 
     -- The HIGHLIGHT layer is drawn only while the mouse is over the button.
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
@@ -117,30 +213,29 @@ function Bar.SetText(block, text)
     return true
 end
 
-local function sorted(side)
-    local list = {}
-    for _, block in ipairs(Engine.blocks) do
-        if block.side == side and block.widget then list[#list + 1] = block end
-    end
-    table.sort(list, function(a, c)
-        if a.order ~= c.order then return a.order < c.order end
-        return a._seq < c._seq
-    end)
-    return list
+local function shows(block)
+    local b = block.widget
+    -- nil never shows; "" shows only for a fixed-width (graphical) block.
+    return not Bar.IsHidden(block) and b.text ~= nil and (b.text ~= "" or block.width ~= nil)
 end
 
--- Place every block. Hidden blocks and empty ones (text "") take no space.
+local function widthOf(id)
+    local block = Engine.byId[id]
+    if not (block and block.widget and shows(block)) then return nil end
+    local b = block.widget
+    return block.width or (b.textX + math.ceil(b.label:GetStringWidth()) + PAD)
+end
+
+-- Place every block. Hidden blocks and empty ones take no space.
 -- A block's onShown hears when it appears on or leaves the screen, the whole
 -- bar being toggled included.
 function Bar.Layout()
     if not Bar.frame then return end
     local barShown = Bar.frame:IsShown()
-    for _, side in ipairs({ "left", "right" }) do
-        local offset = EDGE
-        for _, block in ipairs(sorted(side)) do
-            local b = block.widget
-            -- nil never shows; "" shows only for a fixed-width (graphical) block.
-            local show = not Bar.IsHidden(block) and b.text ~= nil and (b.text ~= "" or block.width ~= nil)
+    for _, block in ipairs(Engine.blocks) do
+        local b = block.widget
+        if b then
+            local show = shows(block)
             b:SetShown(show)
             local visible = show and barShown
             if b.visible ~= visible then
@@ -149,17 +244,17 @@ function Bar.Layout()
                 if visible and block.paint then Engine.MarkDirty(block) end
             end
             b.visible = visible
-            if show then
-                local w = block.width or (b.textX + math.ceil(b.label:GetStringWidth()) + PAD)
-                b:SetWidth(w)
-                b:ClearAllPoints()
-                if side == "left" then
-                    b:SetPoint("LEFT", Bar.content, "LEFT", offset, 0)
-                else
-                    b:SetPoint("RIGHT", Bar.content, "RIGHT", -offset, 0)
-                end
-                offset = offset + w + GAP
-            end
+        end
+    end
+    Bar.geometry = Layout.Place(Layout.Current(), Bar.frame:GetWidth(), widthOf)
+    if drag then drag.cachedX = nil end   -- the slots under the cursor may have moved
+    for _, lane in ipairs(Bar.geometry) do
+        for _, it in ipairs(lane.items) do
+            local b = Engine.byId[it.id].widget
+            b.left = it.left
+            b:SetWidth(it.width)
+            b:ClearAllPoints()
+            b:SetPoint("LEFT", Bar.content, "LEFT", it.left, 0)
         end
     end
 end
@@ -180,6 +275,20 @@ function Bar.Build()
     content:SetFrameLevel(Glass.ContentLevel(f))
     Bar.content = content
     Bar.frame = f
+    -- Lanes are placed by fractions of the width: redo them when it changes.
+    f:SetScript("OnSizeChanged", function() Bar.Layout() end)
+    f:SetScript("OnHide", function() endDrag(false) end)
+
+    -- The drop marker, and a frame that moves it while a drag is on.
+    local marker = content:CreateTexture(nil, "OVERLAY")
+    marker:SetSize(2, Bar.HEIGHT - 6)
+    marker:SetColorTexture(0.5, 0.83, 1, 0.9)
+    marker:Hide()
+    Bar.marker = marker
+    local dragFrame = CreateFrame("Frame", nil, f)
+    dragFrame:Hide()
+    dragFrame:SetScript("OnUpdate", function() if drag then updateMarker() end end)
+    Bar.dragFrame = dragFrame
 
     for _, block in ipairs(Engine.blocks) do Bar.Attach(block) end
 end

@@ -8,6 +8,7 @@
 Compat.lua
 Glass.lua
 Engine.lua
+Layout.lua
 Bar.lua
 Blocks\XP.lua
 Blocks\Gold.lua

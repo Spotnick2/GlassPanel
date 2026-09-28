@@ -30,7 +30,7 @@ issues and PRs (the repo name will be GlassPanel).
 
 ## Layout
 
-TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Bar.lua` → `Blocks\*.lua` →
+TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` → `Blocks\*.lua` →
 `GlassPanel.lua`.
 
 - **`Compat.lua`**: `GlassPanel.API`, the only route to client APIs that moved or may be absent.
@@ -58,11 +58,21 @@ TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Bar.lua` → 
   - every block callback runs under `pcall` via `Engine.Call`;
   - `text` must return a plain string. Secrets and non-strings are refused and recorded.
   - A relayout runs only when some text changed.
+- **`Layout.lua`**: where blocks go (#6), a pure model. **Free lanes**: `{ x = 0..1, ids }`,
+  where `0` packs left, `1` packs right and anything else is centred on the anchor. **Lanes never
+  overlap**: `Place` pushes them `LANE_GAP` apart (they only overlap when nothing fits). A drop
+  over a block joins that block's lane; within `SNAP` px of a gap joins that gap; elsewhere it
+  starts a lane where the block was released (grab offset kept). One edge rule, `Layout.Anchor`
+  (in px): a span within `SNAP` of an end snaps to it. Lanes within `SNAP` of each other merge.
+  Empty lanes are pruned, duplicate saved ids dropped. Saved in `GlassPanelDB.layout`, ids in
+  visual order. Ids of blocks that aren't loaded are kept. Blocks never placed follow
+  `side`/`order`. `Layout.Current()` is the cached read; mutators use `Lanes()` then `Save`.
 - **`Bar.lua`**: the strip (`GlassPanelBar`, full width at the top of `UIParent`, strata
   `MEDIUM`, `Glass.Apply(..., "small")`, mouse-less so empty space clicks through), one plain
-  `Button` per block (icon, `Glass.Font` label, `HIGHLIGHT` hover), and the layout. There are two
-  lanes, `left` and `right`, sorted by `order` then registration. Hidden and empty blocks take
-  no space. **Nothing is secure**, so the bar may be touched in combat.
+  `Button` per block (icon, `Glass.Font` label, `HIGHLIGHT` hover), placing them from
+  `Layout.lua`, and dragging: a marker shows the drop slot, shift-drag moves a lane by the
+  cursor's displacement, a drag under 10 px is a wobbly click (no move), the release that ends a
+  drag isn't a click, and the drop target is recomputed after any relayout mid-drag. Hidden and empty blocks take no space. **Nothing is secure**, so the bar may be touched in combat.
 - **`Blocks\XP.lua`**: XP+ (#3), the only graphical block so far (`width`/`build`/`paint`).
   Four layered bars on one `Glass.Bar` host. A level crossing is detected by the level or max
   changing (not by XP going down). Blizzard's XP bar is left alone (#9).
@@ -74,7 +84,7 @@ TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Bar.lua` → 
   plugin would, so the built-ins keep the contract honest.
 - **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`). The bar is built at
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles
-  `list | show <id> | hide <id> | toggle | font | failures`.
+  `list | move <id> <lane> [n] | layout reset | show <id> | hide <id> | toggle | font | failures`.
 - **`Plugins\<Name>\`**: each is a separate addon (`## Dependencies: GlassPanel`). Deploy puts
   each at the AddOns top level, and `.pkgmeta` `move-folders` does the same when packaging (the
   AltStable pattern).

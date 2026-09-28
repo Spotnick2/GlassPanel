@@ -34,8 +34,8 @@ GlassPanel.RegisterBlock({
     id       = "gearscore",            -- required, unique; also the /gpanel show|hide name
     label    = "GearScore",            -- for /gpanel list (default: id)
     icon     = 132627,                 -- file ID or path; optional
-    side     = "left",                 -- "left" (default) or "right"
-    order    = 60,                     -- lower sits nearer the bar's end (default 100)
+    side     = "left",                 -- default lane: "left", "center" or "right" (users drag it anywhere)
+    order    = 60,                     -- in the default lane, lower sits nearer the bar's end (default 100)
     events   = { "PLAYER_EQUIPMENT_CHANGED", "PLAYER_ENTERING_WORLD" },
     interval = nil,                    -- seconds (>= 1) for data with no event
     onInit   = function(block) end,    -- once, at registration (before your SavedVariables load!)

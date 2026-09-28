@@ -26,11 +26,14 @@ loadAddon()
 for _, blk in ipairs(GlassPanel.Engine.blocks) do
     local w = blk.widget
     w._scripts.OnEnter(w); w._scripts.OnLeave(w); w._scripts.OnClick(w, "LeftButton")
+    w._scripts.OnDragStart(w); WoW.tick(); w._scripts.OnDragStop(w)
 end
 GlassPanel._test.slash("font friz")
 GlassPanel._test.slash("hide gold")
 GlassPanel._test.slash("toggle")
 GlassPanel._test.slash("list")
+GlassPanel._test.slash("move gold 40")
+GlassPanel._test.slash("layout reset")
 GlassPanel._test.slash("failures")
 WoW.tick(1.1); WoW.tick()
 
