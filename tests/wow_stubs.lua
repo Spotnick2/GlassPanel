@@ -95,6 +95,10 @@ function WoW.reset()
     -- "secret" for cur/max/cost: comes back secret). Slots absent: no durability.
     WoW.gear = {}
     WoW.noTooltipInfo = false
+    -- Bags: bag index -> { slots, free, family, name } (family 0: normal;
+    -- "secret" for free/family: comes back secret).
+    WoW.bags = { [0] = { slots = 16, free = 4, family = 0 } }
+    WoW.bagToggles = 0
 end
 
 --------------------------------------------------------------------------------
@@ -282,7 +286,8 @@ function print(...)
 end
 
 SlashCmdList = {}
-Enum = { UITextureSliceMode = { Stretched = 0, Tiled = 1 } }
+Enum = { UITextureSliceMode = { Stretched = 0, Tiled = 1 },
+         BagIndex = { Keyring = -2, Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5 } }
 function CreateColor(r, g, b, a) return { r = r, g = g, b = b, a = a } end
 function GetBuildInfo() return "1.60.1", "70009", "Sep 23 2026", 16001 end
 function InCombatLockdown() return false end
@@ -374,6 +379,26 @@ C_TooltipInfo = { GetInventoryItem = function(unit, slot)
     end
     return { repairCost = gearField(slot, "cost") }
 end }
+
+-- Containers: WoW.bags[bag].
+local function bagField(bag, k)
+    local b = WoW.bags[bag]
+    if not b then return nil end
+    if b[k] == "secret" then return WoW.Secret("bag." .. k) end
+    return b[k]
+end
+C_Container = {
+    GetContainerNumSlots = function(bag)
+        if not WoW.bags[bag] then return 0 end
+        return bagField(bag, "slots")
+    end,
+    GetContainerNumFreeSlots = function(bag)
+        if not WoW.bags[bag] then return 0, 0 end
+        return bagField(bag, "free"), bagField(bag, "family")
+    end,
+    GetBagName = function(bag) local b = WoW.bags[bag]; return b and (b.name or ("Bag " .. bag)) or nil end,
+}
+function ToggleAllBags() WoW.bagToggles = WoW.bagToggles + 1 end
 
 -- Quest log: WoW.quests = { { questID = n, xp = n, complete = bool, isHeader = bool }, ... }
 C_QuestLog = {

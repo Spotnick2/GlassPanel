@@ -35,7 +35,7 @@ Done: **XP+** (#3), **Gold**, **Clock**. **Location** is dropped: the minimap al
 
 The owner's TBC Titan bar, still to port:
 - **Durability** (#12): lowest % and repair cost. **In progress.**
-- **Bags** (#13): used/total, special bags apart. Data reference: `TitanBag`.
+- **Bags** (#13): used/total, special bags apart. **In progress.**
 - **Professions** (#15): `C:\Projects\TitanProfessions`. `C_SkillInfo.GetSkillLineInfo` returns **a table**;
   `GetProfessions` returns `nil`s.
 - **GearScore / iLvl** (#16): `C:\Projects\TitanGearScore`. Vanilla item levels are small.

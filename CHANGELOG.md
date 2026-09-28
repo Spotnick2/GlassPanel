@@ -16,5 +16,7 @@
   ones you don't want.
 - Durability: the lowest durability among your equipped items, coloured, with the repair cost;
   the tooltip lists damaged items.
+- Bags: used and total bag slots, coloured as they fill; quivers and soul bags listed apart.
+  Left-click opens or closes your bags.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.
