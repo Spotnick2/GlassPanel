@@ -277,6 +277,15 @@ function Methods.SetStatusBarTexture(b, file)
 end
 function Methods.GetStatusBarTexture(b) return b._fill end
 
+-- Buttons: enabled state. EditBox: focus and selection, recorded.
+function Methods.Enable(b) b._disabled = false end
+function Methods.Disable(b) b._disabled = true end
+function Methods.IsEnabled(b) return not b._disabled end
+function Methods.SetFocus(e) e._focused = true end
+function Methods.ClearFocus(e) e._focused = false end
+function Methods.HighlightText(e) e._highlighted = true end
+function Methods.SetMaxLetters(e, n) e._maxLetters = n end
+
 -- GameTooltip: records its lines.
 function Methods.SetOwner(tt, owner) tt._owner = owner; tt._lines = {} end
 function Methods.GetOwner(tt) return tt._owner end

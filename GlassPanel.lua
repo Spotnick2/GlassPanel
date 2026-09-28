@@ -80,6 +80,8 @@ local COMMANDS = {
     { "hide <id>", "hide a block" },
     { "toggle", "show or hide the whole bar" },
     { "font arial|friz", "bar font" },
+    { "export", "the whole setup as a string, to copy to another account" },
+    { "import", "paste a setup exported on another account" },
     { "failures", "errors recorded from blocks and event registration" },
     { "room auto|full", "auto: the bar ends short of Blizzard's top frames (default); full: always full width" },
     { "covered", "list the frames under the bar (#2 measurement)" },
@@ -159,6 +161,10 @@ local function slash(msg)
         if not Settings.SetFont(arg:lower()) then say("fonts: arial, friz") end
     elseif cmd == "room" then
         if not Settings.SetRoom(arg:lower()) then say("room: auto or full (now " .. db.room .. ")") end
+    elseif cmd == "export" then
+        GlassPanel.Share.Open("export")
+    elseif cmd == "import" then
+        GlassPanel.Share.Open("import")
     elseif cmd == "covered" then
         local list = coveredFrames()
         say(#list .. " frame(s) in the bar's band (under = drawn over, beside = the bar stops short):")
