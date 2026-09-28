@@ -22,7 +22,7 @@ local function blizzardXPBar()
     return CreateFrame("Frame", "MainStatusTrackingBarContainer", UIParent)
 end
 
--- The bar: four layers, texts, Blizzard's XP bar hidden while ours shows.
+-- The bar: four layers, texts. Blizzard's XP bar is left alone (#9).
 WoW.player.rested = 3000
 WoW.quests = {
     { questID = 1, isHeader = true },
@@ -48,16 +48,10 @@ eq(values[1], 12000, "xp layer = current")
 eq(values[2], 14000, "completed-quest layer = current + completed")
 eq(values[3], 15000, "rested layer = current + rested")
 eq(values[4], 15500, "incomplete-quest layer = current + all quest XP")
-eq(bxp._shown, false, "Blizzard XP bar hidden while ours shows")
-
--- Blizzard's bar shown again (Edit Mode, the user) while ours is up: hidden,
--- and given back when ours goes.
-bxp:Show()
-eq(bxp._shown, false, "re-shown Blizzard XP bar hidden again")
+eq(bxp._shown, true, "Blizzard XP bar (an Edit Mode system frame) never touched")
 GlassPanel._test.slash("hide xp")
-eq(bxp._shown, true, "given back when ours is hidden")
 GlassPanel._test.slash("show xp")
-eq(bxp._shown, false, "hidden again when ours returns")
+eq(bxp._shown, true, "not by hiding or showing ours either")
 
 -- /played asked for quietly: chat frames muted, then restored.
 eq(WoW.playedRequests, 1, "time played requested once at login")
@@ -100,8 +94,37 @@ eq(T().S.sessionXP, 0, "right-click resets the session")
 b.widget._scripts.OnClick(b.widget, "LeftButton")
 eq(WoW.playedRequests, 2, "left-click asks for time played")
 eq(chat1._events.TIME_PLAYED_MSG, nil, "muted again for the click")
+b.widget._scripts.OnClick(b.widget, "LeftButton")
+eq(WoW.playedRequests, 2, "no second request while one is pending (its answer would print)")
 WoW.flushTimers(10)   -- no answer: the fallback gives chat back
 eq(chat1._events.TIME_PLAYED_MSG, true, "unmuted by the fallback when no answer comes")
+eq(T().pending(), nil, "request no longer pending")
+b.widget._scripts.OnClick(b.widget, "MiddleButton")
+b.widget._scripts.OnClick(b.widget, "Button4")
+eq(WoW.playedRequests, 2, "only left-click asks for time played (nothing pending here)")
+
+-- An older request's fallback timer can't unmute a newer request.
+b.widget._scripts.OnClick(b.widget, "LeftButton")                -- request A
+WoW.fire("TIME_PLAYED_MSG", 7300, 100); WoW.flushTimers(0)       -- answered: A's 10 s timer still queued
+local staleTimer = WoW.timers[1].fn
+b.widget._scripts.OnClick(b.widget, "LeftButton")                -- request B
+eq(chat1._events.TIME_PLAYED_MSG, nil, "muted for request B")
+staleTimer()
+eq(chat1._events.TIME_PLAYED_MSG, nil, "A's stale fallback leaves B's mute alone")
+WoW.fire("TIME_PLAYED_MSG", 7300, 100); WoW.flushTimers()
+eq(chat1._events.TIME_PLAYED_MSG, true, "B's answer unmutes")
+
+-- An unsolicited /played (the user typed it) is recorded, and touches no mute.
+WoW.fire("TIME_PLAYED_MSG", 9000, 200); WoW.flushTimers()
+eq(T().S.played, 9000, "user's own /played recorded")
+
+-- A level crossed with the new XP ABOVE the old: counted in full.
+b.widget._scripts.OnClick(b.widget, "RightButton")
+WoW.player.xp, WoW.player.maxXP, WoW.player.level = 100, 1400, 3
+b.widget._scripts.OnClick(b.widget, "RightButton")
+WoW.player.xp, WoW.player.maxXP, WoW.player.level = 600, 2100, 4
+WoW.fire("PLAYER_XP_UPDATE", "player")
+eq(T().S.sessionXP, 1900, "1300 to finish level 3 + 600 into level 4")
 
 -- Quest scan is cached: QUEST_LOG_UPDATE only marks it stale.
 WoW.quests = { { questID = 20, xp = 900, complete = true } }
@@ -109,24 +132,41 @@ WoW.fire("QUEST_LOG_UPDATE")
 WoW.tick()
 check(tooltipHas("Completed\t900"), "quest xp rescanned after QUEST_LOG_UPDATE")
 
+-- Reward XP depends on the level: a level-up alone rescans.
+WoW.quests = { { questID = 20, xp = 450, complete = true } }
+WoW.fire("PLAYER_LEVEL_UP", 5); WoW.tick()
+check(tooltipHas("Completed\t450"), "quest xp rescanned after a level-up")
+
+-- Hidden: no painting (no quest scans); shown again: catches up.
+local scans = 0
+local realReward = GetQuestLogRewardXP
+GetQuestLogRewardXP = function(id) scans = scans + 1; return realReward(id) end
+GlassPanel._test.slash("hide xp")
+WoW.quests = { { questID = 20, xp = 300, complete = true } }
+WoW.fire("QUEST_LOG_UPDATE"); WoW.tick()
+eq(scans, 0, "no quest scan while hidden")
+GlassPanel._test.slash("show xp"); WoW.tick()
+check(scans > 0, "scanned once back on screen")
+local seg = {}
+for _, w in ipairs(WoW.frames) do if w._type == "StatusBar" then seg[#seg + 1] = w._value end end
+table.sort(seg)
+eq(seg[2], WoW.player.xp + 300, "bar repainted with the new quest XP")
+GetQuestLogRewardXP = realReward
+
 check(next(GlassPanel.failures) == nil, "no failures")
 
--- Capped: the block hides and gives Blizzard's bar back.
-rawset(_G, "MainStatusTrackingBarContainer", nil)
+-- Capped: the block hides.
 WoW.player = { level = 60, maxLevel = 60, xp = 0, maxXP = 0, xpDisabled = false }
-loadAddon({ before = function() bxp = blizzardXPBar() end })
+loadAddon()
 eq(xpBlock().widget._shown, false, "hidden at the level cap")
-eq(bxp._shown, true, "Blizzard XP bar untouched at the cap")
 
 -- Leveling on the fly into the cap hides it.
-rawset(_G, "MainStatusTrackingBarContainer", nil)
 WoW.player = { level = 59, maxLevel = 60, xp = 100, maxXP = 1000, xpDisabled = false }
-loadAddon({ before = function() bxp = blizzardXPBar() end })
-eq(bxp._shown, false, "hidden below the cap")
+loadAddon()
+eq(xpBlock().widget._shown, true, "shown below the cap")
 WoW.player.level, WoW.player.maxXP = 60, 0
 WoW.fire("PLAYER_LEVEL_UP", 60); WoW.fire("PLAYER_XP_UPDATE", "player"); WoW.tick()
 eq(xpBlock().widget._shown, false, "hidden on reaching the cap")
-eq(bxp._shown, true, "Blizzard XP bar given back")
 
 -- XP disabled by the player behaves like the cap.
 WoW.player = { level = 30, maxLevel = 60, xp = 100, maxXP = 1000, xpDisabled = true }
@@ -140,7 +180,6 @@ eq(xpBlock().widget._shown, false, "hidden while XP is secret")
 WoW.fire("PLAYER_XP_UPDATE", "player"); WoW.tick()
 check(tooltipHas("not available"), "tooltip says so")
 check(next(GlassPanel.failures) == nil, "no failures while secret")
-rawset(_G, "MainStatusTrackingBarContainer", nil)
 
 -- Durations.
 local d = T().duration

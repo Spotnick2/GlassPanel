@@ -23,6 +23,12 @@ local EDGE = 8          -- from the bar's ends to the first block
 
 local function db() return GlassPanelDB end
 
+-- Whether the block is (or, when not yet laid out, may be) on screen: not
+-- hidden by the user, and the bar shown.
+function Bar.OnScreen(block)
+    return not Bar.IsHidden(block) and Bar.frame ~= nil and Bar.frame:IsShown()
+end
+
 function Bar.IsHidden(block)
     local d = db()
     return d and d.hidden and d.hidden[block.id] == true
@@ -82,7 +88,12 @@ function Bar.Attach(block)
         x = PAD + ICON + PAD
     end
     b.textX = x
-    local fs = Glass.Font(b, Bar.FONT_SIZE, "LEFT")
+    -- The label sits on its own layer ABOVE anything a graphical block builds
+    -- (the XP bar goes up to +6), so an error mark is never covered by it.
+    local top = CreateFrame("Frame", nil, b)
+    top:SetAllPoints(b)
+    top:SetFrameLevel(b:GetFrameLevel() + 10)
+    local fs = Glass.Font(top, Bar.FONT_SIZE, "LEFT")
     fs:SetPoint("LEFT", b, "LEFT", x, 0)
     b.label = fs
 
@@ -126,8 +137,10 @@ function Bar.Layout()
             local show = not Bar.IsHidden(block) and b.text ~= nil and (b.text ~= "" or block.width ~= nil)
             b:SetShown(show)
             local visible = show and barShown
-            if block.onShown and b.visible ~= visible then
-                Engine.Call(block, "onShown", block.onShown, block, visible)
+            if b.visible ~= visible then
+                if block.onShown then Engine.Call(block, "onShown", block.onShown, block, visible) end
+                -- Paint was skipped while off screen: catch up now.
+                if visible and block.paint then Engine.MarkDirty(block) end
             end
             b.visible = visible
             if show then

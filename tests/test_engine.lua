@@ -158,6 +158,7 @@ eq(textOf("badevent"), "ok", "block still painted")
 -- Graphical blocks: width, build, paint.
 loadAddon()
 check(register({ id = "w1", text = function() end, width = 5 }) == nil, "refused: width too small")
+check(register({ id = "w3", text = function() end, width = 0 / 0 }) == nil, "refused: width NaN")
 check(register({ id = "w2", text = function() end, build = true }) == nil, "refused: build not a function")
 local builds, paints, txt = 0, 0, ""
 local g = register({ id = "graph", width = 120, text = function() return txt end,
@@ -175,6 +176,16 @@ eq(paints, 1, "no paint while hidden")
 register({ id = "badpaint", width = 50, text = function() return "" end, paint = function() error("p") end })
 WoW.tick()
 check(GlassPanel.failures["badpaint:paint"], "paint error recorded")
+-- A graphical block's error mark is drawn above whatever it built.
+local covered
+register({ id = "badgraph", width = 60, text = function() error("t") end,
+           build = function(blk)
+               covered = CreateFrame("Frame", nil, blk.widget)
+               covered:SetFrameLevel(blk.widget:GetFrameLevel() + 6)
+           end })
+WoW.tick()
+check(textOf("badgraph"):find("error"), "error text set")
+check(block("badgraph").widget.label._parent._level > covered._level, "error label above the block's own frames")
 register({ id = "badbuild", width = 50, text = function() return "" end, build = function() error("b") end })
 WoW.tick()
 check(GlassPanel.failures["badbuild:build"], "build error recorded, block still registered")

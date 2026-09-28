@@ -53,7 +53,8 @@ end
 -- changed. The contract is a plain string, or nil for "not on the bar": a
 -- secret would reach the width measurement and the layout arithmetic, so it
 -- is refused here, at the boundary. Then the block's own paint hook, if any,
--- draws whatever it built (only while it has something to show).
+-- draws whatever it built: only while its text is valid and non-nil and it
+-- is on screen.
 local function paint(block)
     local text
     local ok, res = call(block, "text", block.text, block)
@@ -69,7 +70,9 @@ local function paint(block)
         text = res
     end
     local changed = GlassPanel.Bar ~= nil and GlassPanel.Bar.SetText(block, text)
-    if block.paint and text ~= nil and text ~= ERROR_TEXT then
+    -- Not while hidden (the user's /gpanel hide, or the bar toggled off):
+    -- Bar.Layout marks the block dirty again when it comes back on screen.
+    if block.paint and text ~= nil and text ~= ERROR_TEXT and GlassPanel.Bar.OnScreen(block) then
         call(block, "paint", block.paint, block)
     end
     return changed
@@ -173,7 +176,7 @@ function GlassPanel.RegisterBlock(spec)
             if type(e) ~= "string" then return invalid(spec, "events must be a list of event names") end
         end
     end
-    if spec.width ~= nil and (type(spec.width) ~= "number" or spec.width < 16) then
+    if spec.width ~= nil and (type(spec.width) ~= "number" or spec.width ~= spec.width or spec.width < 16) then
         return invalid(spec, "width must be a number of pixels, at least 16")
     end
     for _, key in ipairs({ "onEvent", "tooltip", "onClick", "onInit", "onShown", "build", "paint" }) do

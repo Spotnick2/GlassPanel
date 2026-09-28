@@ -52,7 +52,7 @@ A block that draws more than text (the XP bar, `Blocks\XP.lua`) adds:
 ```lua
     width = 360,                            -- fixed width in px; "" text then still shows the block, nil hides it
     build = function(block) end,            -- once, when block.widget exists: create your own frames on it
-    paint = function(block) end,            -- after every repaint while the text is non-nil
+    paint = function(block) end,            -- after every repaint while its text is valid and non-nil and it's on screen
 ```
 
 `onInit` runs when you call `RegisterBlock`, which is usually while your files load, **before**
@@ -82,11 +82,13 @@ data changed without an event. `GlassPanel.API_VERSION` is `1`.
 
 ## Helpers
 
-`GlassPanel.API`: `Print`, `IsSecret`, `CoinText(copper)` (coin icons, `nil` for a secret),
+`GlassPanel.API`: `Print`, `IsSecret`, `Plain`, `CoinText(copper)` (coin icons, `nil` for a secret),
 `RegisterEvent(frame, name, owner)` for the rare plugin that must own a frame, and `Fail(key, err)`
 to record into `/gpanel failures`, and `Suppressor(globalName)` to hide a Blizzard frame your block
 replaces while it's on screen (`s.Want(visible)` from `onShown`, `s.Sync()` when a load-on-demand
-Blizzard addon loads). It only shows the frame again if it hid it.
+Blizzard addon loads). It only shows the frame again if it hid it. Use it only for plain frames,
+never for Edit Mode system frames (taint risk, #9). `Plain(v)` returns `v`, or `nil` when it's
+secret: use it at every read before comparing or doing arithmetic.
 
 `GlassPanel.Glass` is the material (`Apply`, `Bar`, `Font`, …) for a block that draws more than
 text, such as the XP bar. See `..\GlassUnitFrames\docs\GLASS-MATERIAL.md`.

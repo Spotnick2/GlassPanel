@@ -10,11 +10,7 @@ local API = GlassPanel.API
 
 local sessionStart   -- copper at the first plain read this session
 
-local function money()
-    local m = GetMoney()
-    if API.IsSecret(m) then return nil end
-    return m
-end
+local function money() return API.Plain(GetMoney()) end
 
 GlassPanel.RegisterBlock({
     id = "gold",

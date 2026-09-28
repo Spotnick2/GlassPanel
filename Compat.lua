@@ -21,6 +21,13 @@ function API.IsSecret(v)
     return issecretvalue ~= nil and issecretvalue(v) == true
 end
 
+-- A value, or nil when it is secret. Secrecy is tested FIRST: even `== nil`
+-- on a secret is a comparison. Use at the point of every read.
+function API.Plain(v)
+    if API.IsSecret(v) then return nil end
+    return v
+end
+
 function API.ClientBuild()
     local version, build = GetBuildInfo()
     return tostring(version) .. "." .. tostring(build)
@@ -66,7 +73,8 @@ end
 -- realm, and nothing says the formatter accepts one.
 function API.CoinText(copper)
     -- Secrecy first: even == nil on a secret is a comparison.
-    if API.IsSecret(copper) or copper == nil then return nil end
+    copper = API.Plain(copper)
+    if copper == nil then return nil end
     local fmt = C_CurrencyInfo and C_CurrencyInfo.GetCoinTextureString
     if fmt then
         local ok, text = pcall(fmt, copper)

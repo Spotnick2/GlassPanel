@@ -32,7 +32,9 @@ local COLORS = {
     xp         = { 0.25, 0.60, 0.90, 0.95 },
 }
 
-local blizzardXP = API.Suppressor("MainStatusTrackingBarContainer")
+-- Blizzard's XP bar is NOT hidden here: MainStatusTrackingBarContainer is an
+-- Edit Mode system frame, and hiding it from addon code (in combat, inside
+-- Edit Mode's own show path) risks tainting Edit Mode (#9).
 
 -- Session and played-time state. nil means unknown, never 0.
 local S = {
@@ -41,11 +43,7 @@ local S = {
     questComplete = 0, questIncomplete = 0, questDirty = true,
 }
 
--- Secrecy first: even == nil on a secret is a comparison.
-local function plain(v)
-    if API.IsSecret(v) then return nil end
-    return v
-end
+local plain = API.Plain
 
 local function capped()
     if IsXPUserDisabled() then return true end
@@ -69,43 +67,63 @@ end
 local function resetSession()
     S.sessionStart, S.sessionXP, S.lastGain = GetTime(), 0, 0
     S.lastXP, S.lastMax = readXP()
+    S.lastLevel = plain(UnitLevel("player"))
 end
 
+-- A level was crossed when the level (or the level's max XP) changed, not
+-- when XP went down: 100/1400 + 1900 XP = level up at 600/2100, which is
+-- more XP than before. Several levels in one gain can't be told apart (the
+-- in-between maxes are unknown) and count as one.
 local function onXPUpdate()
     local cur, max = readXP()
     if cur == nil then return end
-    if S.lastXP == nil then S.lastXP, S.lastMax = cur, max return end
-    local delta = cur - S.lastXP
-    if delta < 0 then delta = (S.lastMax - S.lastXP) + cur end   -- crossed a level
+    local level = plain(UnitLevel("player"))
+    if S.lastXP == nil then S.lastXP, S.lastMax, S.lastLevel = cur, max, level return end
+    local crossed = (level ~= nil and S.lastLevel ~= nil and level > S.lastLevel) or max ~= S.lastMax
+    local delta
+    if crossed then
+        delta = (S.lastMax - S.lastXP) + cur
+    else
+        delta = cur - S.lastXP
+    end
     if delta > 0 then
         S.sessionXP = S.sessionXP + delta
         S.lastGain = delta
     end
-    S.lastXP, S.lastMax = cur, max
+    S.lastXP, S.lastMax, S.lastLevel = cur, max, level
 end
 
 --------------------------------------------------------------------------------
 -- Time played, asked for without printing to chat
 --------------------------------------------------------------------------------
 
+-- One request at a time: a second RequestTimePlayed while one is pending
+-- would get its answer after chat is unmuted, and print. `pending` is the
+-- current request's token, so an older request's fallback timer can't unmute
+-- in the middle of a newer one.
 local muted = {}
+local pending
 
 local function unmuteChat()
     for _, f in ipairs(muted) do f:RegisterEvent("TIME_PLAYED_MSG") end
     muted = {}
+    pending = nil
 end
 
 local function requestPlayed()
-    if #muted == 0 then
-        for i = 1, rawget(_G, "NUM_CHAT_WINDOWS") or 10 do
-            local f = rawget(_G, "ChatFrame" .. i)
-            if f and f:IsEventRegistered("TIME_PLAYED_MSG") then
-                f:UnregisterEvent("TIME_PLAYED_MSG")
-                muted[#muted + 1] = f
-            end
+    if pending then return end   -- the answer is on its way
+    for i = 1, rawget(_G, "NUM_CHAT_WINDOWS") or 10 do
+        local f = rawget(_G, "ChatFrame" .. i)
+        if f and f:IsEventRegistered("TIME_PLAYED_MSG") then
+            f:UnregisterEvent("TIME_PLAYED_MSG")
+            muted[#muted + 1] = f
         end
-        C_Timer.After(10, unmuteChat)   -- in case the answer never comes
     end
+    local token = {}
+    pending = token
+    C_Timer.After(10, function()   -- in case the answer never comes
+        if pending == token then unmuteChat() end
+    end)
     RequestTimePlayed()
 end
 
@@ -138,7 +156,9 @@ local function scanQuests()
     return complete, incomplete
 end
 
--- Cached: QUEST_LOG_UPDATE fires often, so events only mark the cache stale.
+-- Cached, rescanned at most once per repaint (the engine batches a burst of
+-- QUEST_LOG_UPDATEs into one) and not at all while the block is hidden;
+-- the tooltip reuses the last scan.
 local function questXP()
     if S.questDirty then
         S.questDirty = false
@@ -309,12 +329,17 @@ local block = GlassPanel.RegisterBlock({
         elseif event == "PLAYER_XP_UPDATE" then
             onXPUpdate()
         elseif event == "PLAYER_LEVEL_UP" then
+            S.questDirty = true   -- reward XP depends on the player's level
             local total = playedNow()
             if total then S.played, S.playedLevel, S.playedAt = total, 0, GetTime() end
         elseif event == "TIME_PLAYED_MSG" then
             local total, lvl = plain(a1), plain(a2)
             if total and lvl then S.played, S.playedLevel, S.playedAt = total, lvl, GetTime() end
-            C_Timer.After(0, unmuteChat)   -- after this event has been delivered
+            -- Unmute only for our own request, after this event is delivered.
+            if pending then
+                local token = pending
+                C_Timer.After(0, function() if pending == token then unmuteChat() end end)
+            end
         elseif event == "QUEST_LOG_UPDATE" or event == "QUEST_TURNED_IN" then
             S.questDirty = true
         end
@@ -326,17 +351,16 @@ local block = GlassPanel.RegisterBlock({
     end,
     build = build,
     paint = paint,
-    onShown = function(_, visible) blizzardXP.Want(visible) end,
     tooltip = tooltip,
     onClick = function(_, button)
         if button == "RightButton" then
             resetSession()
             API.Print("XP+ session reset")
             GlassPanel.Refresh("xp")
-        else
+        elseif button == "LeftButton" then
             requestPlayed()
         end
     end,
 })
 
-if block then block._test = { S = S, duration = duration, muted = function() return muted end } end
+if block then block._test = { S = S, duration = duration, pending = function() return pending end } end

@@ -37,8 +37,10 @@ TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Bar.lua` → 
   It has `IsSecret`, `RegisterEvent` (reports throws and refusals, naming the block that asked),
   `Fail(key, err)` (**the one failure recorder**, `GlassPanel.failures`, read by
   `/gpanel failures`), `CoinText`, and `Suppressor(globalName)`, which hides a Blizzard frame
-  while our block replaces it and only restores what it hid (clock: `TimeManagerClockButton`;
-  XP: `MainStatusTrackingBarContainer`). The global `GetCoinTextureString` is **absent** on 70009;
+  while our block replaces it and only restores what it hid (the clock's
+  `TimeManagerClockButton`). **Only for plain frames**: not Edit Mode system frames like
+  `MainStatusTrackingBarContainer` (#9). `API.Plain(v)` is the one "secret becomes nil" guard;
+  use it at every read. The global `GetCoinTextureString` is **absent** on 70009;
   use `C_CurrencyInfo`'s. `MEASURED_ON_BUILD` lives here too.
 - **`Glass.lua`**: the material, **copied** from GlassUnitFrames' **`main`** branch
   (`git -C ..\GlassUnitFrames show main:Glass.lua`), with only the namespace lines and header
@@ -62,9 +64,12 @@ TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Bar.lua` → 
   lanes, `left` and `right`, sorted by `order` then registration. Hidden and empty blocks take
   no space. **Nothing is secure**, so the bar may be touched in combat.
 - **`Blocks\XP.lua`**: XP+ (#3), the only graphical block so far (`width`/`build`/`paint`).
-  Four layered bars on one `Glass.Bar` host. Session XP follows wrap-around across a level.
-  `/played` is requested with `TIME_PLAYED_MSG` muted on the chat frames (unmuted on the next
-  frame after the answer, or after 10 s), **never** by replacing `ChatFrame_DisplayTimePlayed`.
+  Four layered bars on one `Glass.Bar` host. A level crossing is detected by the level or max
+  changing (not by XP going down). Blizzard's XP bar is left alone (#9).
+  `/played` is requested with `TIME_PLAYED_MSG` muted on the chat frames, one request at a time
+  (a token ties the unmute, the next frame after the answer or after 10 s, to its own request),
+  **never** by replacing `ChatFrame_DisplayTimePlayed`. Graphical blocks aren't painted while off
+  screen; `Bar.Layout` marks them dirty when they come back.
 - **`Blocks\*.lua`**: built-in blocks. They register through the **public** API, exactly as a
   plugin would, so the built-ins keep the contract honest.
 - **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`). The bar is built at
