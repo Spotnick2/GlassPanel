@@ -102,6 +102,11 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   screen; `Bar.Layout` marks them dirty when they come back.
 - **`Plugins\Gold`, `Plugins\Clock`**: gold (secret-safe) and the clock (hides Blizzard's
   minimap clock). Plugins use the **public** API only, the same one third-party plugins get.
+- **`Plugins\Durability`** (#12): lowest durability and repair cost. Everything is measured
+  once per event into a cache (tooltip data is heavy); the cost comes from
+  `C_TooltipInfo.GetInventoryItem(...).repairCost` (TitanRepair's Retail path, not in the dump:
+  unknown is shown as unknown). Secret numbers keep type `"number"` on the client, so
+  `type(x) == "number"` is no secrecy check: `API.Plain` first.
 - **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`). The bar is built at
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles
   `list | move <id> <lane> [n] | layout reset | show <id> | hide <id> | toggle | font | room |
@@ -190,6 +195,9 @@ python Tools\make_textures.py                                      # regenerate 
 - Secrets are `newproxy` userdata that throw on use. `WoW.moneySecret = true` makes `GetMoney`
   secret. No Lua 5.1 value can make a truth test or `==` throw, so those misuses are caught only
   in game and in review.
+- `loadAddon()` loads the core, then every plugin (after the core's `ADDON_LOADED`). A test file
+  that asserts on lanes sets `PLUGINS = { ... }` to pin which plugins load, so a new plugin
+  doesn't reshuffle them; `opts.plugins = false` loads the core alone.
 - `loadAddon()` starts a fresh session (new namespace, new frames) and keeps client data the
   test set on `WoW`. `opts.before` runs between file load and `ADDON_LOADED`.
 - **Mutation-test a new test**: break the behaviour and confirm it goes red.

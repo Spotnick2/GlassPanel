@@ -74,9 +74,19 @@ function loadAddon(opts)
     -- Then each plugin, the way the client does it: after the core's
     -- ADDON_LOADED (## Dependencies: GlassPanel), so its blocks register
     -- onto a bar that already exists. opts.plugins = false: the core alone.
-    if opts.plugins ~= false then
+    -- opts.plugins: false (core alone), a list of addon names, or nil for the
+    -- file-wide PLUGINS list a test may set (layout tests pin theirs so a new
+    -- plugin doesn't reshuffle the lanes they assert on), else every plugin.
+    local allow = opts.plugins
+    if allow == nil then allow = rawget(_G, "PLUGINS") end
+    local only
+    if type(allow) == "table" then
+        only = {}
+        for _, n in ipairs(allow) do only[n] = true end
+    end
+    if allow ~= false then
         for _, p in ipairs(plugins()) do
-            if p.toc then
+            if p.toc and (not only or only[p.name]) then
                 local pns = {}
                 for _, file in ipairs(tocFiles(p.toc, p.dir)) do
                     local chunk = assert(loadfile(file))

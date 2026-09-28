@@ -1,6 +1,7 @@
 -- XP+ (#3): bar layers, session math, /played, capped and secret handling.
 dofile("tests/wow_stubs.lua")
 dofile("tests/harness.lua")
+PLUGINS = { "GlassPanelXP", "GlassPanelGold", "GlassPanelClock" }   -- the lanes these tests assert on
 
 local function xpBlock() return block("xp") end
 local function T() return xpBlock()._test end

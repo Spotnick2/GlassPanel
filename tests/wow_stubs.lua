@@ -91,6 +91,13 @@ function WoW.reset()
     WoW.cursor = { 0, 0 }     -- screen pixels, as GetCursorPosition returns them
     WoW.uiScale = 1
     WoW.shift = false
+    -- Equipped items: slot -> { cur, max, cost } (cost nil: tooltip has no repairCost;
+    -- "secret" for cur/max/cost: comes back secret). Slots absent: no durability.
+    WoW.gear = {}
+    WoW.noTooltipInfo = false
+    -- Bags: bag index -> { slots, free, family } (family 0: normal).
+    WoW.bags = { [0] = { slots = 16, free = 4, family = 0 } }
+    WoW.bagToggles = 0
 end
 
 --------------------------------------------------------------------------------
@@ -346,6 +353,36 @@ function BreakUpLargeNumbers(n)
 end
 
 -- Quest log: WoW.quests = { { questID = n, xp = n, complete = bool, isHeader = bool }, ... }
+-- Durability. A field set to "secret" comes back secret.
+local function gearField(slot, k)
+    local g = WoW.gear[slot]
+    if not g then return nil end
+    if g[k] == "secret" then return WoW.Secret("gear." .. k) end
+    return g[k]
+end
+function GetInventoryItemDurability(slot)
+    if not WoW.gear[slot] then return nil end
+    return gearField(slot, "cur"), gearField(slot, "max")
+end
+C_TooltipInfo = { GetInventoryItem = function(unit, slot)
+    if WoW.noTooltipInfo then error("no tooltip data") end
+    if not WoW.gear[slot] then return nil end
+    return { repairCost = gearField(slot, "cost") }
+end }
+
+-- Containers: WoW.bags[bag] = { slots, free, family, name }.
+C_Container = {
+    GetContainerNumSlots = function(bag) local b = WoW.bags[bag]; return b and b.slots or 0 end,
+    GetContainerNumFreeSlots = function(bag)
+        local b = WoW.bags[bag]
+        if not b then return 0, 0 end
+        if b.free == "secret" then return WoW.Secret("free"), b.family end
+        return b.free, b.family
+    end,
+    GetBagName = function(bag) local b = WoW.bags[bag]; return b and (b.name or ("Bag " .. bag)) or nil end,
+}
+function ToggleAllBags() WoW.bagToggles = WoW.bagToggles + 1 end
+
 C_QuestLog = {
     GetNumQuestLogEntries = function() return #WoW.quests, #WoW.quests end,
     GetInfo = function(i)

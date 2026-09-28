@@ -1,6 +1,7 @@
 -- The block contract: registration, batching, isolation, layout.
 dofile("tests/wow_stubs.lua")
 dofile("tests/harness.lua")
+PLUGINS = { "GlassPanelXP", "GlassPanelGold", "GlassPanelClock" }   -- the lanes these tests assert on
 
 local function register(spec) return GlassPanel.RegisterBlock(spec) end
 

@@ -1,6 +1,7 @@
 -- The built-in blocks.
 dofile("tests/wow_stubs.lua")
 dofile("tests/harness.lua")
+PLUGINS = { "GlassPanelXP", "GlassPanelGold", "GlassPanelClock" }   -- the lanes these tests assert on
 
 -- Gold: coin text, and the session delta in the tooltip.
 WoW.money = 1234567
