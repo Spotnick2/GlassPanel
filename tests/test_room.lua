@@ -157,6 +157,8 @@ local buffs = blizzard("BuffFrame", { 400, 700, 360, 64 })
 local container = CreateFrame("Frame", nil, buffs); container._rect = { 759, 763, 1, 1 }
 buffs.AuraContainer = container
 local collapse = CreateFrame("Button", nil, buffs); collapse._rect = { 761, 734, 15, 30 }
+buffs.CollapseAndExpandButton = collapse
+collapse._shown = false   -- its own case below
 local selection = CreateFrame("Frame", nil, buffs); selection._rect = { 400, 700, 360, 64 }; selection._shown = false
 local function aura(x)
     local b = CreateFrame("Button", nil, container); b._rect = { x, 730, 30, 30 }
@@ -166,7 +168,8 @@ local function aura(x)
 end
 local a1, a2 = aura(720), aura(680)
 a1._shown, a2._shown = false, false
--- A 1x1 anchor under the container (private-aura style): a point, not an icon.
+-- A 1x1 anchor under the container (private-aura style): a point, not an
+-- icon, but looked into.
 local pin = CreateFrame("Frame", nil, container); pin._rect = { 700, 740, 1, 1 }
 R.NewSession()
 eq(point("TOPRIGHT")[4], 0, "no buffs up: the empty grid box takes no room (nor the collapse button, nor the 1x1 anchor)")
@@ -253,6 +256,76 @@ eq(point("TOPRIGHT")[4], 0, "secret icon rect skipped")
 a1._rect = { 720, 730, 30, 30 }
 R.NewSession()
 eq(point("TOPRIGHT")[4], -(1000 - 720 + R.MARGIN), "back")
+-- Icons hanging off a 1x1 sub-anchor are found (anchors are looked into),
+-- and so is one four levels under AuraContainer.
+a1._shown = false
+local pinned = aura(600); pinned._parent = pin
+R.NewSession()
+eq(point("TOPRIGHT")[4], -(1000 - 600 + R.MARGIN), "icon under a 1x1 sub-anchor found")
+pinned._shown = false
+local l2 = CreateFrame("Frame", nil, pin); l2._rect = { 700, 740, 1, 1 }
+local l3 = CreateFrame("Frame", nil, l2); l3._rect = { 700, 740, 1, 1 }
+local deep = aura(620); deep._parent = l3   -- container > pin > l2 > l3 > icon: level 4
+R.NewSession()
+eq(point("TOPRIGHT")[4], -(1000 - 620 + R.MARGIN), "an icon four levels down is found (DEPTH 4)")
+deep._shown = false
+a1._shown = true
+R.NewSession()
+
+-- The collapse/expand button is live and clickable: the bar gives it room
+-- even with no buffs up.
+a1._shown = false
+collapse._shown = true
+R.NewSession()
+eq(point("TOPRIGHT")[4], -(1000 - 761 + R.MARGIN), "no buffs: the bar stops at the collapse button")
+collapse._shown = false
+a1._shown = true
+R.NewSession()
+
+-- Resized (not only moved): starts over too.
+a2._shown = true
+R.Update()
+a2._shown = false
+buffs._rect = { 400, 700, 340, 64 }   -- same left edge and top: only its width (right edge) changed
+R.Update()
+eq(point("TOPRIGHT")[4], -(1000 - 720 + R.MARGIN), "aura frame resized: measured afresh")
+buffs._rect = { 400, 700, 360, 64 }
+R.Update()
+
+-- One child throwing mid-read keeps the known extent (no jump to full
+-- width for a tick) and is recorded.
+local realRect = a1.GetRect
+a1.GetRect = function() error("child broke") end
+R.Update()
+eq(point("TOPRIGHT")[4], -(1000 - 720 + R.MARGIN), "a throwing child: extent kept")
+check(GlassPanel.failures["room:BuffFrame"] ~= nil, "and recorded")
+a1.GetRect = realRect
+GlassPanel.failures["room:BuffFrame"] = nil
+
+-- Edit Mode's shown state read through API.Plain: a secret reading isn't
+-- taken for "open" (and doesn't throw).
+local em = CreateFrame("Frame", "EditModeManagerFrame", UIParent)
+em.IsShown = function() return WoW.Secret("shown") end
+R.Update()
+check(not select(1, R.Explain()[2]:find("Edit Mode open", 1, true)), "secret IsShown: not open")
+rawset(_G, "EditModeManagerFrame", nil)
+
+-- An icon count only where it means something.
+local hider2 = CreateFrame("Frame", nil, UIParent); hider2._shown = false
+buffs._parent = hider2
+R.Update()
+local line = R.Explain()[2]
+check(line:find("replaced", 1, true) and not line:find("icon(s) now", 1, true), "replaced: no stale icon count (" .. line .. ")")
+buffs._parent = UIParent
+R.NewSession()
+
+-- room full: why says nothing was measured (no stale or blanket "absent").
+GlassPanel._test.slash("room full")
+WoW.chat = {}
+GlassPanel._test.slash("room why")
+check(table.concat(WoW.chat, " | "):find("nothing is measured", 1, true), "room full: why says so")
+GlassPanel._test.slash("room auto")
+
 -- /gpanel room why never throws out of the command.
 local realExplain = R.Explain
 R.Explain = function() error("explain broke") end

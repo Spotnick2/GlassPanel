@@ -23,14 +23,17 @@
 -- the bar stopped ~350 px short of a lone buff. Measured on 70009: the
 -- icons hang off BuffFrame.AuraContainer (DebuffFrame.AuraContainer too), a
 -- 1x1 anchor at the grid's corner that does NOT size to them; BuffFrame also
--- holds a CollapseAndExpandButton (15x30) and a hidden Selection box. So the
--- icons are the visible frames under AuraContainer between ICON_MIN and
--- ICON_MAX units a side (bigger ones are containers, looked into), never the
--- rest of the frame. Their union only GROWS within a session: the bar steps in
+-- holds a CollapseAndExpandButton (15x30, visible, clickable) and a hidden
+-- Selection box. So the icons are the visible frames under AuraContainer
+-- between ICON_MIN and ICON_MAX units a side (bigger ones are containers and
+-- smaller ones anchors: both looked into, up to DEPTH levels), plus the
+-- collapse button while it shows (the bar mustn't sit on a live button);
+-- never the rest of the frame. Their union only GROWS within a session: the bar steps in
 -- once as buffs appear and doesn't jiggle as they come and go (it does step,
 -- unlike a frame hidden on its own, which holds its place from the start). A
 -- new session measures afresh: a reload, zoning, an Edit Mode, scale or
--- display change, Edit Mode closing, or the aura frame itself moving. While
+-- display change, Edit Mode closing, or the aura frame itself moving or
+-- resizing (its whole rect is compared). While
 -- Edit Mode is open (EditModeManagerFrame shown) its example auras aren't
 -- recorded. No icon seen yet: the frame takes no room.
 --
@@ -55,7 +58,7 @@ Room.MIDDLE = 0.2      -- a frame centred in this middle fraction of the screen 
 Room.AURAS = { BuffFrame = true, DebuffFrame = true }   -- measured by their icons (#33)
 Room.ICON_MIN = 8      -- UI units: smaller is an anchor (AuraContainer is 1x1), not an icon
 Room.ICON_MAX = 100    -- UI units: bigger than any aura icon, smaller than the grid box
-Room.DEPTH = 3         -- how far under AuraContainer to look for icons
+Room.DEPTH = 4         -- levels under AuraContainer looked into for icons
 
 -- Pure. W: the screen width; bandTop/bandBottom: the bar's band (screen px,
 -- y up); rects: { l, r, top, bottom } in screen px. A rect in the band sits on
@@ -83,10 +86,13 @@ local rects, pool = {}, {}
 -- Aura frames: the widest extent of their icons seen this session, and
 -- where the aura frame itself was then (it moving starts over), by name.
 local seen, anchor = {}, {}
+local fresh = {}   -- a reused accumulator per aura frame until its first icon
 -- Why each watched frame counted or not, and how many icons were read, for
 -- /gpanel room why.
 local why, icons = {}, {}
 local editWasOpen = false
+local editOpen = false   -- this check's reading, taken once in update()
+local measured = "not yet"   -- "yes", "full" (room full: nothing measured), "not yet"
 
 -- A frame's screen rect (l, r, top, bottom in screen px, then its own width
 -- and height in its units), or nil when unreadable. Shared with /gpanel
@@ -100,15 +106,19 @@ function Room.ScreenRect(f)
 end
 local screenRect = Room.ScreenRect
 
--- f's children into a reused table per depth: no per-second garbage.
+-- f's children into a reused table per depth: one GetChildren call, no
+-- per-second garbage.
 local scratch = {}
+local function fill(t, ...)
+    local n = select("#", ...)
+    for i = 1, n do t[i] = (select(i, ...)) end
+    for i = n + 1, #t do t[i] = nil end
+    return t, n
+end
 local function children(f, depth)
     local t = scratch[depth] or {}
     scratch[depth] = t
-    local n = select("#", f:GetChildren())
-    for i = 1, n do t[i] = (select(i, f:GetChildren())) end
-    for i = n + 1, #t do t[i] = nil end
-    return t, n
+    return fill(t, f:GetChildren())
 end
 
 local function grow(acc, l, r, top, bottom)
@@ -120,10 +130,15 @@ local function grow(acc, l, r, top, bottom)
     end
 end
 
+local function isIcon(w, h)
+    return w >= Room.ICON_MIN and h >= Room.ICON_MIN and w <= Room.ICON_MAX and h <= Room.ICON_MAX
+end
+
 -- Add the outermost visible icon-sized frames under f to acc, and return
 -- how many: a frame within ICON_MIN..ICON_MAX is taken whole (an aura
--- button, whatever small frames it holds); a bigger one is a container,
--- looked into; a smaller one is an anchor, skipped.
+-- button, whatever small frames it holds); a bigger one (a container) or a
+-- smaller one (an anchor the icons hang off, like AuraContainer itself) is
+-- looked into.
 local function addIcons(f, acc, depth)
     local found = 0
     local kids, n = children(f, depth)
@@ -131,11 +146,9 @@ local function addIcons(f, acc, depth)
         local c = kids[i]
         if not c:IsForbidden() and c:IsVisible() then
             local l, r, top, bottom, w, h = screenRect(c)
-            if l and w <= Room.ICON_MAX and h <= Room.ICON_MAX then
-                if w >= Room.ICON_MIN and h >= Room.ICON_MIN then
-                    grow(acc, l, r, top, bottom)
-                    found = found + 1
-                end
+            if l and isIcon(w, h) then
+                grow(acc, l, r, top, bottom)
+                found = found + 1
             elseif l and depth < Room.DEPTH then
                 found = found + addIcons(c, acc, depth + 1)
             end
@@ -147,12 +160,13 @@ end
 -- Whether Edit Mode is open (its example auras fill the grids then).
 local function editModeOpen()
     local m = rawget(_G, "EditModeManagerFrame")
-    return type(m) == "table" and m.IsShown and m:IsShown() == true
+    return type(m) == "table" and m.IsShown ~= nil and API.Plain(m:IsShown()) == true
 end
 
 -- Fill `out` with f's screen rect; false when it doesn't count (absent,
 -- replaced, unreadable). Called under pcall: never throws out of Room.
 local function readRect(f, out, name)
+    icons[name] = nil
     if f:IsForbidden() then why[name] = "forbidden" return false end
     if not f:IsVisible() then
         -- Hidden on its own (it comes back) counts; hidden with its parent doesn't.
@@ -160,19 +174,38 @@ local function readRect(f, out, name)
         if f:IsShown() or not (p and p:IsVisible()) then why[name] = "replaced (parent hidden)" return false end
     end
     if Room.AURAS[name] then
-        -- The aura frame moved (Edit Mode, another addon): start over.
-        local fl, _, ftop = screenRect(f)
+        -- The aura frame moved or resized (Edit Mode, another addon): start over.
+        local fl, fr, ftop, fbottom = screenRect(f)
         local at = anchor[name]
-        if at and (at[1] ~= fl or at[2] ~= ftop) then seen[name] = nil end
-        anchor[name] = { fl, ftop }
-        local acc = seen[name] or {}
+        if not at then
+            at = {}
+            anchor[name] = at
+        elseif at[1] ~= fl or at[2] ~= fr or at[3] ~= ftop or at[4] ~= fbottom then
+            seen[name] = nil
+        end
+        at[1], at[2], at[3], at[4] = fl, fr, ftop, fbottom
+        local acc = seen[name]
+        if not acc then
+            -- Still empty whenever it's here: one icon makes it the session's.
+            acc = fresh[name] or {}
+            fresh[name] = acc
+        end
         icons[name] = 0
-        local container = f.AuraContainer
-        if not editModeOpen() and f:IsVisible() and type(container) == "table" and container.GetChildren then
-            icons[name] = addIcons(container, acc, 1)
+        if not editOpen and f:IsVisible() then
+            local container = f.AuraContainer
+            if type(container) == "table" and container.GetChildren then
+                -- One child throwing mustn't drop the extent already known.
+                local ok, n = pcall(addIcons, container, acc, 1)
+                if ok then icons[name] = n else API.Fail("room:" .. name, n) end
+            end
+            local button = f.CollapseAndExpandButton
+            if type(button) == "table" and button.IsVisible and button:IsVisible() then
+                local l, r, top, bottom = screenRect(button)
+                if l then grow(acc, l, r, top, bottom) end
+            end
         end
         if acc.l == nil then why[name] = "no icons seen this session" return false end
-        seen[name] = acc
+        seen[name], fresh[name] = acc, nil
         out.l, out.r, out.top, out.bottom = acc.l, acc.r, acc.top, acc.bottom
         why[name] = "icons"
         return true
@@ -195,7 +228,8 @@ function Room.Measure()
                 n = n + 1
                 rects[n] = pool[i]
             elseif not ok then
-                why[name] = "error"
+                why[name] = "error (see /gpanel failures)"
+                API.Fail("room:" .. name, counts)
             end
         else
             why[name] = "absent"
@@ -210,19 +244,22 @@ local current = { 0, 0 }
 -- Recompute and, if the insets changed, hand them to the bar.
 local function update()
     -- Edit Mode just closed: its examples are gone, the icons may have moved.
-    local open = editModeOpen()
-    if editWasOpen and not open then seen = {} end
-    editWasOpen = open
+    editOpen = editModeOpen()
+    if editWasOpen and not editOpen then seen = {} end
+    editWasOpen = editOpen
     local Bar = GlassPanel.Bar
     if not (Bar and Bar.frame) then return end
     local left, right = 0, 0
-    if not (GlassPanelDB and GlassPanelDB.room == "full") then
+    if GlassPanelDB and GlassPanelDB.room == "full" then
+        measured = "full"
+    else
         local s = API.Plain(UIParent:GetEffectiveScale())
         local w, top = API.Plain(UIParent:GetWidth()), API.Plain(UIParent:GetTop())
         if not (s and w and top) then return end   -- not laid out yet: next check
         local W, T = w * s, top * s
         left, right = Room.Insets(W, T, T - Bar.HEIGHT * s, Room.Measure())
         left, right = left / s, right / s   -- back to UIParent units for SetPoint
+        measured = "yes"
     end
     if left ~= current[1] or right ~= current[2] then
         current[1], current[2] = left, right
@@ -248,6 +285,8 @@ end
 -- where it reaches (screen px), for /gpanel room why. Reads only: asking
 -- never changes what the bar measures.
 function Room.Explain()
+    if measured == "full" then return { "room is full: nothing is measured (/gpanel room auto)" } end
+    if measured ~= "yes" then return { "not measured yet (the bar isn't laid out)" } end
     local lines = {}
     for i, name in ipairs(Room.WATCH) do
         local w, r = why[name] or "absent", pool[i]
@@ -255,7 +294,7 @@ function Room.Explain()
             w = string.format("%s: x %d-%d, top %d, bottom %d", w, r.l, r.r, r.top, r.bottom)
         end
         if Room.AURAS[name] and icons[name] then w = w .. string.format(" (%d icon(s) now)", icons[name]) end
-        if Room.AURAS[name] and editWasOpen then w = w .. " [Edit Mode open: not recording]" end
+        if Room.AURAS[name] and editOpen then w = w .. " [Edit Mode open: not recording]" end
         lines[#lines + 1] = name .. ": " .. w
     end
     return lines
