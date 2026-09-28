@@ -3,24 +3,8 @@
 local ADDON = ...
 GlassPanel = GlassPanel or {}
 local API, Glass, Engine, Bar, Layout = GlassPanel.API, GlassPanel.Glass, GlassPanel.Engine, GlassPanel.Bar, GlassPanel.Layout
+local Settings = GlassPanel.Settings
 local say = API.Print
-
-local DEFAULTS = { font = "arial", shown = true, room = "auto", labels = true }
-
--- Read settings, fill missing keys. Nothing may REQUIRE a value to have
--- survived: SavedVariables were broken on builds before 70009.
-local function ensureDefaults()
-    if type(GlassPanelDB) ~= "table" then GlassPanelDB = {} end
-    local db = GlassPanelDB
-    for k, v in pairs(DEFAULTS) do
-        if db[k] == nil then db[k] = v end
-    end
-    if type(db.hidden) ~= "table" then db.hidden = {} end
-    if type(db.labelsFor) ~= "table" then db.labelsFor = {} end
-    if not Glass.FONTS[db.font] then db.font = DEFAULTS.font end
-    if db.room ~= "auto" and db.room ~= "full" then db.room = DEFAULTS.room end
-    return db
-end
 
 local function findBlock(id)
     local block = id and Engine.byId[id]
@@ -91,10 +75,14 @@ local COMMANDS = {
     { "layout reset", "forget the arrangement: blocks go back to their default lanes" },
     { "labels on|off", "the gold captions before values (\"Bags: \"), for every block" },
     { "label <id> on|off|default", "one block's caption" },
+    { "icon <id> on|off", "one block's icon" },
     { "show <id>", "show a block" },
     { "hide <id>", "hide a block" },
     { "toggle", "show or hide the whole bar" },
     { "font arial|friz", "bar font" },
+    { "options", "open the options panel (Options > AddOns > Glass Panel)" },
+    { "export", "the whole setup as a string, to copy to another account" },
+    { "import", "paste a setup exported on another account" },
     { "failures", "errors recorded from blocks and event registration" },
     { "room auto|full", "auto: the bar ends short of Blizzard's top frames (default); full: always full width" },
     { "covered", "list the frames under the bar (#2 measurement)" },
@@ -141,46 +129,45 @@ local function slash(msg)
         end
         Bar.Layout()
     elseif cmd == "layout" and arg == "reset" then
-        Layout.Reset()
-        Bar.Layout()
+        Settings.ResetLayout()
         say("layout reset")
     elseif cmd == "labels" then
         arg = arg:lower()
         if arg ~= "on" and arg ~= "off" then say("labels: on or off") return end
-        db.labels = (arg == "on")
-        Bar.RefreshCaptions()
+        Settings.SetLabels(arg == "on")
     elseif cmd == "label" then
         local id, v = arg:match("^(%S+)%s+(%S+)$")
         local block = findBlock(id)
         if not block then return end
         v = v:lower()
-        if v == "on" then db.labelsFor[block.id] = true
-        elseif v == "off" then db.labelsFor[block.id] = false
-        elseif v == "default" then db.labelsFor[block.id] = nil
-        else say("label <id> on|off|default") return end
-        Bar.RefreshCaptions()
+        if v == "on" then Settings.SetLabelFor(block.id, true)
+        elseif v == "off" then Settings.SetLabelFor(block.id, false)
+        elseif v == "default" then Settings.SetLabelFor(block.id, nil)
+        else say("label <id> on|off|default") end
+    elseif cmd == "icon" then
+        local id, v = arg:match("^(%S+)%s+(%S+)$")
+        local block = findBlock(id)
+        if not block then return end
+        v = v:lower()
+        if v ~= "on" and v ~= "off" then say("icon <id> on|off") return end
+        if not block.icon then say(block.id .. " has no icon") return end
+        Settings.SetIconFor(block.id, v == "on")
     elseif cmd == "show" or cmd == "hide" then
         local block = findBlock(arg)
         if not block then return end
-        db.hidden[block.id] = (cmd == "hide") or nil
-        Bar.Layout()
+        Settings.SetHidden(block.id, cmd == "hide")
     elseif cmd == "toggle" then
-        db.shown = not db.shown
-        Bar.SetShown(db.shown)
+        Settings.SetShown(not db.shown)
     elseif cmd == "font" then
-        arg = arg:lower()
-        if Glass.SetFont(arg) then
-            db.font = arg
-            -- Every width depends on the font: remeasure.
-            Bar.Layout()
-        else
-            say("fonts: arial, friz")
-        end
+        if not Settings.SetFont(arg:lower()) then say("fonts: arial, friz") end
     elseif cmd == "room" then
-        arg = arg:lower()
-        if arg ~= "auto" and arg ~= "full" then say("room: auto or full (now " .. db.room .. ")") return end
-        db.room = arg
-        GlassPanel.Room.Update()
+        if not Settings.SetRoom(arg:lower()) then say("room: auto or full (now " .. db.room .. ")") end
+    elseif cmd == "options" then
+        if not GlassPanel.Options.Open() then say("find the options under Game Menu > Options > AddOns > Glass Panel") end
+    elseif cmd == "export" then
+        GlassPanel.Share.Open("export")
+    elseif cmd == "import" then
+        GlassPanel.Share.Open("import")
     elseif cmd == "covered" then
         local list = coveredFrames()
         say(#list .. " frame(s) in the bar's band (under = drawn over, beside = the bar stops short):")
@@ -208,7 +195,7 @@ API.RegisterEvent(boot, "PLAYER_LOGIN", "core")
 API.RegisterEvent(boot, "PLAYER_ENTERING_WORLD", "core")
 boot:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON then
-        local db = ensureDefaults()
+        local db = Settings.EnsureDefaults()
         Glass.SetFont(db.font)
         Bar.Build()
         Bar.SetShown(db.shown)

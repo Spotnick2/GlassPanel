@@ -33,5 +33,11 @@
   layers seen in your zone.
 - GearScore: your GearScore, coloured along the item-quality ramp (its bracket in the tooltip), and your average item level; the tooltip
   breaks it down by slot.
+- Options panel under Game Menu > Options > AddOns > Glass Panel (`/gpanel options`): show the bar,
+  captions, font and width, reset the layout, and for each plugin whether it's shown and shows its
+  caption and icon (`/gpanel icon <id> on|off` too).
+- Share your setup between accounts: Export gives one string with your layout and settings to copy
+  (Ctrl+C); paste it into Import on the other account and it's applied at once. From the options
+  panel, or `/gpanel export` and `/gpanel import`.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.

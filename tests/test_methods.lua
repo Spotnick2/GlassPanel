@@ -36,6 +36,24 @@ GlassPanel._test.slash("move gold 40")
 GlassPanel._test.slash("layout reset")
 GlassPanel._test.slash("failures")
 GlassPanel._test.slash("covered")
+GlassPanel._test.slash("icon bags off")
+GlassPanel._test.slash("export")
+GlassPanel._test.slash("import")
+do
+    local win = GlassPanel.Share._test.window()
+    win.edit._scripts.OnTextChanged(win.edit, true)
+    win.action._scripts.OnClick(win.action)
+    win.close._scripts.OnClick(win.close)
+end
+do
+    local o = GlassPanel.Options._test
+    o.panel:Hide(); o.panel:Show()
+    local r = o.rows.gold
+    r.shown._scripts.OnClick(r.shown); r.caption._scripts.OnClick(r.caption)
+    o.controls.labels._scripts.OnClick(o.controls.labels)
+    o.controls.font[2]._scripts.OnClick(o.controls.font[2])
+    GlassPanel._test.slash("options")
+end
 WoW.tick(1.1); WoW.tick()
 
 local ANIMATION_TYPES = { Animation = true, Alpha = true, Translation = true, Scale = true, Rotation = true }

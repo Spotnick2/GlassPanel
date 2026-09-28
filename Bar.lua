@@ -68,6 +68,35 @@ function Bar.RefreshCaptions()
     Bar.Layout()
 end
 
+-- Whether a block shows its icon: it has one, and the user hasn't turned
+-- it off (GlassPanelDB.iconsFor[id] = false, #24).
+function Bar.ShowsIcon(block)
+    if not block.icon then return false end
+    local d = db()
+    return not (d and d.iconsFor and d.iconsFor[block.id] == false)
+end
+
+-- Show or hide the icon, the caption starting after it or at the edge;
+-- true if it changed (the width moves what follows).
+function Bar.UpdateIcon(block)
+    local b = block.widget
+    if not (b and b.icon) then return false end
+    local show = Bar.ShowsIcon(block)
+    if b.iconShown == show then return false end
+    b.iconShown = show
+    b.icon:SetShown(show)
+    b.textX = show and (PAD + ICON + PAD) or PAD
+    b.caption:ClearAllPoints()
+    b.caption:SetPoint("LEFT", b, "LEFT", b.textX, 0)
+    return true
+end
+
+-- After an icon setting changes: every block, then the layout.
+function Bar.RefreshIcons()
+    for _, block in ipairs(Engine.blocks) do Bar.UpdateIcon(block) end
+    Bar.Layout()
+end
+
 function Bar.IsHidden(block)
     local d = db()
     return d and d.hidden and d.hidden[block.id] == true
@@ -245,6 +274,7 @@ function Bar.Attach(block)
     b.label = fs
 
     block.widget = b
+    Bar.UpdateIcon(block)
     Bar.UpdateCaption(block)
     b:Hide()   -- off screen until its first layout decides
     if block.build then Engine.Call(block, "build", block.build, block) end

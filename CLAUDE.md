@@ -39,7 +39,8 @@ list; the layout keeps a disabled plugin's place. `test_toc.lua` checks every pl
 `.pkgmeta` `move-folders` line.
 
 Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` →
-`Room.lua` → `GlassPanel.lua`. Plugins load after the core's `ADDON_LOADED`.
+`Room.lua` → `Settings.lua` → `Share.lua` → `Options.lua` → `GlassPanel.lua`. Plugins load after the
+core's `ADDON_LOADED`.
 
 - **`Compat.lua`**: `GlassPanel.API`, the only route to client APIs that moved or may be absent.
   It has `IsSecret`, `RegisterEvent` (reports throws and refusals, naming the block that asked),
@@ -159,10 +160,35 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   `C_TooltipInfo.GetInventoryItem(...).repairCost` (TitanRepair's Retail path, not in the dump:
   unknown is shown as unknown). Secret numbers keep type `"number"` on the client, so
   `type(x) == "number"` is no secrecy check: `API.Plain` first.
-- **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`, `layout`, `room`, `labels`, `labelsFor[id]`). The bar is built at
+- **`Settings.lua`**: `GlassPanelDB`'s defaults (`EnsureDefaults`) and **the one place a setting
+  is changed and applied** (`SetFont`, `SetShown`, `SetRoom`, `SetLabels`, `SetLabelFor`,
+  `SetIconFor`, `SetHidden`, `ResetLayout`, and `ApplyAll` for a whole imported setup, with one
+  layout pass). `/gpanel`, the options panel and an import all call these, so they can't drift
+  apart. Each calls `Settings.listener` after a change: an open options panel re-reads its controls.
+- **`Share.lua`** (#34): the setup (`font`, `shown`, `room`, `labels`, `hidden`, `labelsFor`,
+  `iconsFor`, and the **effective** layout from `Layout.Lanes`) as `GP1:` + base64 of our own
+  serialisation (sorted keys: same setup, same string). The input is **never run as code**: hard
+  limits (16k chars, depth 6, 2000 values, 128-char strings), then `Share.Clean` checks every key
+  and type: ids are any non-empty string (**what `RegisterBlock` accepts: anything the core
+  exports, it imports**), lanes are checked strictly (a bad lane or a block listed twice rejects;
+  empty lanes are dropped). Unknown keys dropped, missing ones default, a wrong type rejects the
+  whole string and says why. Applied at once through `Settings.ApplyAll`, no reload. An export is
+  decoded again before it's shown, so an oversized setup says so instead of handing out a string
+  the import would refuse. The window is a glass frame with a multi-line EditBox (selected for
+  Ctrl+C: addons have no clipboard), in `UISpecialFrames` for Escape; Import is enabled only for a
+  string that parses, and previews what it holds.
+- **`Options.lua`** (#24): Options > AddOns > Glass Panel, a canvas panel on Retail's Settings
+  framework (as GlassUnitFrames #39), registered at `PLAYER_LOGIN`. **Our `Settings` local shadows
+  Blizzard's global `Settings`**: the framework is read with `rawget(_G, "Settings")`. Bar (shown,
+  captions, font, width), Layout (reset), Share setup (Export / Import), and a row per loaded plugin
+  (Shown, Caption, Icon; Caption greyed for graphical blocks, Icon for blocks without one), all in
+  name order (a plugin registered later gets its row on the next open, where its name sorts).
+  Every open, and every setting change while it's open, re-reads the state.
+- **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`, `layout`, `room`, `labels`,
+  `labelsFor[id]`, `iconsFor[id]` (only `false` is stored)). The bar is built at
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles
-  `list | move <id> <lane> [n] | layout reset | show <id> | hide <id> | toggle | font | room |
-  covered | failures`.
+  `list | move <id> <lane> [n] | layout reset | labels | label <id> | icon <id> | show <id> |
+  hide <id> | toggle | font | room | options | export | import | covered | failures`.
 - **`Plugins\<Name>\`**: deploy puts each at the AddOns top level under its TOC name, and
   `.pkgmeta` `move-folders` does the same when packaging (the AltStable pattern).
 
@@ -198,8 +224,8 @@ includes Titan's code and the owner's TBC plugins.
 - `RegisterEvent` throws on unknown names and returns `false` for refusals. The engine wraps
   both. `COMBAT_LOG_EVENT_UNFILTERED` can't be registered.
 - `GetInstanceInfo()` returns the continent outdoors, so gate on `instanceType ~= "none"`.
-- Tooltips hooking items use `TooltipDataProcessor`. Options, if ever needed, go through
-  `Settings.RegisterAddOnCategory`. **Edit Mode is live.**
+- Tooltips hooking items use `TooltipDataProcessor`. Options go through
+  `Settings.RegisterCanvasLayoutCategory` + `RegisterAddOnCategory` (`Options.lua`). **Edit Mode is live.**
 - **SavedVariables persist as of 70009.** Code must still cope when they're absent. Verify
   persistence only with a full client exit.
 

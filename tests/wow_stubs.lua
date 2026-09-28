@@ -110,6 +110,7 @@ function WoW.reset()
     WoW.map = 1429
     WoW.realm = "Doomhowl"
     WoW.serverTime = 100000
+    WoW.settings = {}
 end
 
 --------------------------------------------------------------------------------
@@ -277,6 +278,19 @@ function Methods.SetStatusBarTexture(b, file)
 end
 function Methods.GetStatusBarTexture(b) return b._fill end
 
+-- Buttons: enabled state. EditBox: focus and selection, recorded.
+function Methods.Enable(b) b._disabled = false end
+function Methods.Disable(b) b._disabled = true end
+function Methods.IsEnabled(b) return not b._disabled end
+function Methods.SetFocus(e) e._focused = true end
+function Methods.ClearFocus(e) e._focused = false end
+function Methods.HighlightText(e) e._highlighted = true end
+function Methods.SetMaxLetters(e, n) e._maxLetters = n end
+-- CheckButton.
+function Methods.SetChecked(cb, v) cb._checked = v and true or false end
+function Methods.GetChecked(cb) return cb._checked == true end
+function Methods.SetEnabled(b, v) b._disabled = not v end
+
 -- GameTooltip: records its lines.
 function Methods.SetOwner(tt, owner) tt._owner = owner; tt._lines = {} end
 function Methods.GetOwner(tt) return tt._owner end
@@ -380,6 +394,24 @@ function strsplit(delim, str, pieces)
     out[#out + 1] = str:sub(pos)
     return unpack(out)
 end
+-- FrameXML's list of frames Escape closes (a table, so not in the dump's
+-- function walk; AltStable's Export.lua and SheetUI.lua insert into it on
+-- Forever).
+UISpecialFrames = {}
+
+-- Retail's Settings framework (names from the dump's _G walk; signatures as
+-- GlassUnitFrames and Priestly use them on Forever). WoW.settings records
+-- what the addon did.
+Settings = {
+    RegisterCanvasLayoutCategory = function(frame, name)
+        local c = { frame = frame, name = name }
+        function c:GetID() return 4242 end
+        WoW.settings.canvas = c
+        return c
+    end,
+    RegisterAddOnCategory = function(c) WoW.settings.addon = c end,
+    OpenToCategory = function(id) WoW.settings.opened = id end,
+}
 -- Timers keep their delay: WoW.flushTimers(upTo) runs those due within upTo
 -- seconds (all when nil) and keeps the rest, so a fallback timer can't mask a
 -- missing immediate one.

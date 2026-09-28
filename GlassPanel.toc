@@ -13,4 +13,7 @@ Engine.lua
 Layout.lua
 Bar.lua
 Room.lua
+Settings.lua
+Share.lua
+Options.lua
 GlassPanel.lua
