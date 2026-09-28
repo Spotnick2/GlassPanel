@@ -1,10 +1,12 @@
 -- Plugins/PvP/PvP.lua: whether you're flagged for PvP (#14), and the time
--- left before the flag drops when a timer is running. Left-click toggles
--- your PvP flag (C_PvP.TogglePVP, the /pvp command).
+-- left before the flag drops when a timer is running. No click: toggling is
+-- protected (measured on 70009: C_PvP.TogglePVP from a click raised
+-- ADDON_ACTION_FORBIDDEN), so the tooltip points to /pvp, which the player
+-- types themselves.
 --
 -- Forever (70009 dump): UnitIsPVP / UnitIsPVPFreeForAll (bool),
 -- IsPVPTimerRunning / GetPVPTimer (ms left), GetPVPDesired (what you asked
--- for: on, or off-but-still-flagged while the timer runs), C_PvP.TogglePVP.
+-- for: on, or off-but-still-flagged while the timer runs).
 -- Every read through API.Plain: a secret shows as unknown, never a guess.
 -- The timer text needs a repaint every second only while it runs.
 
@@ -61,10 +63,6 @@ GlassPanel.RegisterBlock({
             end
         end
         tt:AddLine(" ")
-        tt:AddLine("Left-click: toggle your PvP flag", 0.3, 1, 0.3)
-    end,
-    onClick = function(_, button)
-        if button ~= "LeftButton" then return end
-        if C_PvP and C_PvP.TogglePVP then C_PvP.TogglePVP() end
+        tt:AddLine("Type /pvp to toggle your PvP flag.", 0.3, 1, 0.3)
     end,
 })

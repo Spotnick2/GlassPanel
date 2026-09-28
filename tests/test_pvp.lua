@@ -38,10 +38,10 @@ WoW.fire("PLAYER_FLAGS_CHANGED", "player"); WoW.tick()
 eq(textOf("pvp"), "|cff888888?|r", "secret: ?")
 check(tip():find("can't be read", 1, true), "tooltip says so")
 
--- Left-click toggles; other buttons don't.
-local b = block("pvp").widget
-b._scripts.OnClick(b, "LeftButton"); b._scripts.OnClick(b, "RightButton")
-eq(WoW.pvpToggles, 1, "left-click toggles the flag")
+-- No click: TogglePVP is protected on this client (ADDON_ACTION_FORBIDDEN,
+-- measured). The tooltip points to /pvp instead.
+eq(block("pvp").onClick, nil, "no click handler")
+check(tip():find("Type /pvp to toggle", 1, true), "tooltip points to /pvp")
 
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_pvp")

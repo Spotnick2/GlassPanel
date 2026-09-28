@@ -108,7 +108,8 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
 - **`Plugins\Gold`, `Plugins\Clock`**: gold (secret-safe) and the clock (hides Blizzard's
   minimap clock). Plugins use the **public** API only, the same one third-party plugins get.
 - **`Plugins\PvP`** (#14): flagged / FFA / off and the flag's countdown (`GetPVPTimer` ms); a
-  function `interval` (1 s while the timer runs, else 30 s). Left-click: `C_PvP.TogglePVP`.
+  function `interval` (1 s while the timer runs, else 30 s). **No click: `C_PvP.TogglePVP` is
+  protected** (measured: `ADDON_ACTION_FORBIDDEN` from a block click); the tooltip says `/pvp`.
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable
   bag (free count or family) is left out and flagged with a grey `?`. Left-click: `ToggleAllBags`.

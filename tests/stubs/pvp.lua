@@ -2,7 +2,6 @@
 -- a field set to "secret" comes back secret.
 table.insert(WoW.resetHooks, function()
     WoW.pvp = { flagged = false, ffa = false, timerMs = nil, desired = false }
-    WoW.pvpToggles = 0
 end)
 
 local function field(k)
@@ -16,4 +15,3 @@ function UnitIsPVPFreeForAll(unit) return field("ffa") end
 function IsPVPTimerRunning() return WoW.pvp.timerMs ~= nil end
 function GetPVPTimer() return field("timerMs") or 300000 end
 function GetPVPDesired() return field("desired") end
-C_PvP = { TogglePVP = function() WoW.pvpToggles = WoW.pvpToggles + 1 end }

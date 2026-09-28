@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[PvP]|r
-## Notes: Whether you're flagged for PvP, and when the flag drops. Click toggles it.
+## Notes: Whether you're flagged for PvP, and when the flag drops.
 ## Author: Spotnick
 ## Version: @project-version@
 ## Group: GlassPanel
