@@ -203,7 +203,14 @@ pal.buttons[1]._scripts.PostClick(pal.buttons[1], "LeftButton", true)
 eq(pal._shown, true, "down edge: still open (the up click must reach the button)")
 pal.buttons[1]._scripts.PostClick(pal.buttons[1], "LeftButton", false)
 eq(pal._shown, false, "up edge: closed")
--- Open when combat starts: a click says it closes after combat, and it does.
+-- Open when combat starts: it closes by itself when combat ends, no click needed.
+pb._scripts.OnClick(pb, "LeftButton")
+WoW.combat = true
+WoW.fire("PLAYER_REGEN_DISABLED"); WoW.tick()
+WoW.combat = false
+WoW.fire("PLAYER_REGEN_ENABLED"); WoW.tick()
+eq(pal._shown, false, "closed when combat ends, without another click")
+-- And a click in combat explains it.
 pb._scripts.OnClick(pb, "LeftButton")
 WoW.combat = true
 WoW.chat = {}

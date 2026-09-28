@@ -253,8 +253,15 @@ local block = GlassPanel.RegisterBlock({
     showLabel = false,   -- the icons say it (no caption on the TBC bar either)
     side = "right",
     order = 150,
-    events = { "PLAYER_ENTERING_WORLD", "SKILL_LINES_CHANGED", "CHAT_MSG_SKILL", "PLAYER_REGEN_ENABLED" },
+    events = { "PLAYER_ENTERING_WORLD", "SKILL_LINES_CHANGED", "CHAT_MSG_SKILL",
+               "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED" },
     onEvent = function(_, event)
+        -- Open when combat starts: it can't be hidden until combat ends, so
+        -- close it then, without waiting for another click (Codex review).
+        if event == "PLAYER_REGEN_DISABLED" then
+            if palette and palette:IsShown() then closeAfterCombat = true end
+            return
+        end
         if event == "PLAYER_REGEN_ENABLED" then
             if closeAfterCombat and palette then palette:Hide() end
             closeAfterCombat = nil
