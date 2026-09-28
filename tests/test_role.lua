@@ -58,13 +58,21 @@ for i, w in ipairs(want) do
 end
 eq(#WoW.roleSets, 0, "opening the menu sets nothing")
 
--- Choosing an item sets the role.
+-- Choosing an item asks for the role; the bar shows it once the server
+-- confirms (ROLE_CHANGED_INFORM), never before.
 radios[2].setSelected(radios[2].data)
 eq(#WoW.roleSets, 1, "one UnitSetRole")
 eq(WoW.roleSets[1][1], "player", "for the player")
 eq(WoW.roleSets[1][2], "HEALER", "to healer")
 WoW.tick()
-eq(textOf("role"), HEALER, "repainted")
+eq(textOf("role"), TANK, "not shown before the server confirms")
+-- Meanwhile the menu checks the role asked for, not the stale one.
+WoW.menu = nil
+click("LeftButton")
+eq(WoW.menu.radios[2].isSelected("HEALER"), true, "pending role checked")
+eq(WoW.menu.radios[1].isSelected("TANK"), false, "stale role unchecked")
+WoW.confirmRole(); WoW.tick()
+eq(textOf("role"), HEALER, "repainted on confirmation")
 eq(#WoW.chat, 0, "nothing printed on success")
 
 -- Refused: one line in chat, the role unchanged.
@@ -97,25 +105,53 @@ eq(block("role").widget._shown, false, "secret group state: hidden")
 
 check(next(GlassPanel.failures) == nil, "no failures")
 
--- No menu: a click cycles Tank -> Healer -> Damage -> No Role -> Tank.
+-- No menu at all: a click cycles Tank -> Healer -> Damage -> No Role -> Tank,
+-- each step from the one just asked for (no server answer in between).
 WoW.group.inGroup = true
 roster()
 local menu = MenuUtil.CreateContextMenu
 MenuUtil.CreateContextMenu = nil
+check(tip():find("Left-click: next role", 1, true), "tooltip says a click cycles")
 WoW.roleSets = {}
 for _ = 1, 5 do click("LeftButton") end
-MenuUtil.CreateContextMenu = menu
 local seq = {}
 for _, s in ipairs(WoW.roleSets) do seq[#seq + 1] = s[2] end
 eq(table.concat(seq, ","), "TANK,HEALER,DAMAGER,NONE,TANK", "cycles without a menu")
-
--- A menu that throws is recorded, and the click still cycles.
-MenuUtil.CreateContextMenu = function() error("menu broke") end
+-- The server answers: its role is the truth again.
+WoW.group.pendingRole = "DAMAGER"
+WoW.confirmRole(); WoW.tick()
 WoW.roleSets = {}
 click("LeftButton")
+eq(WoW.roleSets[1] and WoW.roleSets[1][2], "NONE", "next from the confirmed role")
+WoW.confirmRole(); WoW.tick()
+-- An unanswered request is forgotten after a while.
+WoW.group.role = "TANK"
+WoW.roleSets = {}
+click("LeftButton")                       -- asks HEALER; the server never answers
+WoW.now = WoW.now + 6; WoW.tick()
+click("LeftButton")
+eq(WoW.roleSets[2] and WoW.roleSets[2][2], "HEALER", "stale request forgotten: from the live role")
+WoW.confirmRole(); WoW.tick()
+-- An unreadable role is never overwritten blindly.
+WoW.group.role = "secret"
+roster()
+WoW.roleSets, WoW.chat = {}, {}
+click("LeftButton")
+eq(#WoW.roleSets, 0, "unreadable role: nothing set")
+check((WoW.chat[1] or ""):find("can't be read", 1, true), "unreadable role: says why")
+WoW.group.role = "NONE"
+roster()
 MenuUtil.CreateContextMenu = menu
-eq(#WoW.roleSets, 1, "cycled after a menu error")
+check(tip():find("Left-click: set your role", 1, true), "tooltip with a menu")
+
+-- A menu that throws is recorded and explained, and changes nothing.
+MenuUtil.CreateContextMenu = function() error("menu broke") end
+WoW.roleSets, WoW.chat = {}, {}
+click("LeftButton")
+MenuUtil.CreateContextMenu = menu
+eq(#WoW.roleSets, 0, "menu error: role untouched")
 check(GlassPanel.failures["role:menu"] ~= nil, "menu error recorded")
+check((WoW.chat[1] or ""):find("role menu couldn't open", 1, true), "menu error explained")
 
 -- UnitSetRole throwing: recorded and explained.
 WoW.roleSetFails = "error"
