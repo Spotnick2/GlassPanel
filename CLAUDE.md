@@ -95,7 +95,17 @@ core's `ADDON_LOADED`.
   unit frames) and pulls its ends in to stop short of any that reach into its band. A frame hidden
   **on its own** (no target, no buffs) still counts, so the width doesn't jump; one whose
   **parent** is hidden has been replaced by an addon and doesn't. Frames centred in the middle
-  fifth are ignored. Pure `Room.Insets`; read-only `GetRect`/`IsShown`/`IsVisible` under pcall,
+  fifth are ignored. **Buffs and debuffs (#33) count by their icons, not the frame**
+  (`BuffFrame`'s rect is Edit Mode's whole grid). Measured on 70009: the icons hang off
+  `BuffFrame.AuraContainer` / `DebuffFrame.AuraContainer`, a **1x1 anchor** that doesn't size to
+  them; `BuffFrame` also holds a visible `CollapseAndExpandButton` (15x30). So the icons are the
+  outermost visible frames under `AuraContainer` between `ICON_MIN` (8) and `ICON_MAX` (100)
+  units a side (bigger containers and smaller anchors are looked into, `DEPTH` 4), plus the
+  collapse button while shown (a live button). Their union only grows within a session (the bar
+  steps in once, then doesn't jiggle); a new session: layout/scale/display events
+  (`Room.NewSession`), Edit Mode closing, or the aura frame's rect changing. Nothing is recorded while `EditModeManagerFrame` is shown
+  (example auras). No icon yet: they take no room. `/gpanel room why` reports the last check
+  (read-only). Pure `Room.Insets`; read-only `GetRect`/`IsShown`/`IsVisible`/`GetChildren` under pcall,
   every number through `API.Plain`; `Room.Update` never throws (failures go to `API.Fail`).
   Checked on layout, scale and display events and on the engine's clock (`Engine.EverySecond`:
   one clock for everything). `/gpanel room full` opts out; `/gpanel covered` lists frames in the

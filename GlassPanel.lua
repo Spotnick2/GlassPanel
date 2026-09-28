@@ -20,13 +20,12 @@ end
 -- is moved, forbidden frames are skipped, every number goes through API.Plain.
 local P = API.Plain
 
--- Screen rect { l, r, top, bottom } of f, or nil. Called under pcall.
+-- Screen rect { l, r, top, bottom } of f, or nil (Room's conversion, so
+-- both agree where a frame is). Called under pcall.
 local function screenRect(f)
-    local l, b, w, h = f:GetRect()
-    l, b, w, h = P(l), P(b), P(w), P(h)
-    local s = P(f:GetEffectiveScale())
-    if not (l and b and w and h and s) then return nil end
-    return { l = l * s, r = (l + w) * s, top = (b + h) * s, bottom = b * s }
+    local l, r, top, bottom = GlassPanel.Room.ScreenRect(f)
+    if not l then return nil end
+    return { l = l, r = r, top = top, bottom = bottom }
 end
 
 local function coveredEntry(f, bar, band, screenW)
@@ -84,7 +83,7 @@ local COMMANDS = {
     { "export", "the whole setup as a string, to copy to another account" },
     { "import", "paste a setup exported on another account" },
     { "failures", "errors recorded from blocks and event registration" },
-    { "room auto|full", "auto: the bar ends short of Blizzard's top frames (default); full: always full width" },
+    { "room auto|full|why", "auto: the bar ends short of Blizzard's top frames (default); full: always full width; why: what it measured" },
     { "covered", "list the frames under the bar (#2 measurement)" },
 }
 
@@ -161,7 +160,14 @@ local function slash(msg)
     elseif cmd == "font" then
         if not Settings.SetFont(arg:lower()) then say("fonts: arial, friz") end
     elseif cmd == "room" then
-        if not Settings.SetRoom(arg:lower()) then say("room: auto or full (now " .. db.room .. ")") end
+        if arg:lower() == "why" then
+            say("room (" .. db.room .. "): what each watched frame measured, screen px")
+            local ok, lines = pcall(GlassPanel.Room.Explain)
+            if not ok then API.Fail("room:why", lines) say("  couldn't tell (see /gpanel failures)") return end
+            for _, line in ipairs(lines) do say("  " .. line) end
+        elseif not Settings.SetRoom(arg:lower()) then
+            say("room: auto, full or why (now " .. db.room .. ")")
+        end
     elseif cmd == "options" then
         if not GlassPanel.Options.Open() then say("find the options under Game Menu > Options > AddOns > Glass Panel") end
     elseif cmd == "export" then

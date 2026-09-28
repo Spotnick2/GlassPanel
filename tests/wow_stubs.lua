@@ -206,6 +206,12 @@ function Methods.GetTop(w) if w._rect then return w._rect[2] + w._rect[4] end en
 function Methods.GetDebugName(w) return w._name or ("<" .. w._type .. ">") end
 function Methods.IsForbidden(w) return false end
 function Methods.GetParent(w) return w._parent end
+-- Frames made with CreateFrame whose parent is w, in creation order.
+function Methods.GetChildren(w)
+    local out = {}
+    for _, f in ipairs(WoW.frames) do if f._parent == w then out[#out + 1] = f end end
+    return unpack(out)
+end
 function Methods.IsProtected(w) return w._protected == true, false end
 function Methods.IsMouseEnabled(w) return w._mouse == true end
 function Methods.GetFrameStrata(w) return w._strata or "MEDIUM" end
