@@ -157,6 +157,15 @@ function Methods.GetWidth(w) return w._width end
 function Methods.GetLeft(w) return 0 end
 function Methods.GetEffectiveScale(w) return WoW.uiScale end
 function Methods.SetAlpha(w, a) w._alpha = a end
+-- Rect: set w._rect = { left, bottom, width, height } in a test; the bar gets
+-- one from the harness.
+function Methods.GetRect(w) if w._rect then return unpack(w._rect) end end
+function Methods.GetDebugName(w) return w._name or ("<" .. w._type .. ">") end
+function Methods.IsForbidden(w) return false end
+function Methods.GetParent(w) return w._parent end
+function Methods.IsProtected(w) return w._protected == true, false end
+function Methods.IsMouseEnabled(w) return w._mouse == true end
+function Methods.GetFrameStrata(w) return w._strata or "MEDIUM" end
 function Methods.GetHeight(w) return w._height end
 function Methods.GetFrameLevel(w) return w._level end
 function Methods.SetFrameLevel(w, l) w._level = l end
@@ -254,6 +263,15 @@ function GetBuildInfo() return "1.60.1", "70009", "Sep 23 2026", 16001 end
 function InCombatLockdown() return false end
 function GetCursorPosition() return WoW.cursor[1], WoW.cursor[2] end
 function IsShiftKeyDown() return WoW.shift end
+-- Every frame the addon or a test created, in creation order.
+function EnumerateFrames(after)
+    local found = after == nil
+    for _, w in ipairs(WoW.frames) do
+        if found then return w end
+        if w == after then found = true end
+    end
+    return nil
+end
 
 function hooksecurefunc(t, name, fn)
     local orig = t[name]

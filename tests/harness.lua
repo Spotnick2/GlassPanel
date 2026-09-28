@@ -45,8 +45,11 @@ function loadAddon(opts)
     if opts.db then GlassPanelDB = opts.db end
     if opts.before then opts.before() end
     WoW.fire("ADDON_LOADED", "GlassPanel")
-    -- The client sizes the bar from its two anchors; the stub can't.
-    if rawget(_G, "GlassPanelBar") then GlassPanelBar._width = opts.width or 1000 end
+    -- The client sizes the bar from its anchors; the stub can't.
+    if rawget(_G, "GlassPanelBar") then
+        GlassPanelBar._width = opts.width or 1000
+        GlassPanelBar._rect = { 0, 744, opts.width or 1000, 24 }   -- top of a 768-tall UIParent
+    end
     WoW.fire("PLAYER_LOGIN")
     WoW.fire("PLAYER_ENTERING_WORLD", true, false)
     WoW.tick()
