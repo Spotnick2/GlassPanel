@@ -113,6 +113,10 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
 - **`Plugins\PvP`** (#14): flagged / FFA / off and the flag's countdown (`GetPVPTimer` ms); a
   function `interval` (1 s while the timer runs, else 30 s). **No click: `C_PvP.TogglePVP` is
   protected** (measured: `ADDON_ACTION_FORBIDDEN` from a block click); the tooltip says `/pvp`.
+- **`Plugins\Guild`** (#18): online/total from `GetNumGuildMembers` (no loop to count). The roster
+  is requested with `C_GuildInfo.GuildRoster` at login, on tooltip open (>= 15 s apart) and every
+  90 s (`interval`); the tooltip's roster scan runs only after `GUILD_ROSTER_UPDATE` marks it stale.
+  Names through `Ambiguate(name, "guild")`, never split on spaces. Left-click: `ToggleGuildFrame`.
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable
   bag (free count or family) is left out and flagged with a grey `?`. Left-click: `ToggleAllBags`.

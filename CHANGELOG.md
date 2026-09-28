@@ -21,5 +21,7 @@
 - Gold captions before values, Titan-style ("Bags: 45/74"). `/gpanel labels on|off`, or
   `/gpanel label <id> on|off|default` for one block.
 - PvP: whether you're flagged, with the countdown before the flag drops (type /pvp to toggle it).
+- Guild: members online out of the total, with who's online (level, class colour, zone, AFK/DND)
+  in the tooltip. Left-click opens the guild panel. Hidden when you're not in a guild.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.
