@@ -143,7 +143,26 @@ function Methods.IsVisible(w)
     while p do if not p._shown then return false end; p = p._parent end
     return true
 end
-function Methods.SetPoint(w, ...) table.insert(w._points, { ... }) end
+-- The one layout the stub computes: a frame stretched across UIParent by a
+-- TOPLEFT and a TOPRIGHT point (the bar). Its width and rect follow the x
+-- offsets, and OnSizeChanged fires when the width changes, as on the client.
+local function stretchAcrossUIParent(w)
+    local l, r
+    for _, p in ipairs(w._points) do
+        if p[2] == UIParent and p[1] == "TOPLEFT" then l = p[4] or 0 end
+        if p[2] == UIParent and p[1] == "TOPRIGHT" then r = p[4] or 0 end
+    end
+    if not (l and r) then return end
+    local width, h = UIParent._width - l + r, w._height or 0
+    local changed = w._width ~= width
+    w._width = width
+    w._rect = { l, UIParent._rect[4] - h, width, h }
+    if changed and w._scripts.OnSizeChanged then w._scripts.OnSizeChanged(w, width, h) end
+end
+function Methods.SetPoint(w, ...)
+    table.insert(w._points, { ... })
+    if (select(2, ...)) == UIParent then stretchAcrossUIParent(w) end
+end
 function Methods.ClearAllPoints(w) w._points = {} end
 function Methods.GetPoint(w, i)
     local p = w._points[i or 1]
@@ -154,9 +173,19 @@ function Methods.SetSize(w, x, y) w._width, w._height = x, y end
 function Methods.SetWidth(w, x) w._width = x end
 function Methods.SetHeight(w, y) w._height = y end
 function Methods.GetWidth(w) return w._width end
-function Methods.GetLeft(w) return 0 end
+function Methods.GetLeft(w) return w._rect and w._rect[1] or 0 end
 function Methods.GetEffectiveScale(w) return WoW.uiScale end
 function Methods.SetAlpha(w, a) w._alpha = a end
+-- Rect: set w._rect = { left, bottom, width, height } in a test; the bar gets
+-- one from the harness.
+function Methods.GetRect(w) if w._rect then return unpack(w._rect) end end
+function Methods.GetTop(w) if w._rect then return w._rect[2] + w._rect[4] end end
+function Methods.GetDebugName(w) return w._name or ("<" .. w._type .. ">") end
+function Methods.IsForbidden(w) return false end
+function Methods.GetParent(w) return w._parent end
+function Methods.IsProtected(w) return w._protected == true, false end
+function Methods.IsMouseEnabled(w) return w._mouse == true end
+function Methods.GetFrameStrata(w) return w._strata or "MEDIUM" end
 function Methods.GetHeight(w) return w._height end
 function Methods.GetFrameLevel(w) return w._level end
 function Methods.SetFrameLevel(w, l) w._level = l end
@@ -238,6 +267,7 @@ function Methods.AddDoubleLine(tt, l, r) table.insert(tt._lines, l .. "\t" .. r)
 
 UIParent = newWidget("Frame", nil, "UIParent")
 UIParent._level = 0
+UIParent._width, UIParent._rect = 1000, { 0, 0, 1000, 768 }
 GameTooltip = newWidget("GameTooltip", UIParent, "GameTooltip")
 GameTooltip._shown = false
 
@@ -254,6 +284,15 @@ function GetBuildInfo() return "1.60.1", "70009", "Sep 23 2026", 16001 end
 function InCombatLockdown() return false end
 function GetCursorPosition() return WoW.cursor[1], WoW.cursor[2] end
 function IsShiftKeyDown() return WoW.shift end
+-- Every frame the addon or a test created, in creation order.
+function EnumerateFrames(after)
+    local found = after == nil
+    for _, w in ipairs(WoW.frames) do
+        if found then return w end
+        if w == after then found = true end
+    end
+    return nil
+end
 
 function hooksecurefunc(t, name, fn)
     local orig = t[name]

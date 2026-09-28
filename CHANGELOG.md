@@ -9,5 +9,8 @@
 - Drag blocks to arrange the bar: drop next to other blocks to join their group, or on empty
   space to start a new group there. Shift-drag moves a whole group. `/gpanel move` does the same
   from the keyboard, and `/gpanel layout reset` starts over.
+- The bar stops short of the minimap, buffs and other Blizzard frames at the top of the screen
+  instead of covering them, and takes the full width again when they're moved out of the way.
+  `/gpanel room full` keeps it full width always.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.

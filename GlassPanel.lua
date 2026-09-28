@@ -5,7 +5,7 @@ GlassPanel = GlassPanel or {}
 local API, Glass, Engine, Bar, Layout = GlassPanel.API, GlassPanel.Glass, GlassPanel.Engine, GlassPanel.Bar, GlassPanel.Layout
 local say = API.Print
 
-local DEFAULTS = { font = "arial", shown = true }
+local DEFAULTS = { font = "arial", shown = true, room = "auto" }
 
 -- Read settings, fill missing keys. Nothing may REQUIRE a value to have
 -- survived: SavedVariables were broken on builds before 70009.
@@ -17,6 +17,7 @@ local function ensureDefaults()
     end
     if type(db.hidden) ~= "table" then db.hidden = {} end
     if not Glass.FONTS[db.font] then db.font = DEFAULTS.font end
+    if db.room ~= "auto" and db.room ~= "full" then db.room = DEFAULTS.room end
     return db
 end
 
@@ -24,6 +25,63 @@ local function findBlock(id)
     local block = id and Engine.byId[id]
     if not block then say("no block '" .. tostring(id) .. "' (see /gpanel list)") end
     return block
+end
+
+-- /gpanel covered (#2): every visible frame in the bar's band (the top
+-- Bar.HEIGHT of the screen), outermost only (a listed frame's children are
+-- implied), marked "under" when the bar is drawn over it and "beside" when
+-- the bar already stops short of it (Room.lua). Screen pixels throughout
+-- (rect * effective scale), since frames differ in scale. Read-only: nothing
+-- is moved, forbidden frames are skipped, every number goes through API.Plain.
+local P = API.Plain
+
+-- Screen rect { l, r, top, bottom } of f, or nil. Called under pcall.
+local function screenRect(f)
+    local l, b, w, h = f:GetRect()
+    l, b, w, h = P(l), P(b), P(w), P(h)
+    local s = P(f:GetEffectiveScale())
+    if not (l and b and w and h and s) then return nil end
+    return { l = l * s, r = (l + w) * s, top = (b + h) * s, bottom = b * s }
+end
+
+local function coveredEntry(f, bar, band, screenW)
+    if f:IsForbidden() or not f:IsVisible() or f == bar or f:GetParent() == bar then return nil end
+    local r = screenRect(f)
+    if not r then return nil end
+    local width, height = r.r - r.l, r.top - r.bottom
+    if width < 2 or height < 2 or width >= screenW * 0.9 then return nil end   -- specks and full-screen layers
+    if r.bottom >= band.top or r.top <= band.bottom then return nil end
+    local name = f:GetDebugName()
+    if type(name) ~= "string" or name:find("^GlassPanel") then return nil end
+    local under = r.r > band.l and r.l < band.r
+    return { frame = f, name = name, strata = f:GetFrameStrata(), protected = (f:IsProtected()),
+             mouse = f:IsMouseEnabled(), under = under, depth = math.floor(band.top - r.top + 0.5) }
+end
+
+local function coveredFrames()
+    local bar = Bar.frame
+    if not bar then return {} end
+    local okBar, band = pcall(screenRect, bar)
+    local okUI, ui = pcall(screenRect, UIParent)
+    if not (okBar and band and okUI and ui) then return {} end
+    local screenW = ui.r - ui.l
+    local hits, isHit = {}, {}
+    local f = EnumerateFrames()
+    while f do
+        local fine, entry = pcall(coveredEntry, f, bar, band, screenW)
+        if fine and entry then hits[#hits + 1] = entry; isHit[f] = true end
+        f = EnumerateFrames(f)
+    end
+    local out = {}
+    for _, e in ipairs(hits) do
+        local p, nested = e.frame:GetParent(), false
+        while p do
+            if isHit[p] then nested = true break end
+            p = p:GetParent()
+        end
+        if not nested then out[#out + 1] = e end
+    end
+    return out
 end
 
 local COMMANDS = {
@@ -35,6 +93,8 @@ local COMMANDS = {
     { "toggle", "show or hide the whole bar" },
     { "font arial|friz", "bar font" },
     { "failures", "errors recorded from blocks and event registration" },
+    { "room auto|full", "auto: the bar ends short of Blizzard's top frames (default); full: always full width" },
+    { "covered", "list the frames under the bar (#2 measurement)" },
 }
 
 local function slash(msg)
@@ -98,6 +158,19 @@ local function slash(msg)
         else
             say("fonts: arial, friz")
         end
+    elseif cmd == "room" then
+        arg = arg:lower()
+        if arg ~= "auto" and arg ~= "full" then say("room: auto or full (now " .. db.room .. ")") return end
+        db.room = arg
+        GlassPanel.Room.Update()
+    elseif cmd == "covered" then
+        local list = coveredFrames()
+        say(#list .. " frame(s) in the bar's band (under = drawn over, beside = the bar stops short):")
+        for i, e in ipairs(list) do
+            if i > 30 then say("  ...") break end
+            say(string.format("  %s  %s  %s%s%s  %d", e.under and "under " or "beside", e.name, e.strata,
+                e.protected and " PROTECTED" or "", e.mouse and " mouse" or "", e.depth))
+        end
     elseif cmd == "failures" then
         local n = 0
         for key, err in pairs(GlassPanel.failures) do
@@ -135,4 +208,4 @@ boot:SetScript("OnEvent", function(_, event, arg1)
     end
 end)
 
-GlassPanel._test = { slash = slash }
+GlassPanel._test = { slash = slash, coveredFrames = coveredFrames }

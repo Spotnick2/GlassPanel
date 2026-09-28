@@ -10,6 +10,7 @@ Glass.lua
 Engine.lua
 Layout.lua
 Bar.lua
+Room.lua
 Blocks\XP.lua
 Blocks\Gold.lua
 Blocks\Clock.lua
