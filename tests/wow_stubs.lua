@@ -388,7 +388,10 @@ local function bagField(bag, k)
     return b[k]
 end
 C_Container = {
-    GetContainerNumSlots = function(bag) local b = WoW.bags[bag]; return b and b.slots or 0 end,
+    GetContainerNumSlots = function(bag)
+        if not WoW.bags[bag] then return 0 end
+        return bagField(bag, "slots")
+    end,
     GetContainerNumFreeSlots = function(bag)
         if not WoW.bags[bag] then return 0, 0 end
         return bagField(bag, "free"), bagField(bag, "family")

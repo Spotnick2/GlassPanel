@@ -58,6 +58,12 @@ WoW.bags = { [0] = { slots = 16, free = 8, family = 0 }, [2] = { slots = 18, fre
 WoW.fire("BAG_UPDATE_DELAYED"); WoW.tick()
 eq(textOf("bags"), "|cffffffff8/16|r|cff888888?|r", "secret family: left out and flagged, not counted as normal")
 
+-- A secret slot count: an unreadable bag, not an empty slot.
+WoW.bags = { [0] = { slots = 16, free = 4, family = 0 }, [1] = { slots = "secret", free = 2, family = 0 } }
+WoW.fire("BAG_UPDATE_DELAYED"); WoW.tick()
+eq(textOf("bags"), "|cffffd20012/16|r|cff888888?|r", "secret slot count: flagged")
+check(has("1 bag(s) can't be read right now"), "and explained")
+
 -- Every bag unreadable: "hidden".
 WoW.bags = { [0] = { slots = 16, free = "secret", family = 0 } }
 WoW.fire("BAG_UPDATE_DELAYED"); WoW.tick()

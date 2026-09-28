@@ -27,13 +27,21 @@ local REAGENT = BI.ReagentBag   -- nil when the client has no reagent slot
 local state = { bags = {}, used = nil, total = nil, unreadable = 0 }
 
 local function scanBag(bag, out)
-    local slots = P(C_Container.GetContainerNumSlots(bag))
-    if not (slots and slots > 0) then return end
+    local rawSlots = C_Container.GetContainerNumSlots(bag)
+    -- Secrecy first (comparing a secret, even with nil, throws): a secret
+    -- slot count is a bag we can't read, not an empty slot.
+    if API.IsSecret(rawSlots) then
+        out.unreadable = out.unreadable + 1
+        return
+    end
+    local slots = rawSlots
+    if not (slots and slots > 0) then return end   -- no bag in that slot
     local rawFree, rawFamily = C_Container.GetContainerNumFreeSlots(bag)
     local free, family = P(rawFree), P(rawFamily)
     -- A family that came back but can't be read: normal or special is
-    -- unknown, so the bag can't be counted either way.
-    if free == nil or (family == nil and rawFamily ~= nil) then
+    -- unknown, so the bag can't be counted either way. (API.IsSecret, not
+    -- `rawFamily ~= nil`: the family is an optional return.)
+    if free == nil or API.IsSecret(rawFamily) then
         out.unreadable = out.unreadable + 1
         return
     end
