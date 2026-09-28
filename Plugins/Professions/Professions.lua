@@ -123,7 +123,7 @@ GlassPanel.RegisterBlock({
     label = "Professions",
     showLabel = false,   -- the icons say it (no caption on the TBC bar either)
     side = "right",
-    order = 140,
+    order = 150,
     events = { "PLAYER_ENTERING_WORLD", "SKILL_LINES_CHANGED", "CHAT_MSG_SKILL" },
     onEvent = function() stale = true end,
     text = function()
