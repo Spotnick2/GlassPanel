@@ -38,7 +38,9 @@ local function onEnter(button)
     if not block.tooltip then return end
     GameTooltip:SetOwner(button, "ANCHOR_NONE")
     GameTooltip:ClearAllPoints()
-    if (button.left or 0) > Bar.frame:GetWidth() / 2 then
+    -- The side the block's centre is on (a wide block's left edge can be left
+    -- of the middle while most of it is right of it).
+    if (button.left or 0) + button:GetWidth() / 2 > Bar.frame:GetWidth() / 2 then
         GameTooltip:SetPoint("TOPRIGHT", button, "BOTTOMRIGHT", 0, -4)
     else
         GameTooltip:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 0, -4)
@@ -59,8 +61,9 @@ end
 -- Dragging
 --------------------------------------------------------------------------------
 
-local drag            -- { button, block, lane = shift-drag } while dragging
+local drag            -- { button, block, lane = shift-drag, startX, grab } while dragging
 local lastDragStop = -1
+local STILL = 10      -- px: a drag that moved less than this is a wobbly click
 
 -- The cursor's x in bar coordinates.
 local function cursorX()
@@ -68,25 +71,26 @@ local function cursorX()
     return x / Bar.frame:GetEffectiveScale() - (Bar.frame:GetLeft() or 0)
 end
 
--- What a drop at the cursor would do. Cached per cursor x: the marker asks
--- every frame, and the answer only changes when the cursor moves.
---   { none }  the block's own spot: a click that wobbled a pixel also starts
---             a drag, and must leave everything where it was;
---   { laneX } shift-drag: move the whole lane (edges snap like a drop does);
---   otherwise Layout.DropTarget's { lane, index } or { x }.
+-- What a drop at the cursor would do. Cached per cursor x (the marker asks
+-- every frame); Bar.Layout clears the cache, since a relayout mid-drag moves
+-- the slots under a still cursor.
+--   { none }  moved less than STILL px: a click that wobbled also starts a
+--             drag, and must leave everything where it was;
+--   { laneX } shift-drag: the whole lane moves by the cursor's displacement;
+--   otherwise Layout.DropTarget, with the block released where the hand
+--   left it (the cursor minus the grab offset), not centred on the cursor.
 local function dropTarget()
     local cx = cursorX()
     if drag.cachedX == cx then return drag.cached end
     local W = Bar.frame:GetWidth()
-    local b, t = drag.button, nil
-    local left = b.left or 0
-    if cx >= left - Layout.GAP / 2 and cx <= left + b:GetWidth() + Layout.GAP / 2 then
+    local t
+    if math.abs(cx - drag.startX) < STILL then
         t = { none = true }
     elseif drag.lane then
-        local f = Layout.SnapPx(cx, W)
-        t = { laneX = f, slotX = (f == 0 and Layout.EDGE) or (f == 1 and W - Layout.EDGE) or cx }
+        t = Layout.LaneTarget(Bar.geometry or {}, W, drag.block.id, cx - drag.startX)
     else
-        t = Layout.DropTarget(Bar.geometry or {}, W, cx, drag.block.id)
+        t = Layout.DropTarget(Bar.geometry or {}, W, cx, drag.block.id, cx - drag.grab,
+            drag.button:GetWidth())
     end
     drag.cachedX, drag.cached = cx, t
     return t
@@ -101,7 +105,9 @@ local function updateMarker()
 end
 
 local function onDragStart(button)
-    drag = { button = button, block = button.block, lane = IsShiftKeyDown() }
+    local cx = cursorX()
+    drag = { button = button, block = button.block, lane = IsShiftKeyDown(),
+             startX = cx, grab = cx - (button.left or 0) }
     button:SetAlpha(0.4)
     GameTooltip:Hide()
     Bar.dragFrame:Show()
@@ -122,13 +128,13 @@ end
 local function onDragStop()
     if not drag then return end
     local t = dropTarget()
-    local id = drag.block.id
+    local id, W = drag.block.id, Bar.frame:GetWidth()
     if t.laneX then
-        Layout.MoveLane(id, t.laneX)
+        Layout.MoveLane(id, t.laneX, W)
     elseif t.x then
-        Layout.Move(id, { x = t.x })
+        Layout.Move(id, { x = t.x }, W)
     elseif not t.none then
-        Layout.Move(id, { lane = t.lane, index = t.index })
+        Layout.Move(id, { lane = t.lane, index = t.index }, W)
     end
     endDrag(true)
 end
@@ -240,7 +246,8 @@ function Bar.Layout()
             b.visible = visible
         end
     end
-    Bar.geometry = Layout.Place(Layout.Lanes(), Bar.frame:GetWidth(), widthOf)
+    Bar.geometry = Layout.Place(Layout.Current(), Bar.frame:GetWidth(), widthOf)
+    if drag then drag.cachedX = nil end   -- the slots under the cursor may have moved
     for _, lane in ipairs(Bar.geometry) do
         for _, it in ipairs(lane.items) do
             local b = Engine.byId[it.id].widget

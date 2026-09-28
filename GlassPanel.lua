@@ -63,14 +63,18 @@ local function slash(msg)
         if not id then say(usage) return end
         local block = findBlock(id)
         if not block then return end
+        local W = Bar.frame and Bar.frame:GetWidth() or 0
         local x = Layout.SIDE_X[where]
         local pct = tonumber(where or "")
-        if x == nil and pct and pct >= 0 and pct <= 100 then x = pct / 100 end
+        if x == nil and pct and pct >= 0 and pct <= 100 then
+            -- The same edge rule as a drag: near an end is that end.
+            x = Layout.Anchor(pct / 100 * W, pct / 100 * W, W)
+        end
         if x == nil then say(usage) return end
         if n ~= "" then
-            Layout.Move(block.id, { lane = x, index = tonumber(n) })
+            Layout.Move(block.id, { lane = x, index = tonumber(n) }, W)
         else
-            Layout.Move(block.id, { x = x })
+            Layout.Move(block.id, { x = x }, W)
         end
         Bar.Layout()
     elseif cmd == "layout" and arg == "reset" then

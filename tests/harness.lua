@@ -58,9 +58,12 @@ function textOf(id) return block(id).widget.label._text end
 -- A block's left edge on the bar, as last laid out.
 function leftOf(id) return block(id).widget.left end
 -- Drag block id and drop it with the cursor at bar x (shift = move its lane).
-function dragTo(id, x, shift)
+-- The block is grabbed at its centre (or `grabAt` px from its left edge), so
+-- by default "drop at x" puts the block's centre at x.
+function dragTo(id, x, shift, grabAt)
     local b = block(id).widget
     WoW.shift = shift == true
+    WoW.cursor = { ((b.left or 0) + (grabAt or b._width / 2)) * WoW.uiScale, 0 }
     b._scripts.OnDragStart(b)
     WoW.cursor = { x * WoW.uiScale, 0 }
     WoW.tick()

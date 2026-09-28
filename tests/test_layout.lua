@@ -50,7 +50,7 @@ eq(lanes(), "0:gold | 0.3:clock | 1:xp", "clock in its own lane at 30%")
 dragTo("clock", 700, true)
 eq(lanes(), "0:gold | 0.7:clock | 1:xp", "shift-drag moved the lane")
 dragTo("clock", 995, true)
-eq(lanes(), "0:gold | 1:xp,clock", "a lane moved onto another's anchor merges into it")
+eq(lanes(), "0:gold | 1:clock,xp", "a lane moved onto another's anchor merges into it, on the side it came from")
 
 -- The release that ends a drag is not a click; a later click is.
 local clicks = 0
@@ -64,10 +64,12 @@ gb._scripts.OnClick(gb, "LeftButton")
 eq(clicks, 1, "a later click goes through")
 
 -- The drop marker follows the cursor while dragging.
+local gCentre = leftOf("gold") + gb._width / 2
+WoW.cursor = { gCentre, 0 }
 gb._scripts.OnDragStart(gb)
 eq(gb._alpha, 0.4, "dragged block dimmed")
-WoW.cursor = { leftOf("gold") + 3, 0 }; WoW.tick()
-eq(GlassPanel.Bar.marker._shown, false, "no marker over the block's own spot")
+WoW.cursor = { gCentre + 3, 0 }; WoW.tick()
+eq(GlassPanel.Bar.marker._shown, false, "no marker while the cursor has barely moved")
 WoW.cursor = { 500, 0 }; WoW.tick()
 eq(GlassPanel.Bar.marker._shown, true, "marker shown away from it")
 eq(GlassPanel.Bar.marker._points[1][4], 500, "marker at the cursor for a new lane")
@@ -169,6 +171,88 @@ eq(lanes(), "0:xp,gold | 1:clock", "lane snapped to the right edge")
 WoW.chat = {}
 GlassPanel._test.slash("move gold")
 check(WoW.chat[1] and WoW.chat[1]:find("usage"), "usage shown")
+
+-- Second /code-review round on #8.
+loadAddon()
+L = GlassPanel.Layout
+eq(lanes(), "0:xp,gold | 1:clock", "defaults")
+
+-- A drop over another block joins that block's lane (never a lane on top of it).
+dragTo("clock", 8 + 200)                 -- right half of the 360 px XP bar
+eq(lanes(), "0:xp,clock,gold", "dropped on xp's right half: after xp, in its lane")
+dragTo("clock", 8 + 100)                 -- left half
+eq(lanes(), "0:clock,xp,gold", "left half: before it")
+
+-- Lanes never overlap: Place pushes them apart.
+local geo = L.Place({ { x = 0, ids = { "a" } }, { x = 0.1, ids = { "b" } } }, 1000, function() return 100 end)
+check(geo[2].left >= geo[1].left + 100 + L.LANE_GAP, "a centred lane is pushed clear of the edge lane")
+geo = L.Place({ { x = 0.5, ids = { "a" } }, { x = 0.52, ids = { "b" } }, { x = 1, ids = { "c" } } }, 1000, function() return 300 end)
+check(geo[2].left >= geo[1].left + 300 + L.LANE_GAP and geo[3].left >= geo[2].left + 300 + L.LANE_GAP,
+      "a chain of lanes is pushed apart")
+check(geo[3].left + 300 <= 1000 - L.EDGE, "and kept on the bar")
+
+-- A wide block moves by less than its own width.
+GlassPanel._test.slash("layout reset")
+GlassPanel._test.slash("move xp 50")
+eq(lanes(), "0:gold | 0.5:xp | 1:clock", "xp alone in a centre lane")
+dragTo("xp", 500 + 150)
+check(math.abs(L.Lanes()[2].x - 0.65) < 0.001, "moved 150 px right (" .. L.Lanes()[2].x .. ")")
+-- The same with shift: the lane moves by the displacement.
+dragTo("xp", leftOf("xp") + 180 - 100, true)
+check(math.abs(L.Lanes()[2].x - 0.55) < 0.001, "shift-drag moved the lane 100 px left (" .. L.Lanes()[2].x .. ")")
+
+-- The grab offset is kept: grabbed 10 px from its left end, the block lands
+-- where the hand left it, not centred on the cursor.
+dragTo("xp", 500, false, 10)
+eq(leftOf("xp"), 490, "left edge where it was released")
+
+-- A relayout mid-drag refreshes the drop target under a still cursor.
+GlassPanel._test.slash("layout reset")
+local cb = block("clock").widget
+WoW.cursor = { (cb.left + cb._width / 2), 0 }
+cb._scripts.OnDragStart(cb)
+local gapX = leftOf("gold") + block("gold").widget._width + 4
+WoW.cursor = { gapX, 0 }; WoW.tick()
+local before = GlassPanel.Bar.marker._points[1][4]
+WoW.money = WoW.money * 1000               -- gold grows: the gap after it moves right
+WoW.fire("PLAYER_MONEY"); WoW.tick(); WoW.tick()
+local after = GlassPanel.Bar.marker._points[1][4]
+check(after > before, "marker follows the moved gap (" .. before .. " -> " .. after .. ")")
+cb._scripts.OnDragStop(cb)
+
+-- Duplicate ids in a hand-edited layout: kept once, where they first appear.
+GlassPanelDB.layout = { { x = 0, ids = { "gold" } }, { x = 1, ids = { "gold", "clock" } } }
+eq(lanes(), "0:gold,xp | 1:clock", "duplicate gold dropped from the second lane")
+
+-- /gpanel move <pct> <n> near an end snaps to that end's lane, like a drag.
+GlassPanel._test.slash("layout reset")
+GlassPanel._test.slash("move clock 1 1")
+eq(lanes(), "0:clock,xp,gold", "1% joins the left edge lane")
+GlassPanelDB.layout = { { x = 0.5, ids = { "xp", "gold" } }, { x = 1, ids = { "clock" } } }
+GlassPanel._test.slash("move clock 2")
+eq(lanes(), "0:clock | 0.5:xp,gold", "with no left lane, 2% starts the left EDGE lane, not a floating one")
+
+-- A lane shift-dragged near another lane's anchor merges (not only on exact equality).
+GlassPanel._test.slash("layout reset")
+GlassPanel._test.slash("move gold 50")
+GlassPanel._test.slash("move clock 30")
+dragTo("clock", 501, true)
+eq(lanes(), "0:xp | 0.5:clock,gold", "merged into the lane it landed on")
+
+-- The tooltip opens on the side of the block's centre.
+GlassPanel._test.slash("layout reset")
+GlassPanelDB.layout = { { x = 0.6, ids = { "xp" } }, { x = 0, ids = { "gold" } }, { x = 1, ids = { "clock" } } }
+GlassPanel.Bar.Layout()
+local xw = block("xp").widget
+check(xw.left < 500 and xw.left + 180 > 500, "xp's left edge is left of the middle, its centre right of it")
+xw._scripts.OnEnter(xw)
+eq(GameTooltip._points[1][1], "TOPRIGHT", "tooltip anchored on the right")
+
+-- The lane model is cached until something changes it.
+check(L.Current() == L.Current(), "cached")
+local c1 = L.Current()
+GlassPanel._test.slash("move gold right")
+check(L.Current() ~= c1, "rebuilt after a move")
 
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_layout")
