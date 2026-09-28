@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[Role]|r
+## Notes: Your group role (Tank, Healer, Damage), with its icon. Click to set it.
+## Author: Spotnick
+## Version: @project-version@
+## Group: GlassPanel
+## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
+## Dependencies: GlassPanel
+
+Role.lua
