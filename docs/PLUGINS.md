@@ -42,7 +42,8 @@ is hidden.
 ```lua
 GlassPanel.RegisterBlock({
     id       = "gearscore",            -- required, unique; also the /gpanel show|hide name
-    label    = "GearScore",            -- for /gpanel list (default: id)
+    label    = "GearScore",            -- the gold caption "GearScore: " and /gpanel list (default: id)
+    showLabel = true,                  -- false: no caption by default (the user can still turn it on)
     icon     = 132627,                 -- file ID or path; optional
     side     = "left",                 -- default lane: "left", "center" or "right" (users drag it anywhere)
     order    = 60,                     -- in the default lane, lower sits nearer the bar's end (default 100)

@@ -79,7 +79,9 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   `side`/`order`. `Layout.Current()` is the cached read; mutators use `Lanes()` then `Save`.
 - **`Bar.lua`**: the strip (`GlassPanelBar`, full width at the top of `UIParent`, strata
   `MEDIUM`, `Glass.Apply(..., "small")`, mouse-less so empty space clicks through), one plain
-  `Button` per block (icon, `Glass.Font` label, `HIGHLIGHT` hover), placing them from
+  `Button` per block (icon, a gold **caption** `b.caption` "Label: " (#23; `Bar.ShowsCaption`: never
+  on graphical blocks, then `labelsFor[id]`, then `labels`, then the spec's `showLabel`), the
+  value `b.label`, `HIGHLIGHT` hover), placing them from
   `Layout.lua`, and dragging: a marker shows the drop slot, shift-drag moves a lane by the
   cursor's displacement, a drag under 10 px is a wobbly click (no move), the release that ends a
   drag isn't a click, and the drop target is recomputed after any relayout mid-drag. Hidden and empty blocks take no space. **Nothing is secure**, so the bar may be touched in combat.
@@ -113,7 +115,7 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   `C_TooltipInfo.GetInventoryItem(...).repairCost` (TitanRepair's Retail path, not in the dump:
   unknown is shown as unknown). Secret numbers keep type `"number"` on the client, so
   `type(x) == "number"` is no secrecy check: `API.Plain` first.
-- **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`). The bar is built at
+- **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`, `layout`, `room`, `labels`, `labelsFor[id]`). The bar is built at
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles
   `list | move <id> <lane> [n] | layout reset | show <id> | hide <id> | toggle | font | room |
   covered | failures`.

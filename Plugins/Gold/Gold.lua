@@ -15,6 +15,7 @@ local function money() return API.Plain(GetMoney()) end
 GlassPanel.RegisterBlock({
     id = "gold",
     label = "Gold",
+    showLabel = false,   -- the coin icons say it (no caption on the TBC bar either)
     -- No block icon: the coin text carries its own icons, and it drops zero
     -- denominations, so a leading coin icon made "37s 81c" read as 37 gold.
     order = 30,

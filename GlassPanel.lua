@@ -5,7 +5,7 @@ GlassPanel = GlassPanel or {}
 local API, Glass, Engine, Bar, Layout = GlassPanel.API, GlassPanel.Glass, GlassPanel.Engine, GlassPanel.Bar, GlassPanel.Layout
 local say = API.Print
 
-local DEFAULTS = { font = "arial", shown = true, room = "auto" }
+local DEFAULTS = { font = "arial", shown = true, room = "auto", labels = true }
 
 -- Read settings, fill missing keys. Nothing may REQUIRE a value to have
 -- survived: SavedVariables were broken on builds before 70009.
@@ -16,6 +16,7 @@ local function ensureDefaults()
         if db[k] == nil then db[k] = v end
     end
     if type(db.hidden) ~= "table" then db.hidden = {} end
+    if type(db.labelsFor) ~= "table" then db.labelsFor = {} end
     if not Glass.FONTS[db.font] then db.font = DEFAULTS.font end
     if db.room ~= "auto" and db.room ~= "full" then db.room = DEFAULTS.room end
     return db
@@ -88,6 +89,8 @@ local COMMANDS = {
     { "list", "lanes, their blocks, and which are hidden" },
     { "move <id> left|center|right|<0-100> [n]", "move a block into a lane (a % starts one there); n = position as /gpanel list shows it" },
     { "layout reset", "forget the arrangement: blocks go back to their default lanes" },
+    { "labels on|off", "the gold captions before values (\"Bags: \"), for every block" },
+    { "label <id> on|off|default", "one block's caption" },
     { "show <id>", "show a block" },
     { "hide <id>", "hide a block" },
     { "toggle", "show or hide the whole bar" },
@@ -141,6 +144,21 @@ local function slash(msg)
         Layout.Reset()
         Bar.Layout()
         say("layout reset")
+    elseif cmd == "labels" then
+        arg = arg:lower()
+        if arg ~= "on" and arg ~= "off" then say("labels: on or off") return end
+        db.labels = (arg == "on")
+        Bar.RefreshCaptions()
+    elseif cmd == "label" then
+        local id, v = arg:match("^(%S+)%s+(%S+)$")
+        local block = findBlock(id)
+        if not block then return end
+        v = v:lower()
+        if v == "on" then db.labelsFor[block.id] = true
+        elseif v == "off" then db.labelsFor[block.id] = false
+        elseif v == "default" then db.labelsFor[block.id] = nil
+        else say("label <id> on|off|default") return end
+        Bar.RefreshCaptions()
     elseif cmd == "show" or cmd == "hide" then
         local block = findBlock(arg)
         if not block then return end

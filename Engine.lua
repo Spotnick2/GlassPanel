@@ -159,7 +159,8 @@ end
 
 -- The public entry point. Returns the block (the spec itself) or nil.
 -- Required: id (unique string), text = function(block) -> string|nil.
--- Optional: label, icon, side ("left"|"center"|"right": the default lane),
+-- Optional: label (also the gold caption before the value, unless
+--   showLabel = false), icon, side ("left"|"center"|"right": the default lane),
 --   order (number, default 100),
 --   events = { "EVENT", ... }, onEvent(block, event, ...),
 --   interval (seconds, or function(block) -> seconds until the next repaint),
@@ -182,6 +183,7 @@ function GlassPanel.RegisterBlock(spec)
         return invalid(spec, "interval must be seconds (at least 1) or a function returning them")
     end
     if spec.label ~= nil and type(spec.label) ~= "string" then return invalid(spec, "label must be a string") end
+    if spec.showLabel ~= nil and type(spec.showLabel) ~= "boolean" then return invalid(spec, "showLabel must be a boolean") end
     if spec.events ~= nil then
         if type(spec.events) ~= "table" then return invalid(spec, "events must be a list of event names") end
         for _, e in ipairs(spec.events) do

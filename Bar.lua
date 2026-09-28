@@ -28,6 +28,30 @@ function Bar.OnScreen(block)
     return not Bar.IsHidden(block) and Bar.frame ~= nil and Bar.frame:IsShown()
 end
 
+-- Whether a block shows its caption: never for a graphical (fixed-width)
+-- block; else the user's per-block choice, then the global switch, then the
+-- block's own default (showLabel = false opts out, like Gold and Clock).
+function Bar.ShowsCaption(block)
+    if block.width then return false end
+    local d = db()
+    local per = d and d.labelsFor and d.labelsFor[block.id]
+    if per ~= nil then return per end
+    if d and d.labels == false then return false end
+    return block.showLabel ~= false
+end
+
+function Bar.UpdateCaption(block)
+    local b = block.widget
+    if not b then return end
+    b.caption:SetText(Bar.ShowsCaption(block) and (block.label .. ": ") or "")
+end
+
+-- After a caption setting changes: every block, then the layout.
+function Bar.RefreshCaptions()
+    for _, block in ipairs(Engine.blocks) do Bar.UpdateCaption(block) end
+    Bar.Layout()
+end
+
 function Bar.IsHidden(block)
     local d = db()
     return d and d.hidden and d.hidden[block.id] == true
@@ -189,11 +213,17 @@ function Bar.Attach(block)
     local top = CreateFrame("Frame", nil, b)
     top:SetAllPoints(b)
     top:SetFrameLevel(b:GetFrameLevel() + 10)
+    -- The caption ("Durability: ", gold, Titan-style) and the value after it.
+    local caption = Glass.Font(top, Bar.FONT_SIZE, "LEFT")
+    caption:SetPoint("LEFT", b, "LEFT", x, 0)
+    caption:SetTextColor(1, 0.82, 0)
+    b.caption = caption
     local fs = Glass.Font(top, Bar.FONT_SIZE, "LEFT")
-    fs:SetPoint("LEFT", b, "LEFT", x, 0)
+    fs:SetPoint("LEFT", caption, "RIGHT", 0, 0)
     b.label = fs
 
     block.widget = b
+    Bar.UpdateCaption(block)
     b:Hide()   -- off screen until its first layout decides
     if block.build then Engine.Call(block, "build", block.build, block) end
     Engine.MarkDirty(block)
@@ -223,7 +253,8 @@ local function widthOf(id)
     local block = Engine.byId[id]
     if not (block and block.widget and shows(block)) then return nil end
     local b = block.widget
-    return block.width or (b.textX + math.ceil(b.label:GetStringWidth()) + PAD)
+    return block.width
+        or (b.textX + math.ceil(b.caption:GetStringWidth()) + math.ceil(b.label:GetStringWidth()) + PAD)
 end
 
 -- Place every block. Hidden blocks and empty ones take no space.

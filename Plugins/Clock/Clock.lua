@@ -17,6 +17,7 @@ end
 GlassPanel.RegisterBlock({
     id = "clock",
     label = "Clock",
+    showLabel = false,
     side = "right",
     order = 100,
     -- Wake on the next minute, when the text changes, not every second.
