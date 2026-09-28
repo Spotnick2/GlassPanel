@@ -97,6 +97,22 @@ for _ = 1, 15 do WoW.fire("PLAYER_EQUIPMENT_CHANGED", 5, true) end
 WoW.tick()
 eq(WoW.tooltipReads, 1, "15 events, one scan, one read (only the damaged chest)")
 
+-- A scan that throws is recorded and retried, not marked fresh with old data.
+WoW.gear = { [5] = { cur = 30, max = 100, cost = 5 } }
+local realDur = GetInventoryItemDurability
+GetInventoryItemDurability = function() error("client hiccup") end
+WoW.fire("UPDATE_INVENTORY_DURABILITY"); WoW.tick()
+check(GlassPanel.failures["durability:scan"], "failed scan recorded")
+GetInventoryItemDurability = realDur
+GlassPanel.failures["durability:scan"] = nil
+GlassPanel.Refresh("durability"); WoW.tick()
+check(textOf("durability"):find("30%%"), "retried on the next repaint: 30% (not the old figure)")
+
+-- API.Returned: a secret counts as returned without being compared.
+check(GlassPanel.API.Returned(WoW.Secret("x")), "secret: returned")
+check(GlassPanel.API.Returned(0), "plain value: returned")
+check(not GlassPanel.API.Returned(nil), "nil: not returned")
+
 -- Nothing with durability equipped: the block hides.
 WoW.gear = {}
 WoW.fire("PLAYER_EQUIPMENT_CHANGED", 5, false); WoW.tick()

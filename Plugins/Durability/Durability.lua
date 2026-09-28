@@ -73,7 +73,7 @@ local function scan()
             items[#items + 1] = { slot = s[1], label = slotLabel(s), cur = cur, max = max, cost = cost }
             local f = cur / max
             if not lowest or f < lowest then lowest = f end
-        elseif rawCur ~= nil or rawMax ~= nil then
+        elseif API.Returned(rawCur) or API.Returned(rawMax) then
             -- It has durability, but we can't read it: its cost is unknown too.
             unreadable = unreadable + 1
             known = false
@@ -83,11 +83,12 @@ local function scan()
     state.cost = known and total or nil
 end
 
+-- A scan that throws leaves the cache stale (tried again on the next
+-- repaint) and is recorded, rather than leaving an old cache marked fresh.
 local function ensure()
-    if stale then
-        stale = false
-        scan()
-    end
+    if not stale then return end
+    local ok, err = pcall(scan)
+    if ok then stale = false else API.Fail("durability:scan", err) end
 end
 
 -- Green while fine, yellow when an item is damaged (<= 25%, where Blizzard's

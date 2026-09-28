@@ -48,7 +48,9 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   while our block replaces it and only restores what it hid (the clock's
   `TimeManagerClockButton`). **Only for plain frames**: not Edit Mode system frames like
   `MainStatusTrackingBarContainer` (#9). `API.Plain(v)` is the one "secret becomes nil" guard;
-  use it at every read. The global `GetCoinTextureString` is **absent** on 70009;
+  use it at every read. `API.Returned(v)` asks "did the client return anything" without comparing:
+  **never write `raw ~= nil` on a raw read**, since comparing a secret (even with nil) throws on
+  the client, and the offline stub can't catch it. The global `GetCoinTextureString` is **absent** on 70009;
   use `C_CurrencyInfo`'s. `MEASURED_ON_BUILD` lives here too.
 - **`Glass.lua`**: the material, **copied** from GlassUnitFrames' **`main`** branch
   (`git -C ..\GlassUnitFrames show main:Glass.lua`), with only the namespace lines and header
