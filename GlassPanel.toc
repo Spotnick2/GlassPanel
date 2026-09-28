@@ -11,7 +11,7 @@ Engine.lua
 Layout.lua
 Bar.lua
 Room.lua
-Blocks\XP.lua
-Blocks\Gold.lua
-Blocks\Clock.lua
+Plugins\XP\XP.lua
+Plugins\Gold\Gold.lua
+Plugins\Clock\Clock.lua
 GlassPanel.lua
