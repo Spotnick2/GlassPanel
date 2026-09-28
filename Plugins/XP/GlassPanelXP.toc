@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[XP+]|r
+## Notes: A glass XP bar with rested and quest XP; the tooltip has time played, XP per hour and time to level.
+## Author: Spotnick
+## Version: @project-version@
+## Group: GlassPanel
+## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
+## Dependencies: GlassPanel
+
+XP.lua

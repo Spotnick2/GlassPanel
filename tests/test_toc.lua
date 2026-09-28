@@ -21,6 +21,69 @@ for _, f in ipairs(tocFiles()) do
     seen[f] = true
 end
 
+-- [Core] and its grouped plugins (#7), AtlasLoot-style in the AddOns list,
+-- AltStable-style on disk: Plugins\<Name>\GlassPanel<Name>.toc.
+check(toc:find("## Title: |cff7fd4ffGlass|r Panel |cFF22B14C[Core]|r", 1, true), "core title says [Core]")
+check(toc:find("## Group: GlassPanel", 1, true), "core in the GlassPanel group")
+local icon = toc:match("## IconTexture: ([^\r\n]+)")
+check(icon, "core has an icon")
+-- .pkgmeta's move-folders block, parsed: only uncommented "  src: dst" lines
+-- between "move-folders:" and the next top-level key count.
+local moves = {}
+do
+    local inBlock = false
+    for line in io.lines(".pkgmeta") do
+        line = line:gsub("\r", "")
+        if line:match("^move%-folders:%s*$") then
+            inBlock = true
+        elseif line:match("^[^%s#]") then
+            inBlock = false
+        elseif inBlock then
+            local src, dst = line:match("^  ([^#%s][^:]*):%s*(%S+)%s*$")
+            if src then moves[src] = dst end
+        end
+    end
+end
+local list = plugins()
+check(#list >= 3, "plugins found (" .. #list .. ")")
+for _, p in ipairs(list) do
+    check(p.toc, "Plugins/" .. p.folder .. " has a TOC (without one it never loads or ships)")
+end
+for _, p in ipairs(list) do
+  if p.toc then
+    local t = io.open(p.dir .. p.toc):read("*a")
+    local name = p.name
+    check(name:match("^GlassPanel%u"), name .. ": AltStable-style name GlassPanel<Name>")
+    check(t:find("## Interface: 16001", 1, true), name .. ": interface 16001")
+    check(t:find("## Version: @project-version@", 1, true), name .. ": version token")
+    check(t:find("## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[", 1, true), name .. ": title 'Glass Panel [X]'")
+    check(t:find("## Group: GlassPanel", 1, true), name .. ": grouped under the core")
+    check(t:find("## Dependencies: GlassPanel\r?\n") or t:find("## Dependencies: GlassPanel$"), name .. ": depends on the core")
+    eq(t:match("## IconTexture: ([^\r\n]+)"), icon, name .. ": the core's icon")
+    local files = tocFiles(p.toc, p.dir)
+    check(#files > 0, name .. ": lists its files")
+    for _, f in ipairs(files) do
+        local src = io.open(f, "r")
+        check(src ~= nil, name .. ": file exists: " .. f)
+        if src then
+            check(src:read("*a"):find("\nGlassPanel = GlassPanel or {}\n", 1, true), "starts with the namespace line: " .. f)
+            src:close()
+        end
+    end
+    local folder = p.dir:gsub("/$", "")
+    eq(moves["GlassPanel/" .. folder], name, name .. ": .pkgmeta move-folders moves " .. folder .. " out")
+  end
+end
+
+-- The core runs alone: every plugin can be switched off.
+loadAddon({ plugins = false })
+eq(#GlassPanel.Engine.blocks, 0, "core alone registers no blocks")
+check(next(GlassPanel.failures) == nil, "core alone: no failures")
+WoW.chat = {}
+GlassPanel._test.slash("list")
+check(WoW.chat[1] and WoW.chat[1]:find("drag a block", 1, true), "core alone: /gpanel list prints its header")
+eq(#WoW.chat, 1, "core alone: and no lanes")
+
 -- Two places that must agree, never derived from each other.
 loadAddon()
 eq(GlassPanel.MEASURED_ON_BUILD, "1.60.1.70009", "MEASURED_ON_BUILD")

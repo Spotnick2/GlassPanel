@@ -1,4 +1,4 @@
--- Blocks/Clock.lua: local time on the bar, realm time in the tooltip.
+-- Plugins/Clock/Clock.lua: local time on the bar, realm time in the tooltip.
 --
 -- While this block is on screen, Blizzard's minimap clock
 -- (TimeManagerClockButton, from Blizzard_TimeManager) is hidden: two clocks

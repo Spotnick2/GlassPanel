@@ -25,13 +25,21 @@ number*. Then check that API against the Forever dump, because Titan targets TBC
 Don't reuse its structure: no global button names, no `TitanGetVar` store, no XML, no
 per-plugin option menus, no multiple bars. Titan ships its own license. Write our own code.
 
-**Status: scaffold.** The core runs with the gold and clock blocks. Work goes through GitHub
-issues and PRs (the repo name will be GlassPanel).
+**Status: early.** `Glass Panel [Core]` plus the XP+, Gold and Clock plugins. Work goes through
+GitHub issues and PRs at `github.com/Spotnick2/GlassPanel` (private).
 
 ## Layout
 
-TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` → `Room.lua` → `Blocks\*.lua` →
-`GlassPanel.lua`.
+**Structure (#7):** `Glass Panel [Core]` is the bar, the engine and the API, and has no blocks of
+its own. **Every block is a plugin**: its own addon under `Plugins\<Name>\`, named like AltStable's
+(`GlassPanelXP.toc`, deployed and packaged as `AddOns\GlassPanelXP`), and shown AtlasLoot-style in
+the AddOns list: `## Group: GlassPanel`, title `Glass Panel |cFF0099FF[XP+]|r` under the core's
+`[Core]`, the core's icon, `## Dependencies: GlassPanel`. Users switch blocks off in the AddOns
+list; the layout keeps a disabled plugin's place. `test_toc.lua` checks every plugin TOC and the
+`.pkgmeta` `move-folders` line.
+
+Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` →
+`Room.lua` → `GlassPanel.lua`. Plugins load after the core's `ADDON_LOADED`.
 
 - **`Compat.lua`**: `GlassPanel.API`, the only route to client APIs that moved or may be absent.
   It has `IsSecret`, `RegisterEvent` (reports throws and refusals, naming the block that asked),
@@ -85,21 +93,21 @@ TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` �
   band as "under" or "beside" the bar. Moving Blizzard's frames at runtime was rejected after
   research and a Codex review (see #2 and the porting guide's Edit Mode note); an opt-in Edit
   Mode layout setup is #10.
-- **`Blocks\XP.lua`**: XP+ (#3), the only graphical block so far (`width`/`build`/`paint`).
+- **`Plugins\XP\XP.lua`**: XP+ (#3), the only graphical block so far (`width`/`build`/`paint`).
   Four layered bars on one `Glass.Bar` host. A level crossing is detected by the level or max
   changing (not by XP going down). Blizzard's XP bar is left alone (#9).
   `/played` is requested with `TIME_PLAYED_MSG` muted on the chat frames, one request at a time
   (a token ties the unmute, the next frame after the answer or after 10 s, to its own request),
   **never** by replacing `ChatFrame_DisplayTimePlayed`. Graphical blocks aren't painted while off
   screen; `Bar.Layout` marks them dirty when they come back.
-- **`Blocks\*.lua`**: built-in blocks. They register through the **public** API, exactly as a
-  plugin would, so the built-ins keep the contract honest.
+- **`Plugins\Gold`, `Plugins\Clock`**: gold (secret-safe) and the clock (hides Blizzard's
+  minimap clock). Plugins use the **public** API only, the same one third-party plugins get.
 - **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`). The bar is built at
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles
-  `list | move <id> <lane> [n] | layout reset | show <id> | hide <id> | toggle | font | failures`.
-- **`Plugins\<Name>\`**: each is a separate addon (`## Dependencies: GlassPanel`). Deploy puts
-  each at the AddOns top level, and `.pkgmeta` `move-folders` does the same when packaging (the
-  AltStable pattern).
+  `list | move <id> <lane> [n] | layout reset | show <id> | hide <id> | toggle | font | room |
+  covered | failures`.
+- **`Plugins\<Name>\`**: deploy puts each at the AddOns top level under its TOC name, and
+  `.pkgmeta` `move-folders` does the same when packaging (the AltStable pattern).
 
 Forever is **Vanilla content running on Blizzard's Retail (Mainline) codebase**: assume Vanilla
 content and the Retail API. Advice that cites a TBC or Classic API is usually stale, and that
@@ -159,7 +167,9 @@ python Tools\make_textures.py                                      # regenerate 
 
 ## Addon basics
 
-- One plain `GlassPanel.toc`, `## Interface: 16001` (**`11601` is a transposed-digit bug**).
+- One TOC per addon: the core's `GlassPanel.toc` and each plugin's
+  `Plugins\<Name>\GlassPanel<Name>.toc`. No `_Forever`/`_Camelot` suffix; every one has
+  `## Interface: 16001` (**`11601` is a transposed-digit bug**) and `## Version: @project-version@`.
 - One global namespace table, `GlassPanel`. Every file starts `GlassPanel = GlassPanel or {}`.
 - Plugins reach the core only through `GlassPanel.RegisterBlock`, `GlassPanel.Refresh`,
   `GlassPanel.API` and `GlassPanel.Glass`. Anything else is internal and may change. Bump

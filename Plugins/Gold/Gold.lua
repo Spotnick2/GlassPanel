@@ -1,4 +1,4 @@
--- Blocks/Gold.lua: the player's money, and what changed this session.
+-- Plugins/Gold/Gold.lua: the player's money, and what changed this session.
 --
 -- GetMoney has been measured SECRET on a PvP realm (porting guide, "Secret
 -- values"), so every read is tested before any arithmetic. While it is secret

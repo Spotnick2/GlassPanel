@@ -12,5 +12,7 @@
 - The bar stops short of the minimap, buffs and other Blizzard frames at the top of the screen
   instead of covering them, and takes the full width again when they're moved out of the way.
   `/gpanel room full` keeps it full width always.
+- Every block is its own addon, grouped under Glass Panel [Core] in the AddOns list: switch off the
+  ones you don't want.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.

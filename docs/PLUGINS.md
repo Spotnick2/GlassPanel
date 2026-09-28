@@ -1,8 +1,9 @@
 # Writing a GlassPanel block
 
 A block is one item on the bar: an optional icon, a line of text, an optional tooltip and click.
-Built-in blocks live in `Blocks\`. A plugin is a separate addon that registers blocks the same
-way.
+Every block is a plugin: an addon of its own under `Plugins\<Name>\` that registers blocks
+through the API below. That includes GlassPanel's own blocks (XP+, Gold, Clock), so a user can
+switch any of them off in the AddOns list. Third-party plugins use the same API.
 
 ## A plugin addon
 
@@ -13,14 +14,23 @@ Plugins\GearScore\GearScore.lua
 
 ```
 ## Interface: 16001
-## Title: |cff7fd4ffGlass|r Panel: GearScore
+## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[GearScore]|r
+## Notes: ...
 ## Author: Spotnick
 ## Version: @project-version@
+## Group: GlassPanel
+## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
 ## Dependencies: GlassPanel
 ## SavedVariables: GlassPanelGearScoreDB
 
 GearScore.lua
 ```
+
+`## Group: GlassPanel`, the `Glass Panel [X]` title and the core's icon nest it under
+`Glass Panel [Core]` in the AddOns list (the AtlasLoot Forever style). The folder is deployed and
+packaged under the TOC's name (`GlassPanelGearScore`, AltStable's naming); add its
+`move-folders` line to `.pkgmeta` (`tests/test_toc.lua` checks). Every Lua file starts with
+`GlassPanel = GlassPanel or {}`.
 
 `## Dependencies: GlassPanel` guarantees `GlassPanel.RegisterBlock` exists when the plugin's
 files run. Registering before or after the bar is built both work: an early block is attached
@@ -47,7 +57,7 @@ GlassPanel.RegisterBlock({
 })
 ```
 
-A block that draws more than text (the XP bar, `Blocks\XP.lua`) adds:
+A block that draws more than text (the XP bar, `Plugins\XP\XP.lua`) adds:
 
 ```lua
     width = 360,                            -- fixed width in px; "" text then still shows the block, nil hides it
