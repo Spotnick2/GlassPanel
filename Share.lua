@@ -325,6 +325,7 @@ function Share.Apply(setup) Settings.ApplyAll(setup) end
 --------------------------------------------------------------------------------
 
 local win
+local glass, backing, shareScroll   -- for tests
 
 local function preview()
     local text = win.edit:GetText() or ""
@@ -357,16 +358,15 @@ local function build()
     -- (AltStable registers its export window the same way on Forever).
     local special = rawget(_G, "UISpecialFrames")
     if type(special) == "table" then table.insert(special, "GlassPanelShareWindow") end
-    Glass.Apply(win, "small")
+    glass = Glass.Apply(win, "small")
     -- The glass is made to sit over the world; this window opens over the
     -- Settings panel, whose text showed through (#36). An opaque backing
-    -- above the shadow and under the glass tint, inside the rounded corners.
-    local inset = Glass.Inset("small")
-    local backing = win:CreateTexture(nil, "BACKGROUND", nil, -7)
-    backing:SetPoint("TOPLEFT", win, "TOPLEFT", inset, -inset)
-    backing:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -inset, inset)
+    -- above the shadow (-8) and under the tint (-6), clipped by the glass's
+    -- own rounded mask like the tint, grain and wash are.
+    backing = win:CreateTexture(nil, "BACKGROUND", nil, -7)
+    backing:SetAllPoints(win)
     backing:SetColorTexture(0.05, 0.06, 0.08, 0.96)
-    win.backing = backing
+    backing:AddMaskTexture(glass.mask)
 
     win.title = Glass.Font(win, 14, "LEFT")
     win.title:SetPoint("TOPLEFT", win, "TOPLEFT", 14, -12)
@@ -384,7 +384,7 @@ local function build()
     edit:SetWidth(420)
     scroll:SetScrollChild(edit)
     API.AutoHideScrollBar(scroll)
-    win.scroll = scroll
+    shareScroll = scroll
     edit:SetScript("OnEscapePressed", function() win:Hide() end)
     edit:SetScript("OnTextChanged", function(self, userInput)
         if win.mode == "export" then
@@ -455,4 +455,6 @@ Share._test = {
     serialize = function(v) local out = {}; serialize(v, out); return table.concat(out) end,
     deserialize = deserialize, b64encode = b64encode, b64decode = b64decode,
     window = function() return win end, PREFIX = PREFIX, MAX_INPUT = MAX_INPUT,
+    glass = function() return glass end, backing = function() return backing end,
+    scroll = function() return shareScroll end,
 }

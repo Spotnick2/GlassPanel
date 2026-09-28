@@ -234,7 +234,11 @@ function Methods.UnregisterEvent(w, e) w._events[e] = nil end
 function Methods.IsEventRegistered(w, e) return w._events[e] == true end
 
 -- Regions.
-function Methods.CreateTexture(w) return newWidget("Texture", w) end
+function Methods.CreateTexture(w, name, layer, template, sublevel)
+    local t = newWidget("Texture", w)
+    t._layer, t._sublevel = layer, sublevel
+    return t
+end
 function Methods.CreateMaskTexture(w) return newWidget("MaskTexture", w) end
 function Methods.CreateFontString(w) return newWidget("FontString", w) end
 function Methods.CreateAnimationGroup(w) return newWidget("AnimationGroup", w) end

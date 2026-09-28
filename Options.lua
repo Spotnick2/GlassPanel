@@ -274,6 +274,5 @@ local reg = CreateFrame("Frame")
 API.RegisterEvent(reg, "PLAYER_LOGIN", "options")
 reg:SetScript("OnEvent", register)
 
-panel.scroll = scroll
-Options._test = { panel = panel, controls = widgets, refreshers = refreshers, rows = rows,
+Options._test = { panel = panel, scroll = scroll, controls = widgets, refreshers = refreshers, rows = rows,
                   category = function() return category end }
