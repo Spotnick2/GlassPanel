@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[GearScore]|r
+## Notes: Your GearScore and average item level, with a per-slot breakdown.
+## Author: Spotnick
+## Version: @project-version@
+## Group: GlassPanel
+## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
+## Dependencies: GlassPanel
+
+GearScore.lua

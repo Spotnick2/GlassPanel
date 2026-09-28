@@ -31,5 +31,7 @@
 - Layer: which layer of the realm you're on, detected from the NPCs you target or mouse over
   (nameplates confirm a known layer), numbered per zone and per realm. Left-click forgets the
   layers seen in your zone.
+- GearScore: your GearScore, coloured along the item-quality ramp (its bracket in the tooltip), and your average item level; the tooltip
+  breaks it down by slot.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.

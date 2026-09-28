@@ -142,6 +142,14 @@ Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.l
   entering the world, combat end, taxi end, a uiMapID change (`ZONE_CHANGED[_INDOORS]`) and
   5/15/30 s after a group change. The current layer holds only while the live uiMapID is the one it
   was seen on (checked at every read). Map and player phase changes make it unknown. No NWB listener (#26). Left-click forgets the current map's layers.
+- **`Plugins\GearScore`** (#16): TitanGearScore's per-item formula on a fixed 200-point bracket
+  scale (not derived from `GetBuildInfo`), plus Blizzard's `GetAverageItemLevel()` equipped value.
+  Items via `GetInventoryItemID`/`Link` and `C_Item.GetItemInfo` (the global `GetItemInfo` is
+  absent), looked up by id. An uncached item is requested once, left out and flagged with a grey
+  `?`; `ITEM_DATA_LOAD_RESULT`/`GET_ITEM_INFO_RECEIVED` fire for every item the client loads, so
+  they're registered on the plugin's own frame only while one of ours is pending (a failed load
+  makes it unreadable until the next gear change). Score `nil` until known.
+  `PLAYER_AVG_ITEM_LEVEL_UPDATE` repaints without a rescan. No click.
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable
   bag (free count or family) is left out and flagged with a grey `?`. Left-click: `ToggleAllBags`.
