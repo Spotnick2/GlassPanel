@@ -145,68 +145,124 @@ check(seen, "a 750 px frame isn't mistaken for a full-screen layer on a narrowed
 rawset(_G, "WideTopThing", nil)
 
 -- Buffs (#33): measured by the icons shown, not Edit Mode's whole grid box.
--- The box spans x 400-760 at the top right; the icons fill from its right.
+-- The structure measured on 70009: BuffFrame (the grid box, x 400-760 here)
+-- holds a 1x1 AuraContainer anchor at its top-right corner that does NOT
+-- size to the icons, the icons under it, a visible CollapseAndExpandButton
+-- (15x30) and a hidden Selection box.
 rawset(_G, "MinimapCluster", nil)
 loadAddon()
 R = GlassPanel.Room
 bar = GlassPanel.Bar.frame
 local buffs = blizzard("BuffFrame", { 400, 700, 360, 64 })
-local grid = CreateFrame("Frame", nil, buffs); grid._rect = { 400, 700, 360, 64 }
+local container = CreateFrame("Frame", nil, buffs); container._rect = { 759, 763, 1, 1 }
+buffs.AuraContainer = container
+local collapse = CreateFrame("Button", nil, buffs); collapse._rect = { 761, 734, 15, 30 }
+local selection = CreateFrame("Frame", nil, buffs); selection._rect = { 400, 700, 360, 64 }; selection._shown = false
 local function aura(x)
-    local b = CreateFrame("Button", nil, grid); b._rect = { x, 730, 30, 30 }
-    local cd = CreateFrame("Cooldown", nil, b); cd._rect = { x + 2, 732, 26, 26 }   -- an icon's own child frame
+    local b = CreateFrame("Button", nil, container); b._rect = { x, 730, 30, 30 }
+    local cd = CreateFrame("Cooldown", nil, b); cd._rect = { x + 2, 732, 26, 26 }   -- the icon's own child frame
+    b.cd = cd
     return b
 end
 local a1, a2 = aura(720), aura(680)
 a1._shown, a2._shown = false, false
+-- A 1x1 anchor under the container (private-aura style): a point, not an icon.
+local pin = CreateFrame("Frame", nil, container); pin._rect = { 700, 740, 1, 1 }
 R.NewSession()
-eq(point("TOPRIGHT")[4], 0, "no buffs up: the empty grid box takes no room")
+eq(point("TOPRIGHT")[4], 0, "no buffs up: the empty grid box takes no room (nor the collapse button, nor the 1x1 anchor)")
 a1._shown = true
 R.Update()
-eq(point("TOPRIGHT")[4], -(1000 - 720 + R.MARGIN), "one buff: the bar stops at the icon, not the box (400)")
+eq(point("TOPRIGHT")[4], -(1000 - 720 + R.MARGIN), "one buff: the bar stops at the icon (720, not its 722 cooldown, not the box's 400)")
 a2._shown = true
 R.Update()
 eq(point("TOPRIGHT")[4], -(1000 - 680 + R.MARGIN), "a second buff to its left: pushed further")
 a2._shown = false
 R.Update()
 eq(point("TOPRIGHT")[4], -(1000 - 680 + R.MARGIN), "it expires: the bar doesn't jiggle back this session")
--- A new session (Edit Mode, zoning, reload) measures afresh.
+-- A new session (Edit Mode layout saved, zoning, reload) measures afresh.
 WoW.fire("EDIT_MODE_LAYOUTS_UPDATED"); WoW.flushTimers(0)
 eq(point("TOPRIGHT")[4], -(1000 - 720 + R.MARGIN), "new session: only the icons up now")
--- The icon is measured whole, not the smaller frames inside it.
-eq(select(1, a1:GetChildren())._rect[1], 722, "(the cooldown frame sits 2 px inside the icon)")
--- A big visible frame with nothing in it is a box, not an icon.
+
+-- /gpanel room why: from the last check, and asking changes nothing.
+a2._shown = true   -- appears, but no check has run yet
+WoW.chat = {}
+GlassPanel._test.slash("room why")
+local out = table.concat(WoW.chat, " | ")
+check(out:find("BuffFrame: icons: x 720-750", 1, true), "why: buffs measured by icons (" .. out .. ")")
+check(out:find("(1 icon(s) now)", 1, true), "why: how many icons")
+check(out:find("MinimapCluster: absent", 1, true), "why: absent frames say so")
+R.Update()
+eq(point("TOPRIGHT")[4], -(1000 - 680 + R.MARGIN), "(the next check sees the new icon)")
+a2._shown = false
+WoW.fire("EDIT_MODE_LAYOUTS_UPDATED"); WoW.flushTimers(0)
+
+-- Edit Mode open: its example auras fill the grid and aren't recorded;
+-- closing it starts a new session (dropping what this one had grown to).
+a2._shown = true
+R.Update()
+a2._shown = false
+R.Update()
+eq(point("TOPRIGHT")[4], -(1000 - 680 + R.MARGIN), "(grown to 680 this session)")
+local editMode = CreateFrame("Frame", "EditModeManagerFrame", UIParent)
+local examples = {}
+for i = 1, 8 do examples[i] = aura(400 + (i - 1) * 40) end
+R.Update()
+eq(point("TOPRIGHT")[4], -(1000 - 680 + R.MARGIN), "Edit Mode open: examples not recorded")
+for _, e in ipairs(examples) do e._shown = false end
+editMode._shown = false
+R.Update()
+eq(point("TOPRIGHT")[4], -(1000 - 720 + R.MARGIN), "Edit Mode closed: measured afresh")
+check(select(1, R.Explain()[2]:find("icons", 1, true)), "(still icons)")
+
+-- The aura frame itself moves (dragged in Edit Mode, another addon): the
+-- old extent is dropped at once.
+buffs._rect = { 400, 400, 360, 64 }
+a1._rect = { 720, 430, 30, 30 }; a1.cd._rect = { 722, 432, 26, 26 }
+R.Update()
+eq(point("TOPRIGHT")[4], 0, "buffs moved below the band: full width at once")
+buffs._rect = { 400, 700, 360, 64 }
+a1._rect = { 720, 730, 30, 30 }; a1.cd._rect = { 722, 732, 26, 26 }
+R.Update()
+-- A big visible frame with nothing in it is a container, not an icon.
 a1._shown = false
-local empty = CreateFrame("Frame", nil, buffs); empty._rect = { 450, 700, 200, 60 }
+local empty = CreateFrame("Frame", nil, container); empty._rect = { 620, 700, 140, 60 }
 R.NewSession()
 eq(point("TOPRIGHT")[4], 0, "a visible but empty container isn't an icon")
-empty._shown = false
--- Buffs moved down in Edit Mode: below the band, full width as before.
-a1._shown = true
-a1._rect = { 720, 500, 30, 30 }; select(1, a1:GetChildren())._rect = { 722, 502, 26, 26 }
+-- An icon inside a bigger sub-frame is found (containers are looked into).
+local nested = aura(640); nested._parent = empty
 R.NewSession()
-eq(point("TOPRIGHT")[4], 0, "icons below the band: full width")
-a1._rect = { 720, 730, 30, 30 }; select(1, a1:GetChildren())._rect = { 722, 732, 26, 26 }
+eq(point("TOPRIGHT")[4], -(1000 - 640 + R.MARGIN), "an icon inside a sub-container is found")
+nested._shown = false
+empty._shown = false
+a1._shown = true
 -- Replaced by an addon (reparented to a hidden frame): ignored, as before.
 local hider = CreateFrame("Frame", nil, UIParent); hider._shown = false
 buffs._parent = hider
 R.NewSession()
 eq(point("TOPRIGHT")[4], 0, "buff frame replaced: ignored")
 buffs._parent = UIParent
+-- No AuraContainer (another build): no icons, nothing thrown.
+buffs.AuraContainer = nil
+R.NewSession()
+eq(point("TOPRIGHT")[4], 0, "no AuraContainer: takes no room")
+buffs.AuraContainer = container
 -- Unreadable icon geometry: skipped, nothing thrown.
-a1._rect = { WoW.Secret("x"), 730, 30, 30 }; select(1, a1:GetChildren())._rect = { WoW.Secret("x2"), 732, 26, 26 }
+a1._rect = { WoW.Secret("x"), 730, 30, 30 }
 R.NewSession()
 eq(point("TOPRIGHT")[4], 0, "secret icon rect skipped")
-a1._rect = { 720, 730, 30, 30 }; select(1, a1:GetChildren())._rect = { 722, 732, 26, 26 }
+a1._rect = { 720, 730, 30, 30 }
 R.NewSession()
-
--- /gpanel room why: how each watched frame was measured.
+eq(point("TOPRIGHT")[4], -(1000 - 720 + R.MARGIN), "back")
+-- /gpanel room why never throws out of the command.
+local realExplain = R.Explain
+R.Explain = function() error("explain broke") end
 WoW.chat = {}
 GlassPanel._test.slash("room why")
-local out = table.concat(WoW.chat, " | ")
-check(out:find("BuffFrame: icons: x 720-750", 1, true), "why: buffs measured by icons")
-check(out:find("MinimapCluster: absent", 1, true), "why: absent frames say so")
+R.Explain = realExplain
+check(GlassPanel.failures["room:why"] ~= nil, "a failing why is recorded")
+GlassPanel.failures["room:why"] = nil
 rawset(_G, "BuffFrame", nil)
+rawset(_G, "EditModeManagerFrame", nil)
 
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_room")

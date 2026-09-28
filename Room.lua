@@ -11,22 +11,28 @@
 -- those frames down in Edit Mode gets the full width back automatically.
 -- Writing a GlassPanel Edit Mode layout with them lowered is opt-in (#10).
 --
--- Which frames count: one hidden ON ITS OWN (no target, no buffs, no focus)
--- still counts where Edit Mode put it, so the bar's width doesn't jump every
--- time you target something; one whose PARENT is hidden has been replaced by
+-- Which frames count: one hidden ON ITS OWN (no target, no focus) still
+-- counts where Edit Mode put it, so the bar's width doesn't jump every time
+-- you target something (buffs and debuffs follow their own rule, below); one whose PARENT is hidden has been replaced by
 -- another addon (GlassUnitFrames reparents Blizzard's unit frames to a hidden
 -- frame) and doesn't count. A frame centred in the middle fifth of the screen
 -- is ignored: the bar's two ends can't route around it.
 --
 -- Buffs and debuffs (#33) are measured by the icons shown, not by the frame:
 -- BuffFrame's rect is Edit Mode's whole buff grid, and on a default layout
--- the bar stopped ~350 px short of a lone buff. Their names inside the frame
--- aren't known on Forever (nothing in the dump or in the addons shipping on
--- it), so the icons are found by shape: the outermost visible frames under it
--- at most ICON_MAX units a side (bigger ones are containers, looked into). Their union
--- only ever GROWS within a session, so the bar doesn't jiggle as buffs come
--- and go; a new session (reload, zoning, Edit Mode or scale change) measures
--- afresh. No icon seen yet: the frame doesn't count.
+-- the bar stopped ~350 px short of a lone buff. Measured on 70009: the
+-- icons hang off BuffFrame.AuraContainer (DebuffFrame.AuraContainer too), a
+-- 1x1 anchor at the grid's corner that does NOT size to them; BuffFrame also
+-- holds a CollapseAndExpandButton (15x30) and a hidden Selection box. So the
+-- icons are the visible frames under AuraContainer between ICON_MIN and
+-- ICON_MAX units a side (bigger ones are containers, looked into), never the
+-- rest of the frame. Their union only GROWS within a session: the bar steps in
+-- once as buffs appear and doesn't jiggle as they come and go (it does step,
+-- unlike a frame hidden on its own, which holds its place from the start). A
+-- new session measures afresh: a reload, zoning, an Edit Mode, scale or
+-- display change, Edit Mode closing, or the aura frame itself moving. While
+-- Edit Mode is open (EditModeManagerFrame shown) its example auras aren't
+-- recorded. No icon seen yet: the frame takes no room.
 --
 -- Read-only on Blizzard frames: GetRect/IsShown/IsVisible/GetChildren only,
 -- under pcall, every number through API.Plain. Checked on layout/scale/
@@ -47,8 +53,9 @@ Room.MARGIN = 6        -- px between the bar's end and the frame it gives way to
 Room.MIN_WIDTH = 300   -- px: narrower than this, the bar keeps the full width
 Room.MIDDLE = 0.2      -- a frame centred in this middle fraction of the screen is ignored
 Room.AURAS = { BuffFrame = true, DebuffFrame = true }   -- measured by their icons (#33)
+Room.ICON_MIN = 8      -- UI units: smaller is an anchor (AuraContainer is 1x1), not an icon
 Room.ICON_MAX = 100    -- UI units: bigger than any aura icon, smaller than the grid box
-Room.DEPTH = 4         -- how far under an aura frame to look for its icons
+Room.DEPTH = 3         -- how far under AuraContainer to look for icons
 
 -- Pure. W: the screen width; bandTop/bandBottom: the bar's band (screen px,
 -- y up); rects: { l, r, top, bottom } in screen px. A rect in the band sits on
@@ -73,18 +80,35 @@ end
 
 -- One rect table per watched frame, reused every check (no per-second garbage).
 local rects, pool = {}, {}
--- Aura frames: the widest extent of their icons seen this session, by name.
-local seen = {}
--- Why each watched frame counted or not, for /gpanel room why.
-local why = {}
+-- Aura frames: the widest extent of their icons seen this session, and
+-- where the aura frame itself was then (it moving starts over), by name.
+local seen, anchor = {}, {}
+-- Why each watched frame counted or not, and how many icons were read, for
+-- /gpanel room why.
+local why, icons = {}, {}
+local editWasOpen = false
 
--- A frame's screen rect as four numbers, or nil (unreadable).
-local function screenRect(f)
+-- A frame's screen rect (l, r, top, bottom in screen px, then its own width
+-- and height in its units), or nil when unreadable. Shared with /gpanel
+-- covered, so both place a frame the same way.
+function Room.ScreenRect(f)
     local l, b, w, h = f:GetRect()
     l, b, w, h = API.Plain(l), API.Plain(b), API.Plain(w), API.Plain(h)
     local s = API.Plain(f:GetEffectiveScale())
     if not (l and b and w and h and s) then return nil end
     return l * s, (l + w) * s, (b + h) * s, b * s, w, h
+end
+local screenRect = Room.ScreenRect
+
+-- f's children into a reused table per depth: no per-second garbage.
+local scratch = {}
+local function children(f, depth)
+    local t = scratch[depth] or {}
+    scratch[depth] = t
+    local n = select("#", f:GetChildren())
+    for i = 1, n do t[i] = (select(i, f:GetChildren())) end
+    for i = n + 1, #t do t[i] = nil end
+    return t, n
 end
 
 local function grow(acc, l, r, top, bottom)
@@ -96,21 +120,34 @@ local function grow(acc, l, r, top, bottom)
     end
 end
 
--- Add the outermost visible icon-sized frames under f to acc: a frame that
--- fits ICON_MAX is taken whole (an aura button, whatever small frames it
--- holds); a bigger one is a container, looked into.
+-- Add the outermost visible icon-sized frames under f to acc, and return
+-- how many: a frame within ICON_MIN..ICON_MAX is taken whole (an aura
+-- button, whatever small frames it holds); a bigger one is a container,
+-- looked into; a smaller one is an anchor, skipped.
 local function addIcons(f, acc, depth)
-    local kids = { f:GetChildren() }
-    for _, c in ipairs(kids) do
+    local found = 0
+    local kids, n = children(f, depth)
+    for i = 1, n do
+        local c = kids[i]
         if not c:IsForbidden() and c:IsVisible() then
             local l, r, top, bottom, w, h = screenRect(c)
             if l and w <= Room.ICON_MAX and h <= Room.ICON_MAX then
-                if r > l then grow(acc, l, r, top, bottom) end
-            elseif depth < Room.DEPTH then
-                addIcons(c, acc, depth + 1)
+                if w >= Room.ICON_MIN and h >= Room.ICON_MIN then
+                    grow(acc, l, r, top, bottom)
+                    found = found + 1
+                end
+            elseif l and depth < Room.DEPTH then
+                found = found + addIcons(c, acc, depth + 1)
             end
         end
     end
+    return found
+end
+
+-- Whether Edit Mode is open (its example auras fill the grids then).
+local function editModeOpen()
+    local m = rawget(_G, "EditModeManagerFrame")
+    return type(m) == "table" and m.IsShown and m:IsShown() == true
 end
 
 -- Fill `out` with f's screen rect; false when it doesn't count (absent,
@@ -123,8 +160,17 @@ local function readRect(f, out, name)
         if f:IsShown() or not (p and p:IsVisible()) then why[name] = "replaced (parent hidden)" return false end
     end
     if Room.AURAS[name] then
+        -- The aura frame moved (Edit Mode, another addon): start over.
+        local fl, _, ftop = screenRect(f)
+        local at = anchor[name]
+        if at and (at[1] ~= fl or at[2] ~= ftop) then seen[name] = nil end
+        anchor[name] = { fl, ftop }
         local acc = seen[name] or {}
-        if f:IsVisible() then addIcons(f, acc, 1) end
+        icons[name] = 0
+        local container = f.AuraContainer
+        if not editModeOpen() and f:IsVisible() and type(container) == "table" and container.GetChildren then
+            icons[name] = addIcons(container, acc, 1)
+        end
         if acc.l == nil then why[name] = "no icons seen this session" return false end
         seen[name] = acc
         out.l, out.r, out.top, out.bottom = acc.l, acc.r, acc.top, acc.bottom
@@ -163,6 +209,10 @@ local current = { 0, 0 }
 
 -- Recompute and, if the insets changed, hand them to the bar.
 local function update()
+    -- Edit Mode just closed: its examples are gone, the icons may have moved.
+    local open = editModeOpen()
+    if editWasOpen and not open then seen = {} end
+    editWasOpen = open
     local Bar = GlassPanel.Bar
     if not (Bar and Bar.frame) then return end
     local left, right = 0, 0
@@ -194,16 +244,18 @@ function Room.NewSession()
     Room.Update()
 end
 
--- One line per watched frame: how it was measured and where it reaches
--- (screen px), for /gpanel room why.
+-- One line per watched frame from the last check: how it was measured and
+-- where it reaches (screen px), for /gpanel room why. Reads only: asking
+-- never changes what the bar measures.
 function Room.Explain()
-    Room.Measure()
     local lines = {}
     for i, name in ipairs(Room.WATCH) do
         local w, r = why[name] or "absent", pool[i]
-        if (w == "icons" or w == "frame") and r then
+        if (w == "icons" or w == "frame") and r and r.l then
             w = string.format("%s: x %d-%d, top %d, bottom %d", w, r.l, r.r, r.top, r.bottom)
         end
+        if Room.AURAS[name] and icons[name] then w = w .. string.format(" (%d icon(s) now)", icons[name]) end
+        if Room.AURAS[name] and editWasOpen then w = w .. " [Edit Mode open: not recording]" end
         lines[#lines + 1] = name .. ": " .. w
     end
     return lines
