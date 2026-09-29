@@ -41,6 +41,9 @@
   Points, Merchant's Favor and the rest), each with its icon and amount; left-click to choose.
 - GearScore: your GearScore, coloured along the item-quality ramp (its bracket in the tooltip), and your average item level; the tooltip
   breaks it down by slot.
+- AltStable (needs the AltStable addon): the gold of all your characters that AltStable knows,
+  with each character's level and gold in the tooltip, grouped by realm. Left-click opens
+  AltStable's sheet. An option counts only this realm and faction.
 - Options panel under Game Menu > Options > AddOns > Glass Panel (`/gpanel options`): show the bar,
   captions, font and width, reset the layout, and for each plugin whether it's shown and shows its
   caption and icon (`/gpanel icon <id> on|off` too).
