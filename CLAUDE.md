@@ -217,10 +217,13 @@ core's `ADDON_LOADED`.
   false)`. Moves only systems anchored top-to-top on UIParent (minimap, buffs, debuffs, damage
   meter) by clamping the **saved** `offsetY` to `-(bar height + 2)` and `isInDefaultPosition =
   false` (StatusTrayManager re-anchors a default-position BuffFrame): a second run is a no-op. An
-  active "GlassPanel" is adjusted in place; an inactive one isn't overwritten. Refused in combat,
+  existing "GlassPanel" is **never written to** (a save from outside Edit Mode leaves Blizzard's
+  in-memory `layoutInfo` stale, and its next save would put the old offsets back): the player is told
+  to move things in Edit Mode, or delete it and run again. Refused in combat,
   with Edit Mode open or not loaded, under an override layout, or at 5 Character layouts; the plan is rebuilt at Apply. "Saved" and "activated" are reported apart.
   `/gpanel setup back` returns this character to its recorded source (a preset by enum, a saved one
-  by name and type). A reload is recommended. Measured in game: the Modern preset result, switch
+  by name and type), written only after a new GlassPanel is saved (replacing any stale one) and
+  kept after switching back. A reload is recommended. Measured in game: the Modern preset result, switch
   back, and no taint reports.
 - **`Options.lua`** (#24): Options > AddOns > Glass Panel, a canvas panel on Retail's Settings
   framework (as GlassUnitFrames #39), registered at `PLAYER_LOGIN`. **Our `Settings` local shadows

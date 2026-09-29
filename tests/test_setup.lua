@@ -102,8 +102,12 @@ ok, lines = Setup().SwitchBack()
 check(ok, "switched back (" .. tostring(lines) .. ")")
 eq(WoW.editMode.saved.activeLayout, 1, "Modern is active again")
 eq(#WoW.editMode.saved.layouts, 1, "the GlassPanel layout is kept (the player deletes it in Edit Mode)")
-ok, lines = Setup().SwitchBack()
-eq(ok, false, "nothing recorded any more")
+-- The record stays: select GlassPanel again (in Edit Mode), and switching
+-- back still works.
+WoW.editMode.saved.activeLayout = 4
+ok = Setup().SwitchBack()
+check(ok, "after re-selecting GlassPanel: switch back still works")
+eq(WoW.editMode.saved.activeLayout, 1, "back on Modern")
 
 -- GlassPanel exists but isn't active: never overwritten (account-wide).
 WoW.editMode.calls = {}
@@ -114,20 +118,18 @@ eq(Setup().Apply(plan), false, "Apply refuses too")
 eq(#WoW.editMode.calls, 0, "nothing saved")
 
 -- GlassPanel active but a system back in the strip (moved in Edit Mode):
--- adjusted in place.
+-- never written to (Blizzard's in-memory copy would put it back): refused,
+-- with what to do.
 local gpSystems = modernSystems()
 for _, s in ipairs(gpSystems) do if s.system == S.Minimap or s.system == S.DamageMeter or s.systemIndex == 1 then
     s.anchorInfo.offsetY, s.isInDefaultPosition = -26, false end end
 gpSystems[1].anchorInfo.offsetY = -5
 session({ saved("Mine", T.Account), saved("GlassPanel", T.Character, gpSystems) }, 5)
 plan = Setup().Plan()
-eq(plan.mode, "inplace", "active GlassPanel: adjusted in place")
-eq(#plan.moves, 1, "only what's in the strip again")
-ok = Setup().Apply(plan)
-check(ok, "applied in place")
-eq(table.concat(WoW.editMode.calls, ";"), "SaveLayouts;SetActiveLayout 5", "saved, still active")
-eq(#WoW.editMode.saved.layouts, 2, "no new layout")
-eq(WoW.editMode.saved.layouts[2].systems[1].anchorInfo.offsetY, -26, "moved in place")
+eq(plan.mode, "refuse", "active GlassPanel with something under the bar: not written to")
+check(plan.why:find("move it down in Edit Mode", 1, true), "says what to do")
+eq(Setup().Apply(plan), false, "Apply refuses")
+eq(#WoW.editMode.calls, 0, "nothing saved")
 
 -- With Account and Character layouts: appended after the last Character
 -- layout, so no existing index moves (measured: an Account layout inserted
@@ -148,6 +150,29 @@ eq(WoW.editMode.saved.activeLayout, 5, "Alt, at its own index")
 session({ saved("Mine", T.Account) }, 4)
 eq(Setup().Plan().index, 5, "after the last Account layout")
 
+-- A stale switch-back record (GlassPanel deleted since) is replaced by the
+-- next run's source; a failed save records nothing.
+session({ saved("Raid", T.Account) }, 4)
+GlassPanelDB.editModeReturn = { ["Player-1-0001"] = { preset = 0 } }
+WoW.editMode.failSave = true
+Setup().Apply(Setup().Plan())
+WoW.editMode.failSave = false
+eq(GlassPanelDB.editModeReturn["Player-1-0001"].preset, 0, "failed save: record untouched")
+GlassPanel.failures["setup:save"] = nil
+WoW.editMode.calls = {}
+Setup().Apply(Setup().Plan())
+eq(GlassPanelDB.editModeReturn["Player-1-0001"].name, "Raid", "new layout: the record is the real source now")
+ok = Setup().SwitchBack()
+eq(WoW.editMode.saved.activeLayout, 4, "switch back: to Raid, not the stale Modern")
+-- A corrupt record doesn't throw.
+GlassPanelDB.editModeReturn = "junk"
+ok, lines = Setup().SwitchBack()
+eq(ok, false, "corrupt record: nothing to switch to")
+GlassPanelDB.editModeReturn = { ["Player-1-0001"] = {} }
+ok, lines = Setup().SwitchBack()
+check(not ok and lines:find("No earlier layout recorded", 1, true), "an empty record: none recorded (" .. tostring(lines) .. ")")
+GlassPanelDB.editModeReturn = nil
+
 -- Only top-to-top anchors on UIParent move; others are listed, not moved.
 local odd = modernSystems()
 odd[1].anchorInfo = anchor("TOPRIGHT", 0, 0, "UIParentRightManagedFrameContainer")   -- snapped elsewhere
@@ -167,6 +192,21 @@ Setup().Apply(plan)
 local dm = sys(WoW.editMode.saved.layouts[2], S.DamageMeter)
 eq(dm.anchorInfo.offsetY, -26, "first anchor moved")
 eq(dm.anchorInfo2.offsetY, -26, "second anchor by the same amount")
+-- The higher anchor decides: one in the band moves both.
+local hi = modernSystems()
+hi[4].anchorInfo = anchor("TOPLEFT", 0, -30)
+hi[4].anchorInfo2 = anchor("TOPRIGHT", 200, -8)
+session({ saved("Custom", T.Account, hi) }, 4)
+Setup().Apply(Setup().Plan())
+dm = sys(WoW.editMode.saved.layouts[2], S.DamageMeter)
+eq(dm.anchorInfo2.offsetY, -26, "the anchor in the band: to -26")
+eq(dm.anchorInfo.offsetY, -48, "the other by the same 18")
+-- A watched system missing from the layout is listed, not silently skipped.
+local noMeter = modernSystems()
+table.remove(noMeter, 4)
+session({ saved("Old", T.Account, noMeter) }, 4)
+text = table.concat(Setup().Describe(Setup().Plan()), " | ")
+check(text:find("Damage meter: not moved, not in this layout yet", 1, true), "missing system listed")
 -- A gamepad-style source keeps its interfaceStyle.
 session({ saved("Pad", T.Account, nil, 1) }, 4)
 plan = Setup().Plan()
@@ -204,6 +244,18 @@ local fiveAccount = {}
 for i = 1, 5 do fiveAccount[i] = saved("A" .. i, T.Account) end
 session(fiveAccount, 1)
 eq(Setup().Plan().mode, "new", "5 account layouts: no limit on the character ones")
+
+-- The window, after a refused Apply: the fresh plan, no Reload.
+session({}, 1)
+Setup().Open()
+local wr = Setup()._test.window()
+WoW.editMode.saved.activeLayout = 2   -- changed since the preview
+wr.apply._scripts.OnClick(wr.apply)
+eq(wr.reload._shown, false, "refused: no Reload offered")
+check(wr.body._text:find("review it again", 1, true) and wr.body._text:find("Classic", 1, true),
+      "says why, then shows the plan as it is now")
+eq(wr.apply._shown, true, "Apply offered for the new plan")
+wr:Hide()
 
 -- A plan that changed since the preview isn't applied.
 session({}, 1)

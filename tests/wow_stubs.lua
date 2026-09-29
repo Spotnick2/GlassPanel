@@ -378,6 +378,7 @@ C_EditMode = {
         WoW.editMode.saved.activeLayout = index
     end,
 }
+function CopyTable(t) return deep(t) end
 EditModePresetLayoutManager = {}
 function EditModePresetLayoutManager:GetCopyOfPresetLayouts() return deep(WoW.editMode.presets) end
 function ReloadUI() WoW.reloads = (WoW.reloads or 0) + 1 end

@@ -33,18 +33,27 @@
 --   another character on a Character layout found itself on GlassPanel.
 --   OnLayoutAdded doesn't repair other characters. A Character layout is in
 --   this character's list only, and last: nobody else's index moves.
---   If "GlassPanel" is the active layout, it's adjusted in place. An
---   inactive one isn't overwritten (it may hold the player's own edits);
---   they're asked to select or rename it. Nothing to move: nothing saved.
+--   An existing "GlassPanel" is never written to: saving from outside Edit
+--   Mode doesn't refresh Blizzard's in-memory copy (EditModeManagerFrame.
+--   layoutInfo), whose next save would put the old offsets back, and
+--   re-activating the active layout may not re-apply it. If GlassPanel is
+--   active with a system back in the bar's band, the player moves it in
+--   Edit Mode (or deletes GlassPanel and runs setup again). Nothing to move:
+--   nothing saved.
 -- - Only out of combat, with Edit Mode closed and its layouts loaded, and
 --   the plan is rebuilt at Apply: a changed plan is shown again, not applied.
 -- - pcall is no transaction: "saved" and "activated" are reported apart, and
 --   the state is read again after.
 -- - "Switch back" returns this character to the layout it came from (a
---   preset by its enum, a saved one by name and type), recorded once per
---   character and kept across runs. It doesn't undo edits.
+--   preset by its enum, a saved one by name and type). The record is written
+--   only after a new GlassPanel layout is saved, replacing any older one
+--   (GlassPanel didn't exist, so an older record is stale), and kept after
+--   switching back, so selecting GlassPanel again still has a way back. It
+--   doesn't undo edits.
 -- - A reload is recommended afterwards (reference addons reload to clear
---   Edit Mode taint); whether it works without one is to be measured.
+--   Edit Mode taint). Measured on 70009 (owner): the Modern preset result,
+--   switching back and two characters, with no taint or blocked-action
+--   reports.
 
 GlassPanel = GlassPanel or {}
 local API, Glass, Bar = GlassPanel.API, GlassPanel.Glass, GlassPanel.Bar
@@ -80,12 +89,7 @@ local function maxPerType()
 end
 
 -- A deep copy (the tables we get are Blizzard's; we never edit them).
-local function copy(v)
-    if type(v) ~= "table" then return v end
-    local out = {}
-    for k, x in pairs(v) do out[k] = copy(x) end
-    return out
-end
+local function copy(v) return CopyTable(v) end
 
 -- Why setup can't run right now, or nil.
 function Setup.Blocked()
@@ -138,17 +142,23 @@ local function planMoves(layout)
         local s = findSystem(layout, w.system, w.index)
         if s then
             local a, a2 = s.anchorInfo, s.anchorInfo2
+            -- The highest of its anchors decides (two anchors move together).
+            local top = type(a) == "table" and a.offsetY
+            if a2 ~= nil and topToTop(a2) and type(top) == "number" then top = math.max(top, a2.offsetY) end
             if type(a) == "table" and a.relativeTo ~= "UIParent" then
                 skipped[#skipped + 1] = { label = w.label, why = "follows " .. tostring(a.relativeTo) }
             elseif not topToTop(a) or (a2 ~= nil and not topToTop(a2)) then
                 skipped[#skipped + 1] = { label = w.label, why = "not anchored to the top of the screen" }
-            elseif a.offsetY > limit then
-                local delta = limit - a.offsetY
-                moves[#moves + 1] = { label = w.label, from = a.offsetY, to = limit, system = s }
-                a.offsetY = limit
+            elseif top > limit then
+                local delta = limit - top
+                moves[#moves + 1] = { label = w.label, from = top, to = limit, system = s }
+                a.offsetY = a.offsetY + delta
                 if a2 then a2.offsetY = a2.offsetY + delta end
                 s.isInDefaultPosition = false
             end
+        else
+            skipped[#skipped + 1] = { label = w.label,
+                why = "not in this layout yet (Blizzard may add it later at its default place)" }
         end
     end
     return moves, skipped
@@ -174,7 +184,7 @@ local function countType(L, t)
     return n
 end
 
--- The plan: { mode = "new" | "inplace" | "none" | "refuse", why, moves,
+-- The plan: { mode = "new" | "none" | "refuse", why, moves,
 -- skipped, source (name), index (where it goes / is), layouts (to save) }.
 function Setup.Plan()
     local blocked = Setup.Blocked()
@@ -186,8 +196,18 @@ function Setup.Plan()
     local plan = { source = source.layoutName, sourceType = source.layoutType, L = L }
     local target
     if source.layoutName == Setup.NAME and source.layoutType ~= T.Preset then
-        plan.mode, plan.index = "inplace", L.active
-        target = L.merged[L.active]
+        -- Never written to (see the header): check it, say what to do.
+        local check = copy(source)
+        local moves = planMoves(check)
+        if #moves > 0 then
+            plan.mode = "refuse"
+            plan.why = "your GlassPanel layout has something back under the bar: move it down in Edit Mode, or"
+                .. " delete GlassPanel and run this again"
+        else
+            plan.mode = "none"
+        end
+        plan.moves, plan.skipped = {}, {}
+        return plan
     else
         for i = L.presets + 1, #L.merged do
             if L.merged[i].layoutName == Setup.NAME then
@@ -232,17 +252,16 @@ local function charKey()
     return type(g) == "string" and g or nil
 end
 
--- Record where this character came from, once (kept across runs).
-local function recordReturn(plan)
+-- Record where this character came from (`src`, the layout it was on),
+-- replacing any older record: a new GlassPanel means GlassPanel didn't
+-- exist, so an older record is stale.
+local function recordReturn(src)
     local key = charKey()
     if not key then return end
-    GlassPanelDB.editModeReturn = GlassPanelDB.editModeReturn or {}
-    if GlassPanelDB.editModeReturn[key] then return end
-    local src = plan.L.merged[plan.L.active]
-    if src.layoutName == Setup.NAME then return end   -- adjusting GlassPanel itself: nothing to go back to
+    if type(GlassPanelDB.editModeReturn) ~= "table" then GlassPanelDB.editModeReturn = {} end
     local T = layoutTypes()
     if src.layoutType == T.Preset then
-        GlassPanelDB.editModeReturn[key] = { preset = src.layoutIndex }
+        if src.layoutIndex ~= nil then GlassPanelDB.editModeReturn[key] = { preset = src.layoutIndex } end
     else
         GlassPanelDB.editModeReturn[key] = { name = src.layoutName, layoutType = src.layoutType }
     end
@@ -256,12 +275,8 @@ function Setup.Apply(shown)
     if plan.mode == "none" then return true, { "Nothing to move: this layout already leaves the bar's strip free." } end
     local L, out = plan.L, {}
     local layouts = L.merged
-    recordReturn(plan)   -- before the list changes: the insert can shift the source's index
-    if plan.mode == "new" then
-        table.insert(layouts, plan.index, plan.target)
-    else
-        layouts[plan.index] = plan.target
-    end
+    local source = copy(L.merged[L.active])   -- before the insert shifts indices
+    table.insert(layouts, plan.index, plan.target)
     -- Blizzard's order: save the whole list with the active index as it
     -- was, then announce the new layout (which activates it).
     local okSave, err = pcall(C_EditMode.SaveLayouts, { layouts = layouts, activeLayout = L.active })
@@ -270,12 +285,8 @@ function Setup.Apply(shown)
         return false, { "Saving the layout failed (see /gpanel failures). Nothing was switched." }
     end
     out[#out + 1] = "Saved the " .. Setup.NAME .. " layout."
-    local okAct, err2
-    if plan.mode == "new" then
-        okAct, err2 = pcall(C_EditMode.OnLayoutAdded, plan.index, true, false)
-    else
-        okAct, err2 = pcall(C_EditMode.SetActiveLayout, plan.index)
-    end
+    recordReturn(source)
+    local okAct, err2 = pcall(C_EditMode.OnLayoutAdded, plan.index, true, false)
     if not okAct then
         API.Fail("setup:activate", err2)
         out[#out + 1] = "Saved, but switching to it failed (see /gpanel failures): pick it in Edit Mode."
@@ -298,8 +309,11 @@ function Setup.SwitchBack()
     local blocked = Setup.Blocked()
     if blocked then return false, "Can't switch now: " .. blocked .. "." end
     local key = charKey()
-    local rec = key and GlassPanelDB.editModeReturn and GlassPanelDB.editModeReturn[key]
-    if not rec then return false, "No earlier layout recorded for this character." end
+    local all = GlassPanelDB.editModeReturn
+    local rec = key and type(all) == "table" and all[key]
+    if type(rec) ~= "table" or (rec.preset == nil and rec.name == nil) then
+        return false, "No earlier layout recorded for this character."
+    end
     local L = readLayouts()
     if not L then return false, "Couldn't read the layouts." end
     local found, n = nil, 0
@@ -318,7 +332,7 @@ function Setup.SwitchBack()
         API.Fail("setup:switchback", err)
         return false, "Switching failed (see /gpanel failures)."
     end
-    GlassPanelDB.editModeReturn[key] = nil
+    -- The record stays: selecting GlassPanel again later still has a way back.
     return true, "Switched back to " .. tostring(L.merged[found].layoutName) .. ". A /reload is recommended."
 end
 
@@ -332,8 +346,6 @@ function Setup.Describe(plan)
     if plan.mode == "new" then
         lines[#lines + 1] = "Copies your layout |cffffd100" .. tostring(plan.source) .. "|r into a new layout for this character, |cffffd100"
             .. Setup.NAME .. "|r and switches to it."
-    elseif plan.mode == "inplace" then
-        lines[#lines + 1] = "Adjusts your active |cffffd100" .. Setup.NAME .. "|r layout."
     else
         lines[#lines + 1] = "Nothing to move: this layout already leaves the bar's strip free."
     end
@@ -384,10 +396,16 @@ local function build()
     win.close = API.Button(win, "Close", 90, function() win:Hide() end)
     win.close:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -12, 10)
     win.apply = API.Button(win, "Apply", 90, function()
-        local _, lines = Setup.Apply(shownPlan)
-        win.body:SetText(table.concat(lines, "\n"))
-        win.apply:Hide()
-        win.reload:Show()
+        local ok, lines = Setup.Apply(shownPlan)
+        if ok then
+            win.body:SetText(table.concat(lines, "\n"))
+            win.apply:Hide()
+            win.reload:Show()
+        else
+            -- Refused or changed: show why, then the plan as it is now.
+            Setup.Open()
+            win.body:SetText(table.concat(lines, "\n") .. "\n\n" .. win.body:GetText())
+        end
     end)
     win.apply:SetPoint("RIGHT", win.close, "LEFT", -8, 0)
     win.reload = API.Button(win, "Reload", 90, function() ReloadUI() end)
@@ -400,7 +418,7 @@ function Setup.Open()
     shownPlan = Setup.Plan()
     win.body:SetText(table.concat(Setup.Describe(shownPlan), "\n"))
     win.reload:Hide()
-    win.apply:SetShown(shownPlan.mode == "new" or shownPlan.mode == "inplace")
+    win.apply:SetShown(shownPlan.mode == "new")
     win:Show()
 end
 
