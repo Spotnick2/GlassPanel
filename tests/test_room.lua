@@ -337,5 +337,92 @@ GlassPanel.failures["room:why"] = nil
 rawset(_G, "BuffFrame", nil)
 rawset(_G, "EditModeManagerFrame", nil)
 
+-- Blizzard's damage meter (#40): TOPLEFT of UIParent at 0,0 in both presets.
+loadAddon()
+R = GlassPanel.Room
+bar = GlassPanel.Bar.frame
+local function whyLine(name)
+    for _, l in ipairs(R.Explain()) do if l:find(name .. ": ", 1, true) == 1 then return l end end
+    return ""
+end
+local dmeter = blizzard("DamageMeter", { 0, 748, 200, 20 })
+dmeter.visibility = Enum.DamageMeterVisibility.Always
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "the bar starts right of the damage meter")
+-- Shown only in combat or in a group: it keeps its place while it waits.
+for _, v in ipairs({ "InCombat", "InGroup" }) do
+    dmeter.visibility = Enum.DamageMeterVisibility[v]
+    dmeter._shown = false
+    R.Update()
+    eq(point("TOPLEFT")[4], 200 + R.MARGIN, v .. ", hidden for now: still counts")
+end
+-- Switched off, hidden: no room kept for it.
+dmeter.visibility = Enum.DamageMeterVisibility.Hidden
+R.Update()
+eq(point("TOPLEFT")[4], 0, "Visibility Hidden: takes no room")
+check(whyLine("DamageMeter"):find("Visibility: Hidden", 1, true), "why: says so (" .. whyLine("DamageMeter") .. ")")
+-- ...but SHOWN it always counts: Edit Mode shows a switched-off meter.
+dmeter._shown = true
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "shown (Edit Mode) though switched off: counts")
+dmeter._shown = false
+dmeter.visibility = Enum.DamageMeterVisibility.Always
+WoW.cvars.damageMeterEnabled = false
+R.Update()
+eq(point("TOPLEFT")[4], 0, "damageMeterEnabled off: takes no room")
+WoW.cvars.damageMeterEnabled = nil
+R.Update()
+eq(point("TOPLEFT")[4], 0, "damageMeterEnabled unset (nil): off, as Blizzard reads it")
+WoW.cvars.damageMeterEnabled = true
+-- Not available (level-gated, re-checked on level-up): keeps its place.
+WoW.damageMeterAvailable = false
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "not available yet: keeps its place (no jump on a level-up)")
+WoW.damageMeterAvailable = true
+-- A probe that throws, or a secret setting: not taken for "off".
+local realCVar = C_CVar.GetCVarBool
+C_CVar.GetCVarBool = function() error("cvar broke") end
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "a throwing CVar read: still counts")
+C_CVar.GetCVarBool = realCVar
+dmeter.visibility = WoW.Secret("visibility")
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "secret visibility: counts, nothing thrown")
+dmeter.visibility = Enum.DamageMeterVisibility.Always
+dmeter._shown = true
+-- A secondary session window dragged to the top edge joins the meter.
+local win2 = CreateFrame("Frame", "DamageMeterSessionWindow2", dmeter); win2._rect = { 180, 740, 160, 28 }
+R.Update()
+eq(point("TOPLEFT")[4], 340 + R.MARGIN, "a second meter window at the top: the bar gives way to it too")
+win2._shown = false
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "closed window: ignored")
+-- Each window is its own rect (Codex on #41): one on each edge pushes each
+-- end in (merged, their centre fell in the ignored middle)...
+win2._shown = true
+win2._rect = { 800, 740, 200, 28 }
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "meter on the left: left end pushed in")
+eq(point("TOPRIGHT")[4], -(1000 - 800 + R.MARGIN), "window on the right: right end pushed in too")
+-- ...and one below the bar doesn't widen the meter's rect.
+win2._rect = { 180, 500, 160, 28 }
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "a window below the band: the meter alone counts")
+eq(point("TOPRIGHT")[4], 0, "(nothing on the right)")
+-- Windows count only when the meter does: switched off, none of them.
+win2._rect = { 800, 740, 200, 28 }
+dmeter._shown = false
+dmeter.visibility = Enum.DamageMeterVisibility.Hidden
+R.Update()
+eq(point("TOPLEFT")[4] + point("TOPRIGHT")[4], 0, "meter switched off: its windows take no room either")
+dmeter.visibility = Enum.DamageMeterVisibility.Always
+dmeter._shown = true
+rawset(_G, "DamageMeterSessionWindow2", nil)
+-- Moved down in Edit Mode (the owner's custom layout): full width.
+dmeter._rect = { 0, 500, 200, 20 }
+R.Update()
+eq(point("TOPLEFT")[4], 0, "moved below the band: full width")
+rawset(_G, "DamageMeter", nil)
+
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_room")

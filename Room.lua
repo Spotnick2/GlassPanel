@@ -51,7 +51,7 @@ GlassPanel.Room = Room
 -- list comes from /gpanel covered measurements (#2); a frame not on it is
 -- simply drawn over, as before.
 Room.WATCH = { "MinimapCluster", "BuffFrame", "DebuffFrame", "TicketStatusFrame",
-               "PlayerFrame", "TargetFrame", "FocusFrame" }
+               "PlayerFrame", "TargetFrame", "FocusFrame", "DamageMeter" }
 Room.MARGIN = 6        -- px between the bar's end and the frame it gives way to
 Room.MIN_WIDTH = 300   -- px: narrower than this, the bar keeps the full width
 Room.MIDDLE = 0.2      -- a frame centred in this middle fraction of the screen is ignored
@@ -163,11 +163,48 @@ local function editModeOpen()
     return type(m) == "table" and m.IsShown ~= nil and API.Plain(m:IsShown()) == true
 end
 
+-- Frames the player can switch off outright take no room while hidden
+-- (one hidden for now keeps its place). A SHOWN frame always counts: Blizzard
+-- decides what shows (Edit Mode shows a switched-off meter), not a copy of
+-- its rules here.
+-- DamageMeter (#40): Blizzard's built-in meter, TOPLEFT of UIParent at 0,0
+-- in both presets (measured). Its ShouldBeShown (wow-ui-source forever:
+-- Blizzard_DamageMeter/DamageMeter.lua) hides it while the damageMeterEnabled
+-- CVar isn't true (nil too) and for Visibility Hidden: those count as off.
+-- "Not available" doesn't: it's re-checked on PLAYER_LEVEL_CHANGED, so the
+-- meter may appear on a level-up, and keeping its place avoids a jump. Each
+-- probe runs under pcall; a probe that throws or reads secret means "not off".
+local function damageMeterOff(f)
+    local ok, enabled = pcall(function() return C_CVar.GetCVarBool("damageMeterEnabled") end)
+    if ok and not API.IsSecret(enabled) and enabled ~= true then
+        return "switched off (damageMeterEnabled)"
+    end
+    local okV, hidden = pcall(function()
+        local vis = Enum.DamageMeterVisibility
+        return vis ~= nil and vis.Hidden ~= nil and API.Plain(f.visibility) == vis.Hidden
+    end)
+    if okV and hidden then return "switched off (Visibility: Hidden)" end
+end
+Room.OFF = { DamageMeter = damageMeterOff }
+
+-- The meter's windows (DamageMeterSessionWindow1..3, MAX_DAMAGE_METER_SESSION_WINDOWS
+-- in its code) are its children, but the secondary ones anchor to UIParent
+-- and can sit anywhere: each shown one is its own rect (never merged with the
+-- meter's: one on each edge would merge across the middle, and one below the
+-- bar would widen the meter's rect). They count only when the meter does.
+Room.EXTRA = { DamageMeter = { "DamageMeterSessionWindow1", "DamageMeterSessionWindow2",
+                               "DamageMeterSessionWindow3" } }
+
 -- Fill `out` with f's screen rect; false when it doesn't count (absent,
--- replaced, unreadable). Called under pcall: never throws out of Room.
+-- replaced, switched off, unreadable). Called under pcall: never throws out
+-- of Room.
 local function readRect(f, out, name)
     icons[name] = nil
     if f:IsForbidden() then why[name] = "forbidden" return false end
+    if Room.OFF[name] and not f:IsShown() then
+        local off = Room.OFF[name](f)
+        if off then why[name] = off return false end
+    end
     if not f:IsVisible() then
         -- Hidden on its own (it comes back) counts; hidden with its parent doesn't.
         local p = f:GetParent()
@@ -217,6 +254,26 @@ local function readRect(f, out, name)
     return true
 end
 
+-- The shown extra frames of a watched frame that counts, each its own rect
+-- after rects[n]; returns the new n. Reused tables, one per extra name.
+local extraPool = {}
+local function addExtras(name, n)
+    for _, extra in ipairs(Room.EXTRA[name] or {}) do
+        local x = rawget(_G, extra)
+        local ok, xl, xr, xtop, xbottom = pcall(function()
+            if type(x) == "table" and x.IsShown and x:IsShown() then return screenRect(x) end
+        end)
+        if ok and xl then
+            local r = extraPool[extra] or {}
+            extraPool[extra] = r
+            r.l, r.r, r.top, r.bottom = xl, xr, xtop, xbottom
+            n = n + 1
+            rects[n] = r
+        end
+    end
+    return n
+end
+
 function Room.Measure()
     local n = 0
     for i, name in ipairs(Room.WATCH) do
@@ -227,6 +284,7 @@ function Room.Measure()
             if ok and counts then
                 n = n + 1
                 rects[n] = pool[i]
+                n = addExtras(name, n)
             elseif not ok then
                 why[name] = "error (see /gpanel failures)"
                 API.Fail("room:" .. name, counts)
