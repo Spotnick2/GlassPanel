@@ -58,8 +58,14 @@ for _, p in ipairs(list) do
     check(t:find("## Version: @project-version@", 1, true), name .. ": version token")
     check(t:find("## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[", 1, true), name .. ": title 'Glass Panel [X]'")
     check(t:find("## Group: GlassPanel", 1, true), name .. ": grouped under the core")
-    -- The core first; a bridge plugin may add the addon it reads (AltStable).
-    check(t:find("## Dependencies: GlassPanel[\r\n,]") or t:find("## Dependencies: GlassPanel$"), name .. ": depends on the core")
+    -- The core first; a bridge plugin may add the addon it reads (AltStable),
+    -- never another GlassPanel plugin: each block switches off on its own.
+    local deps = {}
+    for d in (t:match("## Dependencies:([^\r\n]*)") or ""):gmatch("[^,%s]+") do deps[#deps + 1] = d end
+    eq(deps[1], "GlassPanel", name .. ": depends on the core, listed first")
+    for i = 2, #deps do
+        check(not deps[i]:match("^GlassPanel"), name .. ": no dependency on another plugin (" .. deps[i] .. ")")
+    end
     eq(t:match("## IconTexture: ([^\r\n]+)"), icon, name .. ": the core's icon")
     local files = tocFiles(p.toc, p.dir)
     check(#files > 0, name .. ": lists its files")

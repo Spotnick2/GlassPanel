@@ -24,6 +24,7 @@ local API = GlassPanel.API
 local P = API.Plain
 
 local ID = "altstable"
+local AS = rawget(_G, "AltStable")   -- every call goes through this, the table whose version was checked
 local MAX_ROWS = 40
 
 local function db()
@@ -49,18 +50,26 @@ local function classColour(classFile)
     return string.format("|cff%02x%02x%02x", byte(r), byte(g), byte(b))
 end
 
--- The characters in scope (hidden ones included, flagged) and their totals
--- ({ money, unknown, characters, hidden }), or nil when the scope can't be
--- worked out: "this realm" before AltStable has a record of this character.
-local function gather()
-    local chars = AltStable.GetCharacters()
-    if not realmOnly() then return chars, AltStable.GetTotals() end
+-- The totals in scope ({ money, unknown, characters, hidden, unplaced }) and,
+-- when withList, the characters in scope (hidden ones included, flagged).
+-- nil when the scope can't be worked out: "this realm" before AltStable has a
+-- record of this character. Every character: AltStable's own totals, and the
+-- list only when asked (the bar text doesn't need it).
+local function gather(withList)
+    if not realmOnly() then
+        return AS.GetTotals(), withList and AS.GetCharacters() or nil
+    end
+    local chars = AS.GetCharacters()
     local me
     for _, c in ipairs(chars) do if c.current then me = c end end
     if not (me and me.realm and me.faction) then return nil end
-    local list, t = {}, { money = 0, unknown = 0, characters = 0, hidden = 0 }
+    local list, t = {}, { money = 0, unknown = 0, characters = 0, hidden = 0, unplaced = 0 }
     for _, c in ipairs(chars) do
-        if c.realm == me.realm and c.faction == me.faction then
+        -- A record with no realm or faction (too old or partial, the API
+        -- allows it) may belong here: not counted, but said, never dropped.
+        if not (c.realm and c.faction) then
+            if not c.hidden then t.unplaced = t.unplaced + 1 end
+        elseif c.realm == me.realm and c.faction == me.faction then
             list[#list + 1] = c
             if c.hidden then
                 t.hidden = t.hidden + 1
@@ -71,14 +80,20 @@ local function gather()
             end
         end
     end
-    return list, t
+    return t, list
+end
+
+-- The total as coin text, or nil when no counted character's gold is known:
+-- unknown, never "0c".
+local function totalText(t)
+    if t.characters - t.unknown <= 0 then return nil end
+    return API.CoinText(t.money)
 end
 
 local UNKNOWN = "|cff888888?|r"
 
 local function refresh() GlassPanel.Refresh(ID) end
 
-local AS = rawget(_G, "AltStable")
 if not (type(AS) == "table" and AS.PUBLIC_API_VERSION == 1) then
     local why = "AltStable's public API version 1 not found (got "
         .. tostring(type(AS) == "table" and AS.PUBLIC_API_VERSION or nil) .. ")"
@@ -90,20 +105,18 @@ end
 GlassPanel.RegisterBlock({
     id = ID,
     label = "Alts",
-    icon = "Interface\\Icons\\INV_Misc_Coin_02",
+    -- No icon: the coin text drops zero denominations, so a coin icon made
+    -- "37s 81c" read as 37 gold (Gold.lua's reason). The caption says "Alts".
     order = 40,   -- left lane, after your own gold
-    onInit = function()
-        local ok, err = pcall(AltStable.RegisterCallback, "CharactersChanged", refresh)
-        if not ok then API.Fail("altstable:callback", err) end
-    end,
+    onInit = function() AS.RegisterCallback("CharactersChanged", refresh) end,
     text = function()
-        local _, t = gather()
-        local coins = t and API.CoinText(t.money)
+        local t = gather(false)
+        local coins = t and totalText(t)
         if not coins then return UNKNOWN end
-        return coins .. (t.unknown > 0 and (" " .. UNKNOWN) or "")
+        return coins .. ((t.unknown > 0 or (t.unplaced or 0) > 0) and (" " .. UNKNOWN) or "")
     end,
     tooltip = function(_, tt)
-        local list, t = gather()
+        local t, list = gather(true)
         tt:AddLine(realmOnly() and "Alts: this realm and faction" or "Alts")
         if not list then
             tt:AddLine("AltStable doesn't know this character yet.", 0.7, 0.7, 0.7, true)
@@ -129,10 +142,14 @@ GlassPanel.RegisterBlock({
                 tt:AddLine("+" .. (shown - MAX_ROWS) .. " more", 0.7, 0.7, 0.7)
             end
             tt:AddLine(" ")
-            tt:AddDoubleLine("Total (" .. t.characters .. ")", API.CoinText(t.money) or UNKNOWN,
+            tt:AddDoubleLine("Total (" .. t.characters .. ")", totalText(t) or UNKNOWN,
                 1, 0.82, 0, 1, 1, 1)
             if t.unknown > 0 then
                 tt:AddLine(t.unknown .. " character(s) with unknown gold, not counted.", 0.7, 0.7, 0.7, true)
+            end
+            if (t.unplaced or 0) > 0 then
+                tt:AddLine(t.unplaced .. " character(s) with no realm or faction known, not counted.",
+                    0.7, 0.7, 0.7, true)
             end
             if t.hidden > 0 then
                 tt:AddLine(t.hidden .. " hidden in AltStable, not counted.", 0.7, 0.7, 0.7, true)
@@ -142,7 +159,7 @@ GlassPanel.RegisterBlock({
         tt:AddLine("Left-click: open AltStable", 0.3, 1, 0.3)
     end,
     onClick = function(_, button)
-        if button == "LeftButton" then AltStable.ToggleSheet() end
+        if button == "LeftButton" then AS.ToggleSheet() end
     end,
     options = {
         { label = "Only this realm and faction",

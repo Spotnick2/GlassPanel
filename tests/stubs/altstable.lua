@@ -2,12 +2,15 @@
 -- ..\AltStable\docs\PUBLIC-API.md. Not a client API: AltStable is another
 -- addon, and this mirrors its documented contract (not its code).
 -- WoW.alts = { characters = { { guid, name, realm, faction, class, level,
--- money, hidden, current }, ... }, version = 1 }; WoW.altsChanged() fires
--- "CharactersChanged"; WoW.altsToggles counts ToggleSheet calls.
+-- money, hidden, current }, ... }, version = 1 }; WoW.altsToggles counts
+-- ToggleSheet calls. WoW.altsChanged() is a change: like AltStable, one
+-- "CharactersChanged" per burst, on the next frame (WoW.flushTimers(0)), each
+-- listener under pcall (errors in WoW.altsErrors). A listener registered by
+-- an earlier loadAddon session is never called: that session is dead.
 table.insert(WoW.resetHooks, function()
     WoW.alts = { characters = {}, version = 1 }
     WoW.altsToggles = 0
-    WoW.altsListeners = {}
+    WoW.altsListeners, WoW.altsErrors, WoW.altsBurst = {}, {}, 0
 end)
 
 local function copy(t)
@@ -51,12 +54,22 @@ function AltStable.OpenSheet() end
 
 function AltStable.RegisterCallback(event, fn)
     assert(event == "CharactersChanged", "unknown event " .. tostring(event))
-    table.insert(WoW.altsListeners, fn)
+    table.insert(WoW.altsListeners, { fn = fn, session = GlassPanel })
 end
 function AltStable.UnregisterCallback(event, fn)
-    for i, f in ipairs(WoW.altsListeners) do if f == fn then table.remove(WoW.altsListeners, i) return end end
+    for i, f in ipairs(WoW.altsListeners) do if f.fn == fn then table.remove(WoW.altsListeners, i) return end end
 end
 
 function WoW.altsChanged()
-    for _, fn in ipairs(WoW.altsListeners) do fn("CharactersChanged") end
+    WoW.altsBurst = WoW.altsBurst + 1
+    local burst = WoW.altsBurst
+    C_Timer.After(0, function()
+        if burst ~= WoW.altsBurst then return end   -- a later change in the same burst delivers
+        for _, l in ipairs(WoW.altsListeners) do
+            if l.session == GlassPanel then
+                local ok, err = pcall(l.fn, "CharactersChanged")
+                if not ok then table.insert(WoW.altsErrors, err) end
+            end
+        end
+    end)
 end

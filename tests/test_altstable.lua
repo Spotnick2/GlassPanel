@@ -6,7 +6,9 @@ PLUGINS = { "GlassPanelAltStable" }
 local function tip()
     local b = block("altstable").widget
     b._scripts.OnEnter(b)
-    return table.concat(GameTooltip._lines, "\n")
+    local text = table.concat(GameTooltip._lines, "\n")
+    b._scripts.OnLeave(b)   -- closed: an open tooltip is redrawn after every repaint
+    return text
 end
 
 local function char(name, realm, faction, class, level, money, extra)
@@ -50,7 +52,7 @@ check(t:find("Left-click: open AltStable", 1, true), "click hint")
 
 -- Unknown money: not counted as 0, a grey ? on the bar, said in the tooltip.
 WoW.alts.characters[2].money = nil
-WoW.altsChanged(); WoW.tick()
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
 eq(textOf("altstable"), "126g45s67c |cff888888?|r", "repainted on CharactersChanged, unknown flagged")
 t = tip()
 check(t:find("Bankalt|r\t|cff888888?|r", 1, true), "unknown gold row")
@@ -75,7 +77,7 @@ check(t:find("Total (2)", 1, true), "scoped count")
 check(t:find("1 hidden in AltStable", 1, true), "scoped hidden count")
 -- No record of this character yet: the scope is unknown, not zero.
 WoW.alts.characters[1].current = nil
-WoW.altsChanged(); WoW.tick()
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
 eq(textOf("altstable"), "|cff888888?|r", "no current record: unknown")
 check(tip():find("AltStable doesn't know this character yet.", 1, true), "said in the tooltip")
 WoW.alts.characters[1].current = true
@@ -83,6 +85,61 @@ block("altstable").options[1].set(false)
 WoW.tick()
 eq(GlassPanelAltStableDB.realmOnly, nil, "off stored as nil")
 eq(textOf("altstable"), "126g45s67c |cff888888?|r", "back to every character")
+
+-- No icon: a coin icon before "37s 81c" reads as 37 gold (Gold.lua's reason).
+eq(block("altstable").icon, nil, "no block icon")
+
+-- Default scope: the bar reads only the totals, not the whole list.
+local reads = 0
+local get = AltStable.GetCharacters
+AltStable.GetCharacters = function() reads = reads + 1; return get() end
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
+eq(reads, 0, "bar text doesn't copy the character list")
+tip()
+eq(reads, 1, "the tooltip does")
+AltStable.GetCharacters = get
+
+-- A burst of changes: one repaint, on the next frame, not at once.
+local paints = 0
+local text = block("altstable").text
+block("altstable").text = function(...) paints = paints + 1; return text(...) end
+WoW.altsChanged(); WoW.altsChanged(); WoW.altsChanged()
+WoW.tick()
+eq(paints, 0, "nothing before the callback's frame")
+WoW.flushTimers(0); WoW.tick()
+eq(paints, 1, "one repaint per burst")
+block("altstable").text = text
+
+-- No counted gold known: unknown, never "0c".
+local saved = WoW.alts.characters
+WoW.alts.characters = { char("Karuzo Elegia", "Doomhowl", "Horde", "PRIEST", 60, nil, { current = true }) }
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
+eq(textOf("altstable"), "|cff888888?|r", "only unknown gold: ?")
+check(tip():find("Total (1)\t|cff888888?|r", 1, true), "tooltip total unknown too")
+WoW.alts.characters = {}
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
+eq(textOf("altstable"), "|cff888888?|r", "no characters yet (before AltStable's scan): ?")
+
+-- This realm and faction: a record with no realm or faction isn't dropped
+-- silently: not counted, flagged and said.
+WoW.alts.characters = {
+    char("Karuzo Elegia", "Doomhowl", "Horde", "PRIEST", 60, 10000, { current = true }),
+    char("Oldpeer", nil, "Horde", "MAGE", 10, 50000),
+    char("Partial", "Doomhowl", nil, "MAGE", 10, 50000),
+    char("Gone", nil, nil, "MAGE", 10, 50000, { hidden = true }),
+}
+block("altstable").options[1].set(true)
+WoW.tick()
+eq(textOf("altstable"), "1g0s0c |cff888888?|r", "unplaced records flagged on the bar")
+t = tip()
+check(t:find("2 character(s) with no realm or faction known, not counted.", 1, true), "and said (hidden ones not)")
+check(t:find("Total (1)\t1g0s0c", 1, true), "total of the placed ones")
+block("altstable").options[1].set(false)
+WoW.alts.characters = saved
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
+
+-- A dead session's listener is never called (the stub's own guarantee).
+check(#WoW.altsErrors == 0, "no listener errors")
 
 -- A different public API version: no block, and it says why.
 WoW.alts.version = 2
