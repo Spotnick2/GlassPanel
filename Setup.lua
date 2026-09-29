@@ -370,23 +370,7 @@ end
 local win, shownPlan
 
 local function build()
-    win = CreateFrame("Frame", "GlassPanelSetupWindow", UIParent)
-    win:SetSize(520, 260)
-    win:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
-    win:SetFrameStrata("FULLSCREEN_DIALOG")
-    win:SetClampedToScreen(true)
-    win:EnableMouse(true)
-    win:Hide()
-    local glass = Glass.Apply(win, "small")
-    local backing = win:CreateTexture(nil, "BACKGROUND", nil, -7)
-    backing:SetAllPoints(win)
-    backing:SetColorTexture(0.05, 0.06, 0.08, 0.96)
-    backing:AddMaskTexture(glass.mask)
-    local special = rawget(_G, "UISpecialFrames")
-    if type(special) == "table" then table.insert(special, "GlassPanelSetupWindow") end
-
-    win.title = Glass.Font(win, 14, "LEFT")
-    win.title:SetPoint("TOPLEFT", win, "TOPLEFT", 14, -12)
+    win = API.Window("GlassPanelSetupWindow", 520, 260)
     win.title:SetText("Make room in Edit Mode")
     win.body = Glass.Font(win, 12, "LEFT")
     win.body:SetPoint("TOPLEFT", win.title, "BOTTOMLEFT", 0, -10)

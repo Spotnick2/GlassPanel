@@ -56,7 +56,9 @@ core's `ADDON_LOADED`.
   `hooksecurefunc` and undone the same way; `Set(false)` gives it back to the parent Blizzard last
   gave it. **Never reparent a frame whose children call it through `GetParent()`** (Edit Mode's
   status bar containers do). `Button(parent, text, width, onClick)` is the
-  one push-button helper. `API.Plain(v)` is the one "secret becomes nil" guard;
+  one push-button helper, and `Window(name, w, h)` the one glass dialog (FULLSCREEN_DIALOG,
+  Escape, the opaque masked backing from #36, a title and a wrapping hint): Share, Setup and
+  Currencies use it. `API.Plain(v)` is the one "secret becomes nil" guard;
   use it at every read. `API.Returned(v)` asks "did the client return anything" without comparing:
   **never write `raw ~= nil` on a raw read**, since comparing a secret (even with nil) throws on
   the client, and the offline stub can't catch it. The global `GetCoinTextureString` is **absent** on 70009;
@@ -181,6 +183,16 @@ core's `ADDON_LOADED`.
   they're registered on the plugin's own frame only while one of ours is pending (a failed load
   makes it unreadable until the next gear change). Score `nil` until known.
   `PLAYER_AVG_ITEM_LEVEL_UPDATE` repaints without a rescan. No click.
+- **`Plugins\Currencies`** (#47): the currencies the player picks, in their order (icon + amount),
+  from `C_CurrencyInfo`'s list, not a hardcoded table (TitanCurrenciesMulti's way). Forever's five
+  (Wowhead Forever: Merchant's Favor 3402, Tarnished Undermine Real 3469, Honor Points 1792, Rank
+  Points 3468, Darkmoon Prize Ticket 515) are offered by id even before owning any. The currency tab
+  is never expanded by us (collapsed headers hide rows); ids come from the list rows' `currencyID`.
+  Picks per character (`## SavedVariablesPerCharacter: GlassPanelCurrenciesDB`); never chosen: up
+  to 3 owned ones, **saved once found** (the bar doesn't change by itself). A chooser window (tick,
+  Up/Down on the shown ones; unresolved saved ids kept at the end) from a left-click or the plugin's
+  option **button**; refreshed at most once per frame. Secret amount: grey `?`; measured plain for
+  Honor Points (36 / 15,000).
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable
   bag (free count or family) is left out and flagged with a grey `?`. Left-click: `ToggleAllBags`.

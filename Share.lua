@@ -347,35 +347,12 @@ local function preview()
 end
 
 local function build()
-    win = CreateFrame("Frame", "GlassPanelShareWindow", UIParent)
-    win:SetSize(480, 260)
-    win:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
-    win:SetFrameStrata("FULLSCREEN_DIALOG")   -- above the Settings panel it's opened from
-    win:SetClampedToScreen(true)
-    win:EnableMouse(true)
-    win:Hide()
-    -- Escape closes it even when the text box doesn't have the focus
-    -- (AltStable registers its export window the same way on Forever).
-    local special = rawget(_G, "UISpecialFrames")
-    if type(special) == "table" then table.insert(special, "GlassPanelShareWindow") end
-    glass = Glass.Apply(win, "small")
-    -- The glass is made to sit over the world; this window opens over the
-    -- Settings panel, whose text showed through (#36). An opaque backing
-    -- above the shadow (-8) and under the tint (-6), clipped by the glass's
-    -- own rounded mask like the tint, grain and wash are.
-    backing = win:CreateTexture(nil, "BACKGROUND", nil, -7)
-    backing:SetAllPoints(win)
-    backing:SetColorTexture(0.05, 0.06, 0.08, 0.96)
-    backing:AddMaskTexture(glass.mask)
-
-    win.title = Glass.Font(win, 14, "LEFT")
-    win.title:SetPoint("TOPLEFT", win, "TOPLEFT", 14, -12)
-    win.hint = Glass.Font(win, 11, "LEFT")
-    win.hint:SetPoint("TOPLEFT", win.title, "BOTTOMLEFT", 0, -6)
-    win.hint:SetTextColor(0.75, 0.75, 0.75)
+    -- The shared glass dialog (opaque backing, Escape, wrapping hint).
+    win = API.Window("GlassPanelShareWindow", 480, 260)
+    glass, backing = win.glass, win.backing
 
     local scroll = CreateFrame("ScrollFrame", nil, win, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", win, "TOPLEFT", 14, -52)
+    scroll:SetPoint("TOPLEFT", win.hint, "BOTTOMLEFT", 0, -8)
     scroll:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -34, 64)
     local edit = CreateFrame("EditBox", nil, scroll)
     edit:SetMultiLine(true)

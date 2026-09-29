@@ -217,14 +217,16 @@ function GlassPanel.RegisterBlock(spec)
     if spec.options ~= nil then
         local ok = type(spec.options) == "table"
         for _, o in ipairs(ok and spec.options or {}) do
-            if type(o) ~= "table" or type(o.label) ~= "string" or type(o.get) ~= "function"
-                or type(o.set) ~= "function" or (o.note ~= nil and type(o.note) ~= "string") then
+            -- A checkbox (get + set) or a button (run).
+            local kind = type(o) == "table"
+                and ((type(o.get) == "function" and type(o.set) == "function") or type(o.run) == "function")
+            if not kind or type(o.label) ~= "string" or (o.note ~= nil and type(o.note) ~= "string") then
                 ok = false
             end
         end
         if not ok then
             API.Fail(spec.id .. ":options",
-                "options must be a list of { label = string, get = function, set = function, note = string? }")
+                "options must be a list of { label = string, get + set (a checkbox) or run (a button), note = string? }")
             spec.options = nil
         end
     end
