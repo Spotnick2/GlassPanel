@@ -86,8 +86,8 @@ WoW.tick()
 eq(GlassPanelAltStableDB.realmOnly, nil, "off stored as nil")
 eq(textOf("altstable"), "126g45s67c |cff888888?|r", "back to every character")
 
--- No icon: a coin icon before "37s 81c" reads as 37 gold (Gold.lua's reason).
-eq(block("altstable").icon, nil, "no block icon")
+-- AltStable's own icon, never a coin (a coin before "37s 81c" reads as 37 gold).
+eq(block("altstable").icon, 8197123, "AltStable's icon")
 
 -- Default scope: the bar reads only the totals, not the whole list.
 local reads = 0
@@ -148,5 +148,30 @@ loadAddon()
 eq(block("altstable"), nil, "incompatible API: no block")
 check(GlassPanel.failures["altstable:api"], "recorded")
 check(table.concat(WoW.chat, "\n"):find("public API version 1 not found (got 2)", 1, true), "printed")
+
+-- It replaces Gold (#50): Gold is hidden ONCE, the first time, and said.
+WoW.alts.version = 1
+local both = { "GlassPanelAltStable", "GlassPanelGold" }
+loadAddon({ plugins = both })
+eq(GlassPanelDB.hidden.gold, true, "first load: Gold hidden")
+eq(GlassPanelDB.replaced.altstable, true, "recorded")
+eq(block("gold").widget._shown, false, "Gold off the bar")
+local said = table.concat(WoW.chat, "\n")
+check(said:find("Alts replaces gold", 1, true) and said:find("/gpanel show gold", 1, true), "said once, with the way back")
+-- The player brings Gold back: it stays, across sessions.
+GlassPanel._test.slash("show gold")
+local db = GlassPanelDB
+loadAddon({ plugins = both, db = db })
+eq(GlassPanelDB.hidden.gold, nil, "shown again stays shown")
+check(not table.concat(WoW.chat, "\n"):find("replaces", 1, true), "not said again")
+-- Gold already hidden by the player: recorded, nothing said.
+loadAddon({ plugins = both, db = { hidden = { gold = true } } })
+eq(GlassPanelDB.replaced.altstable, true, "recorded when Gold was already hidden")
+check(not table.concat(WoW.chat, "\n"):find("replaces", 1, true), "nothing to say")
+-- No AltStable block (API mismatch): Gold untouched.
+WoW.alts.version = 2
+loadAddon({ plugins = both })
+eq(GlassPanelDB.hidden.gold, nil, "no replacing block, Gold stays")
+WoW.alts.version = 1
 
 done("test_altstable")

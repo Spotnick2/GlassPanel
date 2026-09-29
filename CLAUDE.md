@@ -203,7 +203,9 @@ core's `ADDON_LOADED`.
   option "Only this realm and faction" (`GlassPanelAltStableDB.realmOnly`) sums the logged-in
   character's realm and faction itself, unknown until AltStable has this character; a record with no
   realm or faction isn't counted but is flagged and said. Unknown money is a grey `?`, never 0 (no
-  known gold at all: only `?`). No block icon (Gold's reason); the bar text reads only `GetTotals()`.
+  known gold at all: only `?`). AltStable's own icon (file ID 8197123), never a coin (Gold's reason);
+  `replaces = "gold"` (#50: Gold hidden once, the first time, then the player's). The bar text reads
+  only `GetTotals()`.
   GlassPanel keeps no character list (forgetting is AltStable's).
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable
@@ -258,7 +260,8 @@ core's `ADDON_LOADED`.
   name order (a plugin registered later gets its row on the next open, where its name sorts).
   Every open, and every setting change while it's open, re-reads the state.
 - **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`, `layout`, `room`, `labels`,
-  `labelsFor[id]`, `iconsFor[id]` (only `false` is stored)). The bar is built at
+  `labelsFor[id]`, `iconsFor[id]` (only `false` is stored), `replaced[id]` (#50: a block's
+  `replaces` has hidden the other block once; `Settings.Replaces`, not part of a shared setup)). The bar is built at
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles
   `list | move <id> <lane> [n] | layout reset | labels | label <id> | icon <id> | show <id> |
   hide <id> | toggle | font | room | options | export | import | covered | failures`.

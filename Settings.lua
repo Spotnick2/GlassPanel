@@ -32,6 +32,7 @@ function Settings.EnsureDefaults()
     if type(d.hidden) ~= "table" then d.hidden = {} end
     if type(d.labelsFor) ~= "table" then d.labelsFor = {} end
     if type(d.iconsFor) ~= "table" then d.iconsFor = {} end
+    if type(d.replaced) ~= "table" then d.replaced = {} end
     if d.editModeReturn ~= nil and type(d.editModeReturn) ~= "table" then d.editModeReturn = nil end
     if not Glass.FONTS[d.font] then d.font = Settings.DEFAULTS.font end
     if d.room ~= "auto" and d.room ~= "full" then d.room = Settings.DEFAULTS.room end
@@ -87,6 +88,20 @@ function Settings.SetHidden(id, hidden)
     db().hidden[id] = hidden and true or nil
     Bar.Layout()
     changed()
+end
+
+-- A block that replaces another (spec.replaces, #50: [AltStable] replaces
+-- Gold) hides it ONCE, the first time it loads, as if the player had unticked
+-- it, and says so. GlassPanelDB.replaced[id] records that it happened: from
+-- then on the replaced block's Shown is the player's, never touched again.
+function Settings.Replaces(block)
+    local old, d = block.replaces, db()
+    if not old or type(d) ~= "table" or type(d.replaced) ~= "table" or d.replaced[block.id] then return end
+    d.replaced[block.id] = true
+    if d.hidden[old] then return end
+    Settings.SetHidden(old, true)
+    GlassPanel.API.Print((block.label or block.id) .. " replaces " .. old .. ": " .. old
+        .. " is hidden. Bring it back in Options > AddOns > Glass Panel, or /gpanel show " .. old .. ".")
 end
 
 function Settings.ResetLayout()

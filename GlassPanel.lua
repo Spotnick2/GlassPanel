@@ -214,6 +214,7 @@ boot:SetScript("OnEvent", function(_, event, arg1)
         Glass.SetFont(db.font)
         Bar.Build()
         Bar.SetShown(db.shown)
+        for _, block in ipairs(GlassPanel.Engine.blocks) do Settings.Replaces(block) end
         SLASH_GLASSPANEL1 = "/gpanel"
         SlashCmdList.GLASSPANEL = slash
     elseif event == "PLAYER_LOGIN" then
