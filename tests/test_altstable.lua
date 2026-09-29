@@ -86,8 +86,8 @@ WoW.tick()
 eq(GlassPanelAltStableDB.realmOnly, nil, "off stored as nil")
 eq(textOf("altstable"), "126g45s67c |cff888888?|r", "back to every character")
 
--- No icon: a coin icon before "37s 81c" reads as 37 gold (Gold.lua's reason).
-eq(block("altstable").icon, nil, "no block icon")
+-- AltStable's own icon, never a coin (a coin before "37s 81c" reads as 37 gold).
+eq(block("altstable").icon, 8197123, "AltStable's icon")
 
 -- Default scope: the bar reads only the totals, not the whole list.
 local reads = 0
@@ -148,5 +148,67 @@ loadAddon()
 eq(block("altstable"), nil, "incompatible API: no block")
 check(GlassPanel.failures["altstable:api"], "recorded")
 check(table.concat(WoW.chat, "\n"):find("public API version 1 not found (got 2)", 1, true), "printed")
+
+-- It replaces Gold (#50), live: Gold is hidden while Alts shows, and it's
+-- said once; nothing about Gold is stored until the player shows it again.
+WoW.alts.version = 1
+local both = { "GlassPanelAltStable", "GlassPanelGold" }
+local function said() return table.concat(WoW.chat, "\n") end
+loadAddon({ plugins = both })
+eq(block("gold").widget._shown, false, "Gold off the bar while Alts shows")
+eq(GlassPanelDB.hidden.gold, nil, "not stored as hidden")
+check(said():find("Alts replaces Gold, which is hidden.", 1, true) and said():find("/gpanel show gold", 1, true),
+      "said, by label, with the way back")
+local db = GlassPanelDB
+loadAddon({ plugins = both, db = db })
+check(not said():find("replaces", 1, true), "said once")
+-- Alts hidden: Gold comes back; shown again: Gold goes.
+GlassPanel._test.slash("hide altstable")
+eq(block("gold").widget._shown, true, "Alts hidden: Gold shows")
+GlassPanel._test.slash("show altstable")
+eq(block("gold").widget._shown, false, "Alts back: Gold hidden again")
+-- The player shows Gold: kept, across sessions, even with Alts on.
+GlassPanel._test.slash("show gold")
+eq(block("gold").widget._shown, true, "shown by the player")
+eq(GlassPanelDB.keep.gold, true, "kept")
+loadAddon({ plugins = both, db = db })
+eq(block("gold").widget._shown, true, "stays shown next session")
+-- Another character without the Alts block (plugin off, or refused): Gold
+-- is there, nothing to undo.
+loadAddon({ plugins = { "GlassPanelGold" } })
+eq(block("gold").widget._shown, true, "no Alts block: Gold shows")
+WoW.alts.version = 2
+loadAddon({ plugins = both })
+eq(block("gold").widget._shown, true, "Alts refused: Gold shows")
+WoW.alts.version = 1
+-- Alts already hidden by the player: Gold shows, nothing said.
+loadAddon({ plugins = both, db = { hidden = { altstable = true } } })
+eq(block("gold").widget._shown, true, "Alts hidden from the start: Gold shows")
+check(not said():find("replaces", 1, true), "nothing said")
+-- The bar off: nothing said (and so still said once it's on, next session).
+loadAddon({ plugins = both, db = { shown = false } })
+check(not said():find("replaces", 1, true), "bar off: nothing said")
+eq(GlassPanelDB.replaced["altstable>gold"], nil, "not recorded")
+-- ... and said when the bar comes on (Codex on #51).
+GlassPanel._test.slash("toggle")
+check(said():find("Alts replaces Gold", 1, true), "bar toggled on: said then")
+eq(block("gold").widget._shown, false, "and Gold hidden")
+-- Alts hidden from the start, then shown: Gold goes, and it's said then.
+loadAddon({ plugins = both, db = { hidden = { altstable = true } } })
+GlassPanel._test.slash("show altstable")
+eq(block("gold").widget._shown, false, "Alts shown: Gold hidden")
+check(said():find("Alts replaces Gold", 1, true), "said when Alts is shown")
+-- Show Gold while Alts is hidden: still the player's choice once Alts is
+-- back (Codex on #51).
+loadAddon({ plugins = both, db = { hidden = { altstable = true, gold = true } } })
+GlassPanel._test.slash("show gold")
+GlassPanel._test.slash("show altstable")
+eq(block("gold").widget._shown, true, "Gold shown while Alts was hidden: kept")
+-- An explicit Hide clears the keep: shown again with Alts on, Gold goes.
+GlassPanel._test.slash("hide gold")
+eq(GlassPanelDB.keep.gold, nil, "hide clears keep")
+GlassPanelDB.hidden.gold = nil   -- (as an imported setup could)
+GlassPanel.Bar.Layout()
+eq(block("gold").widget._shown, false, "replaced again")
 
 done("test_altstable")

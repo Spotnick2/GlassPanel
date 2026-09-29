@@ -43,7 +43,8 @@
   breaks it down by slot.
 - AltStable (needs the AltStable addon): the gold of all your characters that AltStable knows,
   with each character's level and gold in the tooltip, grouped by realm. Left-click opens
-  AltStable's sheet. An option counts only this realm and faction.
+  AltStable's sheet. An option counts only this realm and faction. While it shows, the Gold block
+  is hidden (your gold is in its total); it says so once, and showing Gold again keeps it.
 - Options panel under Game Menu > Options > AddOns > Glass Panel (`/gpanel options`): show the bar,
   captions, font and width, reset the layout, and for each plugin whether it's shown and shows its
   caption and icon (`/gpanel icon <id> on|off` too).

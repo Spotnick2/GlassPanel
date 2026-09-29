@@ -20,6 +20,19 @@ eq(#GlassPanel.Engine.blocks, before, "nothing half-registered")
 check(#WoW.chat >= 8, "each refusal was reported")
 check(block("a") == nil, "a refused id stays free")
 check(register({ id = "a", text = function() end, label = true }) == nil, "refused: label not a string")
+check(register({ id = "a", text = function() end, replaces = 5 }) == nil, "refused: replaces not an id")
+check(register({ id = "a", text = function() end, replaces = "a" }) == nil, "refused: replaces itself")
+
+-- replaces (#50): an early block (registered before the settings exist)
+-- replaces too; two blocks can't replace each other.
+loadAddon({ before = function()
+    register({ id = "early", replaces = "clock", text = function() return "e" end })
+end })
+eq(block("clock").widget._shown, false, "early replacing block hides the other")
+eq(GlassPanelDB.hidden.clock, nil, "live, not stored")
+check(register({ id = "loop", replaces = "early", text = function() end }) ~= nil, "a chain is fine")
+check(register({ id = "back", replaces = "back2", text = function() end }) ~= nil, "replacing an unknown id is fine")
+check(register({ id = "back2", replaces = "back", text = function() end }) == nil, "refused: replaces its replacer")
 
 -- A repeated event name runs onEvent once.
 loadAddon()

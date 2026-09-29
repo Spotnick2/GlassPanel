@@ -195,6 +195,13 @@ function GlassPanel.RegisterBlock(spec)
     end
     if spec.label ~= nil and type(spec.label) ~= "string" then return invalid(spec, "label must be a string") end
     if spec.showLabel ~= nil and type(spec.showLabel) ~= "boolean" then return invalid(spec, "showLabel must be a boolean") end
+    if spec.replaces ~= nil and (type(spec.replaces) ~= "string" or spec.replaces == "" or spec.replaces == spec.id) then
+        return invalid(spec, "replaces must be another block's id")
+    end
+    local target = spec.replaces and Engine.byId[spec.replaces]
+    if target and target.replaces == spec.id then
+        return invalid(spec, "replaces " .. spec.replaces .. ", which replaces it")
+    end
     if spec.unitEvents ~= nil then
         if type(spec.unitEvents) ~= "table" then return invalid(spec, "unitEvents must map event names to a unit") end
         for e, u in pairs(spec.unitEvents) do

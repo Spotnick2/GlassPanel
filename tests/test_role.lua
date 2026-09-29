@@ -1,6 +1,7 @@
 -- The Role plugin (#20).
 dofile("tests/wow_stubs.lua")
 dofile("tests/harness.lua")
+PLUGINS = { "GlassPanelRole" }   -- it counts chat lines: no other plugin's
 
 local function tip()
     local b = block("role").widget

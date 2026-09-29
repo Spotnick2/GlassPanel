@@ -32,6 +32,8 @@ function Settings.EnsureDefaults()
     if type(d.hidden) ~= "table" then d.hidden = {} end
     if type(d.labelsFor) ~= "table" then d.labelsFor = {} end
     if type(d.iconsFor) ~= "table" then d.iconsFor = {} end
+    if type(d.replaced) ~= "table" then d.replaced = {} end
+    if type(d.keep) ~= "table" then d.keep = {} end
     if d.editModeReturn ~= nil and type(d.editModeReturn) ~= "table" then d.editModeReturn = nil end
     if not Glass.FONTS[d.font] then d.font = Settings.DEFAULTS.font end
     if d.room ~= "auto" and d.room ~= "full" then d.room = Settings.DEFAULTS.room end
@@ -50,6 +52,7 @@ end
 function Settings.SetShown(shown)
     db().shown = shown and true or false
     Bar.SetShown(db().shown)
+    Settings.AnnounceReplaced()   -- the bar coming on can make a replacement visible
     changed()
 end
 
@@ -84,9 +87,31 @@ function Settings.SetIconFor(id, shown)
 end
 
 function Settings.SetHidden(id, hidden)
+    -- An explicit Show is the player's choice: kept against any block that
+    -- replaces this one, whether or not one is loaded and shown right now
+    -- (#50). An explicit Hide clears it.
+    db().keep[id] = (not hidden) or nil
     db().hidden[id] = hidden and true or nil
     Bar.Layout()
+    Settings.AnnounceReplaced()   -- showing a replacing block hides another: say so
     changed()
+end
+
+-- Say ONCE per pair that a block stands in for another (the hiding itself is
+-- live: Bar.ReplacedBy). Only while the player could see it happen: the bar
+-- on and both blocks loaded. GlassPanelDB.replaced["new>old"] records it.
+function Settings.AnnounceReplaced()
+    local d = db()
+    if type(d) ~= "table" or d.shown == false then return end
+    for _, block in ipairs(GlassPanel.Engine.blocks) do
+        local old = block.replaces and GlassPanel.Engine.byId[block.replaces]
+        local key = block.id .. ">" .. tostring(block.replaces)
+        if old and not d.replaced[key] and Bar.ReplacedBy(old) == block then
+            d.replaced[key] = true
+            GlassPanel.API.Print(block.label .. " replaces " .. old.label .. ", which is hidden."
+                .. " Show it again in Options > AddOns > Glass Panel, or /gpanel show " .. old.id .. ".")
+        end
+    end
 end
 
 function Settings.ResetLayout()
@@ -117,5 +142,6 @@ function Settings.ApplyAll(setup)
     if Bar.frame then Bar.frame:SetShown(d.shown) end
     GlassPanel.Room.Update()
     Bar.Layout()
+    Settings.AnnounceReplaced()
     changed()
 end

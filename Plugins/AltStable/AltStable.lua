@@ -105,9 +105,14 @@ end
 GlassPanel.RegisterBlock({
     id = ID,
     label = "Alts",
-    -- No icon: the coin text drops zero denominations, so a coin icon made
-    -- "37s 81c" read as 37 gold (Gold.lua's reason). The caption says "Alts".
-    order = 40,   -- left lane, after your own gold
+    -- AltStable's own icon (its TOC's IconTexture), never a coin: the coin
+    -- text drops zero denominations, so a coin icon made "37s 81c" read as
+    -- 37 gold (Gold.lua's reason).
+    icon = 8197123,
+    -- The logged-in character's gold is in the total already: Gold is hidden
+    -- while this block shows, until the player shows it again (#50).
+    replaces = "gold",
+    order = 40,   -- left lane, right after Gold
     onInit = function() AS.RegisterCallback("CharactersChanged", refresh) end,
     text = function()
         local t = gather(false)
