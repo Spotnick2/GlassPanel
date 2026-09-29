@@ -6,5 +6,6 @@
 ## Group: GlassPanel
 ## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
 ## Dependencies: GlassPanel
+## SavedVariables: GlassPanelXPDB
 
 XP.lua

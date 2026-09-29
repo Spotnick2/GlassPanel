@@ -212,6 +212,22 @@ function GlassPanel.RegisterBlock(spec)
     if spec.width ~= nil and (type(spec.width) ~= "number" or spec.width ~= spec.width or spec.width < 16) then
         return invalid(spec, "width must be a number of pixels, at least 16")
     end
+    -- Malformed options drop the options (recorded), never the block: an
+    -- optional setting mustn't take a plugin's readout off the bar.
+    if spec.options ~= nil then
+        local ok = type(spec.options) == "table"
+        for _, o in ipairs(ok and spec.options or {}) do
+            if type(o) ~= "table" or type(o.label) ~= "string" or type(o.get) ~= "function"
+                or type(o.set) ~= "function" or (o.note ~= nil and type(o.note) ~= "string") then
+                ok = false
+            end
+        end
+        if not ok then
+            API.Fail(spec.id .. ":options",
+                "options must be a list of { label = string, get = function, set = function, note = string? }")
+            spec.options = nil
+        end
+    end
     for _, key in ipairs({ "onEvent", "tooltip", "onClick", "onInit", "onShown", "build", "paint", "caption" }) do
         if spec[key] ~= nil and type(spec[key]) ~= "function" then return invalid(spec, key .. " must be a function") end
     end

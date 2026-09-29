@@ -309,6 +309,37 @@ local function tooltip(_, tt)
 end
 
 --------------------------------------------------------------------------------
+-- Blizzard's XP bar (#9)
+--------------------------------------------------------------------------------
+
+-- Optional, off by default (TitanPanelXPP's "hide the default XP bar"):
+-- hidden only while XP+ is on screen, and given back whenever it isn't (the
+-- level cap, XP disabled, the block or the bar hidden). Through
+-- API.SystemHider on StatusTrackingBarManager, as TitanPanelXPP did on
+-- Retail: its two Edit Mode containers (XP while levelling, since Blizzard
+-- ranks it first; reputation) call it through GetParent(), so hiding one
+-- container under our frame broke Edit Mode (measured), and the manager goes
+-- instead. A watched reputation bar hides with it while XP+ shows. The
+-- setting lives in GlassPanelXPDB (this plugin's SavedVariables; first read
+-- in onShown, which runs on the first layout, after they load). While Edit
+-- Mode is open the bars are given back, so they can be seen and moved.
+local blizzardBar = API.SystemHider("StatusTrackingBarManager")
+local onScreen = false
+
+local function db()
+    local d = rawget(_G, "GlassPanelXPDB")
+    if type(d) ~= "table" then
+        d = {}
+        GlassPanelXPDB = d
+    end
+    return d
+end
+
+local function applyBlizzardBar()
+    blizzardBar.Set(onScreen and db().hideBlizzard == true)
+end
+
+--------------------------------------------------------------------------------
 -- The block
 --------------------------------------------------------------------------------
 
@@ -352,6 +383,19 @@ local block = GlassPanel.RegisterBlock({
     build = build,
     paint = paint,
     tooltip = tooltip,
+    onShown = function(_, visible)
+        onScreen = visible
+        applyBlizzardBar()
+    end,
+    options = {
+        { label = "Hide Blizzard's XP bar",
+          note = "And the reputation bar under it, while XP+ shows; both come back at the level cap.",
+          get = function() return db().hideBlizzard == true end,
+          set = function(on)
+              db().hideBlizzard = on or nil
+              applyBlizzardBar()
+          end },
+    },
     onClick = function(_, button)
         if button == "RightButton" then
             resetSession()
@@ -363,4 +407,6 @@ local block = GlassPanel.RegisterBlock({
     end,
 })
 
-if block then block._test = { S = S, duration = duration, pending = function() return pending end } end
+if block then
+    block._test = { S = S, duration = duration, pending = function() return pending end, blizzardBar = blizzardBar }
+end

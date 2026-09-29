@@ -128,6 +128,28 @@ local before = rows.gold.shown:GetChecked()
 GlassPanel._test.slash("hide gold")
 eq(rows.gold.shown:GetChecked(), before, "closed panel isn't touched")
 
+-- Plugin options (spec.options): a checkbox per option under "Plugin
+-- options"; a throwing get or set is recorded, never raised.
+local flag = false
+GlassPanel.RegisterBlock({ id = "opty", label = "Opty", text = function() return "o" end,
+    options = { { label = "Do the thing", note = "A note.", get = function() return flag end,
+                  set = function(v) flag = v end },
+                { label = "Broken", get = function() error("get broke") end,
+                  set = function() error("set broke") end } } })
+open()
+local ob = c["options:opty:1"]
+check(ob ~= nil and ob.label._text == "Do the thing", "plugin option on the panel")
+eq(ob:GetChecked(), false, "reads get()")
+click(ob, true)
+eq(flag, true, "click calls set()")
+local bad = c["options:opty:2"]
+check(GlassPanel.failures["options:opty:2:get"] ~= nil, "a throwing get is recorded, under its own key")
+eq(bad:GetChecked(), false, "and shows unchecked")
+GlassPanel.failures["options:opty:2:get"] = nil
+click(bad, true)
+check(GlassPanel.failures["options:opty:2"] ~= nil, "a throwing set is recorded")
+for k in pairs(GlassPanel.failures) do GlassPanel.failures[k] = nil end
+
 -- A category whose GetID throws: /gpanel options falls back to the hint.
 do
     local cat = O().category()
