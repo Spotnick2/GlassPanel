@@ -62,6 +62,8 @@ GlassPanel.RegisterBlock({
           note  = "Only while XP+ shows.",       -- optional grey line under it
           get   = function() return MyDB.hide end,
           set   = function(on) MyDB.hide = on end },  -- store it in YOUR SavedVariables
+        { label = "Choose currencies...",        -- or a button: run() is called on click
+          run   = function() MyWindow:Show() end },
     },
 })
 ```

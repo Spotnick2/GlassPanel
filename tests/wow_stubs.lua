@@ -112,6 +112,8 @@ function WoW.reset()
     WoW.serverTime = 100000
     WoW.settings = {}
     WoW.cvars = { damageMeterEnabled = true }
+    WoW.currencies = {}
+    WoW.currencyTab = {}
     WoW.editMode = { presets = {}, saved = { layouts = {}, activeLayout = 1 }, calls = {} }
     WoW.damageMeterAvailable = true
 end
@@ -441,6 +443,31 @@ C_CurrencyInfo = { GetCoinTextureString = function(copper)
     if secrets[copper] then error("formatter given a secret") end
     return string.format("%dg%ds%dc", math.floor(copper / 10000), math.floor(copper / 100) % 100, copper % 100)
 end }
+-- Currencies (#47). WoW.currencies[id] = { name, quantity, max, icon, weekly,
+-- weeklyMax } is what the client knows; WoW.currencyTab = { {header = name}
+-- | id, ... } is the currency tab as listed (collapsed headers hide rows).
+-- A field set to "secret" comes back secret.
+local function csv(v, label) if v == "secret" then return WoW.Secret(label) end return v end
+function C_CurrencyInfo.GetCurrencyInfo(id)
+    local c = WoW.currencies[id]
+    if not c then return nil end
+    return { name = c.name, quantity = csv(c.quantity or 0, "quantity"), maxQuantity = c.max or 0,
+             iconFileID = c.icon or 134400, quantityEarnedThisWeek = c.weekly or 0,
+             maxWeeklyQuantity = c.weeklyMax or 0, discovered = true }
+end
+function C_CurrencyInfo.GetCurrencyListSize() return #WoW.currencyTab end
+function C_CurrencyInfo.GetCurrencyListInfo(i)
+    local e = WoW.currencyTab[i]
+    if type(e) == "table" then return { name = e.header, isHeader = true, quantity = 0 } end
+    local c = WoW.currencies[e]
+    return c and { name = c.name, isHeader = false, quantity = csv(c.quantity or 0, "quantity") } or nil
+end
+function C_CurrencyInfo.GetCurrencyListLink(i)
+    local e = WoW.currencyTab[i]
+    if type(e) == "number" then return "|Hcurrency:" .. e .. "|h[x]|h" end
+end
+function C_CurrencyInfo.GetCurrencyIDFromLink(link) return tonumber(link:match("currency:(%d+)")) end
+function BreakUpLargeNumbers(n) local s = tostring(n) local r repeat s, r = s:gsub("^(%d+)(%d%d%d)", "%1,%2") until r == 0 return s end
 function GetGameTime() return WoW.gameTime[1], WoW.gameTime[2] end
 function GetTime() return WoW.now end
 function GetServerTime() return WoW.serverTime end

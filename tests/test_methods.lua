@@ -54,6 +54,10 @@ do
     o.controls.font[2]._scripts.OnClick(o.controls.font[2])
     GlassPanel._test.slash("options")
 end
+do
+    local cb = GlassPanel.Engine.byId.currencies
+    if cb and cb.options then cb.options[1].run() end
+end
 GlassPanel._test.slash("setup")
 GlassPanel._test.slash("setup back")
 WoW.tick(1.1); WoW.tick()

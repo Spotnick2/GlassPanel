@@ -1,0 +1,11 @@
+## Interface: 16001
+## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[Currencies]|r
+## Notes: The currencies you pick, in your order: Tarnished Undermine Reals, honor and the rest.
+## Author: Spotnick
+## Version: @project-version@
+## Group: GlassPanel
+## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
+## Dependencies: GlassPanel
+## SavedVariablesPerCharacter: GlassPanelCurrenciesDB
+
+Currencies.lua

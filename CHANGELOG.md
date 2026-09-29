@@ -37,6 +37,8 @@
 - Layer: which layer of the realm you're on, detected from the NPCs you target or mouse over
   (nameplates confirm a known layer), numbered per zone and per realm. Left-click forgets the
   layers seen in your zone.
+- Currencies: pick which currencies to show and in what order (Tarnished Undermine Reals, Honor
+  Points, Merchant's Favor and the rest), each with its icon and amount; left-click to choose.
 - GearScore: your GearScore, coloured along the item-quality ramp (its bracket in the tooltip), and your average item level; the tooltip
   breaks it down by slot.
 - Options panel under Game Menu > Options > AddOns > Glass Panel (`/gpanel options`): show the bar,

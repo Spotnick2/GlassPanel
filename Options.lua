@@ -202,16 +202,23 @@ local function addPluginOptions()
             place(left, label(block.label or block.id, "GameFontNormal"), 22, 4)
             for i, o in ipairs(block.options) do
                 local key = "options:" .. block.id .. ":" .. i
-                widgets[key] = checkbox(left, o.label,
-                    function()
-                        local ok, v = pcall(o.get)
-                        if not ok then API.Fail(key .. ":get", v) return false end
-                        return v
-                    end,
-                    function(v)
-                        local ok, err = pcall(o.set, v)
+                if o.run then
+                    widgets[key] = button(left, o.label, 200, function()
+                        local ok, err = pcall(o.run)
                         if not ok then API.Fail(key, err) end
                     end)
+                else
+                    widgets[key] = checkbox(left, o.label,
+                        function()
+                            local ok, v = pcall(o.get)
+                            if not ok then API.Fail(key .. ":get", v) return false end
+                            return v
+                        end,
+                        function(v)
+                            local ok, err = pcall(o.set, v)
+                            if not ok then API.Fail(key, err) end
+                        end)
+                end
                 if o.note then note(left, o.note) end
             end
         end
