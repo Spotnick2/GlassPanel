@@ -112,7 +112,10 @@ core's `ADDON_LOADED`.
   collapse button while shown (a live button). Their union only grows within a session (the bar
   steps in once, then doesn't jiggle); a new session: layout/scale/display events
   (`Room.NewSession`), Edit Mode closing, or the aura frame's rect changing. Nothing is recorded while `EditModeManagerFrame` is shown
-  (example auras). No icon yet: they take no room. `/gpanel room why` reports the last check
+  (example auras). No icon yet: they take no room. **`DamageMeter`** (#40, Blizzard's built-in
+  meter, `TOPLEFT` 0,0 in both presets, measured) is watched too; switched off outright
+  (`damageMeterEnabled` CVar off, not available, or Visibility Hidden; `Room.OFF`) it takes no room,
+  while InCombat/InGroup keep its place. `/gpanel room why` reports the last check
   (read-only). Pure `Room.Insets`; read-only `GetRect`/`IsShown`/`IsVisible`/`GetChildren` under pcall,
   every number through `API.Plain`; `Room.Update` never throws (failures go to `API.Fail`).
   Checked on layout, scale and display events and on the engine's clock (`Engine.EverySecond`:

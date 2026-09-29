@@ -337,5 +337,44 @@ GlassPanel.failures["room:why"] = nil
 rawset(_G, "BuffFrame", nil)
 rawset(_G, "EditModeManagerFrame", nil)
 
+-- Blizzard's damage meter (#40): TOPLEFT of UIParent at 0,0 in both presets.
+loadAddon()
+R = GlassPanel.Room
+bar = GlassPanel.Bar.frame
+local dmeter = blizzard("DamageMeter", { 0, 748, 200, 20 })
+dmeter.visibility = Enum.DamageMeterVisibility.Always
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "the bar starts right of the damage meter")
+-- Shown only in combat: it keeps its place while it waits (no jump).
+dmeter.visibility = Enum.DamageMeterVisibility.InCombat
+dmeter._shown = false
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "InCombat, hidden for now: still counts")
+-- Switched off outright: never shows, so no room kept for it.
+dmeter.visibility = Enum.DamageMeterVisibility.Hidden
+R.Update()
+eq(point("TOPLEFT")[4], 0, "Visibility Hidden: takes no room")
+check(R.Explain()[8]:find("Visibility: Hidden", 1, true), "why: says so (" .. R.Explain()[8] .. ")")
+dmeter.visibility = Enum.DamageMeterVisibility.Always
+dmeter._shown = true
+WoW.cvars.damageMeterEnabled = false
+R.Update()
+eq(point("TOPLEFT")[4], 0, "damageMeterEnabled off: takes no room")
+WoW.cvars.damageMeterEnabled = true
+WoW.damageMeterAvailable = false
+R.Update()
+eq(point("TOPLEFT")[4], 0, "not available: takes no room")
+WoW.damageMeterAvailable = true
+-- Unreadable setting (secret): not taken for "off"; the frame still counts.
+dmeter.visibility = WoW.Secret("visibility")
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "secret visibility: counts, nothing thrown")
+-- Moved down in Edit Mode (the owner's custom layout): full width.
+dmeter.visibility = Enum.DamageMeterVisibility.Always
+dmeter._rect = { 0, 500, 200, 20 }
+R.Update()
+eq(point("TOPLEFT")[4], 0, "moved below the band: full width")
+rawset(_G, "DamageMeter", nil)
+
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_room")

@@ -51,7 +51,7 @@ GlassPanel.Room = Room
 -- list comes from /gpanel covered measurements (#2); a frame not on it is
 -- simply drawn over, as before.
 Room.WATCH = { "MinimapCluster", "BuffFrame", "DebuffFrame", "TicketStatusFrame",
-               "PlayerFrame", "TargetFrame", "FocusFrame" }
+               "PlayerFrame", "TargetFrame", "FocusFrame", "DamageMeter" }
 Room.MARGIN = 6        -- px between the bar's end and the frame it gives way to
 Room.MIN_WIDTH = 300   -- px: narrower than this, the bar keeps the full width
 Room.MIDDLE = 0.2      -- a frame centred in this middle fraction of the screen is ignored
@@ -165,9 +165,36 @@ end
 
 -- Fill `out` with f's screen rect; false when it doesn't count (absent,
 -- replaced, unreadable). Called under pcall: never throws out of Room.
+-- Frames the player can switch off outright: then they never show, so they
+-- take no room (unlike one hidden for now, which keeps its place).
+-- DamageMeter (#40): Blizzard's built-in meter, TOPLEFT of UIParent at 0,0
+-- in both presets (measured). Its ShouldBeShown (Blizzard_DamageMeter/
+-- DamageMeter.lua) is false for good when the damageMeterEnabled CVar is off,
+-- the meter isn't available, or its Visibility setting is Hidden; InCombat
+-- and InGroup keep its place while it waits.
+local function damageMeterOff(f)
+    local cvar = rawget(_G, "C_CVar")
+    if type(cvar) == "table" and cvar.GetCVarBool
+        and API.Plain(cvar.GetCVarBool("damageMeterEnabled")) == false then
+        return "switched off (damageMeterEnabled)"
+    end
+    local dm = rawget(_G, "C_DamageMeter")
+    if type(dm) == "table" and dm.IsDamageMeterAvailable
+        and API.Plain((dm.IsDamageMeterAvailable())) == false then
+        return "not available"
+    end
+    local vis = rawget(_G, "Enum") and Enum.DamageMeterVisibility
+    if type(vis) == "table" and vis.Hidden ~= nil and API.Plain(f.visibility) == vis.Hidden then
+        return "switched off (Visibility: Hidden)"
+    end
+end
+Room.OFF = { DamageMeter = damageMeterOff }
+
 local function readRect(f, out, name)
     icons[name] = nil
     if f:IsForbidden() then why[name] = "forbidden" return false end
+    local off = Room.OFF[name] and Room.OFF[name](f)
+    if off then why[name] = off return false end
     if not f:IsVisible() then
         -- Hidden on its own (it comes back) counts; hidden with its parent doesn't.
         local p = f:GetParent()
