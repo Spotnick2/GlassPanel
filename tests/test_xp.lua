@@ -182,6 +182,20 @@ WoW.fire("PLAYER_XP_UPDATE", "player"); WoW.tick()
 check(tooltipHas("not available"), "tooltip says so")
 check(next(GlassPanel.failures) == nil, "no failures while secret")
 
+-- The icon (#43): TitanPanelXPP's purple "XP", the bar starting after it.
+do
+    local x = xpBlock()
+    eq(x.icon, "Interface\\Icons\\XP_Icon", "TitanPanelXPP's icon")
+    eq(x.widget.icon._shown, true, "shown")
+    local host = T().ui().host
+    eq(host._points[1][2], x.widget.caption, "the bar starts where the text would, after the icon")
+    eq(x.widget.caption._points[1][4], 4 + 14 + 4, "(after the icon)")
+    GlassPanel._test.slash("icon xp off"); WoW.tick()
+    eq(x.widget.icon._shown, false, "the Icon toggle works for XP+")
+    eq(x.widget.caption._points[1][4], 4, "and the bar takes the space back")
+    GlassPanel._test.slash("icon xp on"); WoW.tick()
+end
+
 -- Hiding Blizzard's XP bar (#9): off by default; on, while XP+ shows.
 WoW.player = { level = 30, maxLevel = 60, xp = 100, maxXP = 1000, xpDisabled = false }
 GlassPanelXPDB = nil

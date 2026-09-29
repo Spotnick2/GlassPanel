@@ -3,7 +3,7 @@
 ## Unreleased
 
 - A liquid-glass bar across the top of the screen, with gold and clock blocks.
-- XP+: a glass XP bar with rested and quest XP, and a tooltip with time played, XP per hour and
+- XP+: a glass XP bar (with TitanPanelXPP's purple XP icon) with rested and quest XP, and a tooltip with time played, XP per hour and
   time to level. Hidden at the level cap. Left-click refreshes time played, right-click resets
   the session. An option (Options > AddOns > Glass Panel > Plugin options) hides Blizzard's own XP
   bar (and the reputation bar under it) while XP+ shows.
