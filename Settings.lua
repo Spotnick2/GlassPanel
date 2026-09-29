@@ -52,6 +52,7 @@ end
 function Settings.SetShown(shown)
     db().shown = shown and true or false
     Bar.SetShown(db().shown)
+    Settings.AnnounceReplaced()   -- the bar coming on can make a replacement visible
     changed()
 end
 
@@ -86,11 +87,13 @@ function Settings.SetIconFor(id, shown)
 end
 
 function Settings.SetHidden(id, hidden)
-    local block = GlassPanel.Engine.byId[id]
-    -- Showing a block another one replaces: the player keeps it (#50).
-    if not hidden and block and Bar.ReplacedBy(block) then db().keep[id] = true end
+    -- An explicit Show is the player's choice: kept against any block that
+    -- replaces this one, whether or not one is loaded and shown right now
+    -- (#50). An explicit Hide clears it.
+    db().keep[id] = (not hidden) or nil
     db().hidden[id] = hidden and true or nil
     Bar.Layout()
+    Settings.AnnounceReplaced()   -- showing a replacing block hides another: say so
     changed()
 end
 
@@ -139,5 +142,6 @@ function Settings.ApplyAll(setup)
     if Bar.frame then Bar.frame:SetShown(d.shown) end
     GlassPanel.Room.Update()
     Bar.Layout()
+    Settings.AnnounceReplaced()
     changed()
 end

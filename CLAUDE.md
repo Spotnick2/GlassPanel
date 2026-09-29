@@ -206,8 +206,9 @@ core's `ADDON_LOADED`.
   known gold at all: only `?`). AltStable's own icon (file ID 8197123), never a coin (Gold's reason);
   `replaces = "gold"` (#50: **live**, `Bar.ReplacedBy` inside `Bar.IsHidden`: Gold is hidden
   while this block is registered and not hidden, never stored, so a character with the plugin off or
-  a refused block keeps Gold; showing Gold stores `keep.gold`; the chat line is said once, at
-  `PLAYER_ENTERING_WORLD`, with the bar on). The bar text reads
+  a refused block keeps Gold; an explicit Show of Gold stores `keep.gold` whatever Alts is
+  doing, an explicit Hide clears it; the chat line is said once, with the bar on, at
+  `PLAYER_ENTERING_WORLD` or when a setting change brings the replacement on). The bar text reads
   only `GetTotals()`.
   GlassPanel keeps no character list (forgetting is AltStable's).
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);

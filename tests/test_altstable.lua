@@ -189,5 +189,26 @@ check(not said():find("replaces", 1, true), "nothing said")
 loadAddon({ plugins = both, db = { shown = false } })
 check(not said():find("replaces", 1, true), "bar off: nothing said")
 eq(GlassPanelDB.replaced["altstable>gold"], nil, "not recorded")
+-- ... and said when the bar comes on (Codex on #51).
+GlassPanel._test.slash("toggle")
+check(said():find("Alts replaces Gold", 1, true), "bar toggled on: said then")
+eq(block("gold").widget._shown, false, "and Gold hidden")
+-- Alts hidden from the start, then shown: Gold goes, and it's said then.
+loadAddon({ plugins = both, db = { hidden = { altstable = true } } })
+GlassPanel._test.slash("show altstable")
+eq(block("gold").widget._shown, false, "Alts shown: Gold hidden")
+check(said():find("Alts replaces Gold", 1, true), "said when Alts is shown")
+-- Show Gold while Alts is hidden: still the player's choice once Alts is
+-- back (Codex on #51).
+loadAddon({ plugins = both, db = { hidden = { altstable = true, gold = true } } })
+GlassPanel._test.slash("show gold")
+GlassPanel._test.slash("show altstable")
+eq(block("gold").widget._shown, true, "Gold shown while Alts was hidden: kept")
+-- An explicit Hide clears the keep: shown again with Alts on, Gold goes.
+GlassPanel._test.slash("hide gold")
+eq(GlassPanelDB.keep.gold, nil, "hide clears keep")
+GlassPanelDB.hidden.gold = nil   -- (as an imported setup could)
+GlassPanel.Bar.Layout()
+eq(block("gold").widget._shown, false, "replaced again")
 
 done("test_altstable")
