@@ -118,4 +118,18 @@ else
     io.write("  (Glass.lua upstream check skipped: no ../GlassUnitFrames git repo)\n")
 end
 
+-- A texture path written with single backslashes ("Interface\Icons\X")
+-- loses them in Lua 5.1 ("\I" is read as "I", no error from luac): the
+-- path silently breaks. Every shipped file, core and plugins.
+local shipped = {}
+for _, f in ipairs(tocFiles()) do shipped[#shipped + 1] = f end
+for _, p in ipairs(list) do
+    if p.toc then for _, f in ipairs(tocFiles(p.toc, p.dir)) do shipped[#shipped + 1] = f end end
+end
+for _, f in ipairs(shipped) do
+    local src = io.open(f, "r"):read("*a")
+    local bad = src:match('"Interface\\[^\\][^"]*"')
+    check(not bad, f .. ": texture path with single backslashes " .. tostring(bad))
+end
+
 done("test_toc")

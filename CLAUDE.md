@@ -127,7 +127,8 @@ core's `ADDON_LOADED`.
   research and a Codex review (see #2 and the porting guide's Edit Mode note); an opt-in Edit
   Mode layout setup is #10.
 - **`Plugins\XP\XP.lua`**: XP+ (#3), the only graphical block so far (`width`/`build`/`paint`).
-  Four layered bars on one `Glass.Bar` host. A level crossing is detected by the level or max
+  Four layered bars on one `Glass.Bar` host, after TitanPanelXPP's icon (`Interface\Icons\XP_Icon`, #43;
+  the host anchors to the block's empty caption, so the Icon toggle gives the space back). A level crossing is detected by the level or max
   changing (not by XP going down). **Plugin option "Hide Blizzard's XP bar"** (#9, off by default,
   `GlassPanelXPDB.hideBlizzard`): `StatusTrackingBarManager` is hidden through `API.SystemHider`
   only while XP+ is on screen (`onShown`), and given back otherwise. **Not

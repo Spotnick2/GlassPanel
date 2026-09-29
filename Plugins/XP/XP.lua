@@ -214,7 +214,10 @@ local function build(block)
     local w = block.widget
     -- The host glass bar: background, gloss and edge; its own fill is rested.
     local host = Glass.Bar(w, BAR_H)
-    host:SetPoint("LEFT", w, "LEFT", 2, 0)
+    -- After the icon (TitanPanelXPP's XP_Icon): the bar starts where the
+    -- block's text would (its empty caption, which Bar moves when the icon
+    -- is turned off), so it takes the icon's space back then.
+    host:SetPoint("LEFT", w.caption, "LEFT", -2, 0)
     host:SetPoint("RIGHT", w, "RIGHT", -2, 0)
     host:SetFrameLevel(w:GetFrameLevel() + 1)
     local c = COLORS.rested
@@ -346,6 +349,7 @@ end
 local block = GlassPanel.RegisterBlock({
     id = "xp",
     label = "XP+",
+    icon = "Interface\\Icons\\XP_Icon",   -- TitanPanelXPP's purple "XP"
     order = 20,
     width = WIDTH,
     events = { "PLAYER_ENTERING_WORLD", "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "UPDATE_EXHAUSTION",
@@ -408,5 +412,6 @@ local block = GlassPanel.RegisterBlock({
 })
 
 if block then
-    block._test = { S = S, duration = duration, pending = function() return pending end, blizzardBar = blizzardBar }
+    block._test = { S = S, duration = duration, pending = function() return pending end, blizzardBar = blizzardBar,
+                    ui = function() return ui end }
 end
