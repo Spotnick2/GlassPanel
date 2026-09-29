@@ -3,25 +3,26 @@
 -- own list rather than hardcoded per-expansion tables.
 --
 -- Forever (70009 dump): C_CurrencyInfo.GetCurrencyListSize / GetCurrencyListInfo
--- (the currency tab: headers and currencies; a collapsed header hides its
--- currencies, and we never expand the player's tab), GetCurrencyListLink +
--- GetCurrencyIDFromLink for the id, GetCurrencyInfo(id) for one currency,
--- CURRENCY_DISPLAY_UPDATE. Forever's currencies (Wowhead's Forever
--- database, owner, 2026-09-29) are offered even before the character owns
--- any, when the client resolves them to a name: Merchant's Favor 3402,
--- Tarnished Undermine Real 3469, Honor Points 1792, Rank Points 3468,
--- Darkmoon Prize Ticket 515.
+-- (the currency tab: headers and currencies, each with its currencyID; a
+-- collapsed header hides its currencies, and we never expand the player's
+-- tab), GetCurrencyInfo(id) for one currency, CURRENCY_DISPLAY_UPDATE.
+-- Forever's currencies (Wowhead's Forever database, owner, 2026-09-29) are
+-- offered even before the character owns any, when the client resolves them
+-- to a name: Merchant's Favor 3402, Tarnished Undermine Real 3469, Honor
+-- Points 1792, Rank Points 3468, Darkmoon Prize Ticket 515.
 --
--- Picks are per character (## SavedVariablesPerCharacter). Never configured:
--- the currencies it has some of. Every number through API.Plain: a secret
--- amount is a grey "?", never a guess. Unmeasured: whether amounts are plain.
+-- Picks are per character (## SavedVariablesPerCharacter). Never chosen:
+-- up to 3 owned currencies, saved the first time they're found so the bar
+-- doesn't change by itself as currencies are gained. Every number through
+-- API.Plain: a secret amount is a grey "?", never a guess. Measured on 70009
+-- (owner): Honor Points' quantity and cap come back plain.
 
 GlassPanel = GlassPanel or {}
 local API, Glass = GlassPanel.API, GlassPanel.Glass
 local P = API.Plain
 
 local KNOWN = { 3402, 3469, 1792, 3468, 515 }   -- Forever's currencies, offered before the character has any
-local DEFAULT_MAX = 3                 -- first-run picks: up to this many owned
+local DEFAULT_MAX = 3                            -- first-run picks: up to this many owned
 
 local function db()
     local d = rawget(_G, "GlassPanelCurrenciesDB")
@@ -57,15 +58,10 @@ local function available()
     n = okN and P(n) or 0
     for i = 1, (type(n) == "number" and n or 0) do
         local ok, row = pcall(C_CurrencyInfo.GetCurrencyListInfo, i)
-        if ok and type(row) == "table" and P(row.isHeader) ~= true then
-            local okL, link = pcall(C_CurrencyInfo.GetCurrencyListLink, i)
-            local okI, id = false, nil
-            if okL and type(P(link)) == "string" then okI, id = pcall(C_CurrencyInfo.GetCurrencyIDFromLink, link) end
-            id = okI and P(id) or nil
-            if type(id) == "number" and not seen[id] then
-                seen[id] = true
-                list[#list + 1] = info(id)
-            end
+        local id = ok and type(row) == "table" and P(row.isHeader) ~= true and P(row.currencyID) or nil
+        if type(id) == "number" and not seen[id] then
+            seen[id] = true
+            list[#list + 1] = info(id)
         end
     end
     for _, id in ipairs(KNOWN) do
@@ -78,13 +74,24 @@ local function available()
     return list
 end
 
--- The picked ids, in order. First run: the ones the character has some of.
-local function picks()
+-- The picked ids, in order (each once). Never chosen: the owned ones,
+-- saved now so they stay put.
+local function picks(avail)
     local d = db()
-    if d.order then return d.order end
-    local out = {}
-    for _, c in ipairs(available()) do
-        if c.quantity and c.quantity > 0 and #out < DEFAULT_MAX then out[#out + 1] = c.id end
+    if not d.order then
+        local out = {}
+        for _, c in ipairs(avail or available()) do
+            if c.quantity and c.quantity > 0 and #out < DEFAULT_MAX then out[#out + 1] = c.id end
+        end
+        if #out == 0 then return out end   -- nothing yet: decide when there is
+        d.order = out
+    end
+    local seen, out = {}, {}
+    for _, id in ipairs(d.order) do
+        if type(id) == "number" and not seen[id] then
+            seen[id] = true
+            out[#out + 1] = id
+        end
     end
     return out
 end
@@ -101,47 +108,78 @@ end
 
 local function amount(c)
     if c.quantity == nil then return "|cff888888?|r" end
-    return BreakUpLargeNumbers and BreakUpLargeNumbers(c.quantity) or tostring(c.quantity)
+    return BreakUpLargeNumbers(c.quantity)
 end
 
 --------------------------------------------------------------------------------
--- The chooser window: every currency, a checkbox to show it, up/down to
+-- The chooser window: every currency, a checkbox to show it, Up/Down to
 -- order the shown ones.
 --------------------------------------------------------------------------------
 
 local win, rows = nil, {}
-local ROW_H = 26
+local ROW_W, ROW_H = 340, 26
+
+-- The rows: the shown ones first, in order (only those the client resolves),
+-- then the rest by name. `shown` is that first part, as ids.
+local function entries()
+    local avail = available()
+    local byId = {}
+    for _, c in ipairs(avail) do byId[c.id] = c end
+    local list, shown, used = {}, {}, {}
+    for _, id in ipairs(picks(avail)) do
+        local c = byId[id] or info(id)
+        if c then
+            list[#list + 1] = c
+            shown[#shown + 1] = id
+            used[id] = true
+        end
+    end
+    for _, c in ipairs(avail) do
+        if not used[c.id] then list[#list + 1] = c end
+    end
+    return list, shown, used
+end
 
 local refreshWindow
 
-local function move(id, step)
-    local order = {}
-    for i, v in ipairs(picks()) do order[i] = v end
-    for i, v in ipairs(order) do
-        if v == id then
-            local j = i + step
-            if j >= 1 and j <= #order then order[i], order[j] = order[j], order[i] end
-            break
-        end
+-- Write `shown` (the visible order) back, keeping saved ids the client
+-- doesn't resolve right now at the end, untouched.
+local function saveShown(shown)
+    local keep, inShown = {}, {}
+    for _, id in ipairs(shown) do inShown[id] = true; keep[#keep + 1] = id end
+    for _, id in ipairs(picks()) do
+        if not inShown[id] and not info(id) then keep[#keep + 1] = id end
     end
-    setPicks(order)
+    setPicks(keep)
     refreshWindow()
 end
 
-local function toggle(id, on)
-    local order = {}
-    for _, v in ipairs(picks()) do
-        if v ~= id then order[#order + 1] = v end
+local function move(id, step)
+    local _, shown = entries()
+    for i, v in ipairs(shown) do
+        if v == id then
+            local j = i + step
+            if j >= 1 and j <= #shown then shown[i], shown[j] = shown[j], shown[i] end
+            break
+        end
     end
-    if on then order[#order + 1] = id end
-    setPicks(order)
-    refreshWindow()
+    saveShown(shown)
+end
+
+local function toggle(id, on)
+    local _, shown = entries()
+    local out = {}
+    for _, v in ipairs(shown) do
+        if v ~= id then out[#out + 1] = v end
+    end
+    if on then out[#out + 1] = id end
+    saveShown(out)
 end
 
 local function row(i)
     if rows[i] then return rows[i] end
     local r = CreateFrame("Frame", nil, win.content)
-    r:SetSize(360, ROW_H)
+    r:SetSize(ROW_W, ROW_H)
     r:SetPoint("TOPLEFT", win.content, "TOPLEFT", 0, -(i - 1) * ROW_H)
     r.check = CreateFrame("CheckButton", nil, r, "UICheckButtonTemplate")
     r.check:SetSize(24, 24)
@@ -150,34 +188,18 @@ local function row(i)
     r.text = Glass.Font(r, 12, "LEFT")
     r.text:SetPoint("LEFT", r.check, "RIGHT", 4, 0)
     r.up = API.Button(r, "Up", 44, function() move(r.id, -1) end)
-    r.up:SetPoint("RIGHT", r, "RIGHT", -50, 0)
+    r.up:SetPoint("RIGHT", r, "RIGHT", -52, 0)
     r.down = API.Button(r, "Down", 48, function() move(r.id, 1) end)
-    r.down:SetPoint("RIGHT", r, "RIGHT", 0, 0)
+    r.down:SetPoint("RIGHT", r, "RIGHT", -2, 0)
     rows[i] = r
     return r
 end
 
--- Shown ones first, in their order; then the rest by name.
-local function entries()
-    local byId, list, used = {}, {}, {}
-    for _, c in ipairs(available()) do byId[c.id] = c end
-    for _, id in ipairs(picks()) do
-        local c = byId[id] or info(id)
-        if c then list[#list + 1] = c; used[id] = true end
-    end
-    for _, c in ipairs(available()) do
-        if not used[c.id] then list[#list + 1] = c end
-    end
-    return list, used
-end
-
 refreshWindow = function()
     if not win then return end
-    local list, used = entries()
-    local shownCount = 0
-    for _ in pairs(used) do shownCount = shownCount + 1 end
+    local list, shown, used = entries()
     local pos = {}
-    for i, id in ipairs(picks()) do pos[id] = i end
+    for i, id in ipairs(shown) do pos[id] = i end
     for i, c in ipairs(list) do
         local r = row(i)
         r.id = c.id
@@ -186,7 +208,7 @@ refreshWindow = function()
         r.up:SetShown(used[c.id] == true)
         r.down:SetShown(used[c.id] == true)
         r.up:SetEnabled(pos[c.id] ~= nil and pos[c.id] > 1)
-        r.down:SetEnabled(pos[c.id] ~= nil and pos[c.id] < shownCount)
+        r.down:SetEnabled(pos[c.id] ~= nil and pos[c.id] < #shown)
         r:Show()
     end
     for i = #list + 1, #rows do rows[i]:Hide() end
@@ -194,33 +216,28 @@ refreshWindow = function()
     win.empty:SetShown(#list == 0)
 end
 
+-- Currency events come in bursts (login, loot): one refresh per frame.
+local refreshQueued = false
+local function queueRefresh()
+    if refreshQueued then return end
+    refreshQueued = true
+    C_Timer.After(0, function()
+        refreshQueued = false
+        if win and win:IsShown() then refreshWindow() end
+    end)
+end
+
 local function openWindow()
     if not win then
-        win = CreateFrame("Frame", "GlassPanelCurrenciesWindow", UIParent)
-        win:SetSize(400, 320)
-        win:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
-        win:SetFrameStrata("FULLSCREEN_DIALOG")
-        win:SetClampedToScreen(true)
-        win:EnableMouse(true)
-        local glass = Glass.Apply(win, "small")
-        local backing = win:CreateTexture(nil, "BACKGROUND", nil, -7)
-        backing:SetAllPoints(win)
-        backing:SetColorTexture(0.05, 0.06, 0.08, 0.96)
-        backing:AddMaskTexture(glass.mask)
-        local special = rawget(_G, "UISpecialFrames")
-        if type(special) == "table" then table.insert(special, "GlassPanelCurrenciesWindow") end
-        local title = Glass.Font(win, 14, "LEFT")
-        title:SetPoint("TOPLEFT", win, "TOPLEFT", 14, -12)
-        title:SetText("Currencies on the bar")
-        local hint = Glass.Font(win, 11, "LEFT")
-        hint:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
-        hint:SetTextColor(0.75, 0.75, 0.75)
-        hint:SetText("Tick to show, Up/Down to order. Expand headers in the currency tab to see more.")
+        win = API.Window("GlassPanelCurrenciesWindow", 400, 320)
+        win.title:SetText("Currencies on the bar")
+        win.hint:SetText("Tick to show, Up/Down to order. Expanded a header in the currency tab? Reopen this"
+            .. " window to see what it holds.")
         local scroll = CreateFrame("ScrollFrame", nil, win, "UIPanelScrollFrameTemplate")
-        scroll:SetPoint("TOPLEFT", win, "TOPLEFT", 14, -48)
+        scroll:SetPoint("TOPLEFT", win.hint, "BOTTOMLEFT", 0, -8)
         scroll:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -30, 42)
         win.content = CreateFrame("Frame", nil, scroll)
-        win.content:SetSize(360, ROW_H)
+        win.content:SetSize(ROW_W, ROW_H)
         scroll:SetScrollChild(win.content)
         API.AutoHideScrollBar(scroll)
         win.empty = Glass.Font(win.content, 12, "LEFT")
@@ -244,7 +261,7 @@ local block = GlassPanel.RegisterBlock({
     side = "right",
     order = 120,
     events = { "PLAYER_ENTERING_WORLD", "CURRENCY_DISPLAY_UPDATE" },
-    onEvent = function() if win and win:IsShown() then refreshWindow() end end,
+    onEvent = function() if win and win:IsShown() then queueRefresh() end end,
     -- nil hides the block: nothing picked.
     text = function()
         local parts = {}
@@ -261,7 +278,7 @@ local block = GlassPanel.RegisterBlock({
             local c = info(id)
             if c then
                 local right = amount(c)
-                if c.max and c.quantity then right = right .. " / " .. (BreakUpLargeNumbers and BreakUpLargeNumbers(c.max) or c.max) end
+                if c.max and c.quantity then right = right .. " / " .. BreakUpLargeNumbers(c.max) end
                 tt:AddDoubleLine(icon(c, 14) .. " " .. c.name, right, 1, 0.82, 0, 1, 1, 1)
                 if c.weeklyMax and c.weekly then
                     tt:AddDoubleLine("   this week", c.weekly .. " / " .. c.weeklyMax, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7)

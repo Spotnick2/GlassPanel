@@ -39,7 +39,12 @@ GlassPanelCurrenciesDB = nil
 loadAddon()
 eq(textOf("currencies"), "|T1003:14:14:0:0:64:64:5:59:5:59|t 1,234", "owned honor shown by default, icon from the client")
 check(tip():find("Honor Points\t1,234 / 75,000", 1, true), "tooltip: name, amount and cap")
-eq(GlassPanelCurrenciesDB.order, nil, "(defaults aren't saved until the player chooses)")
+eq(table.concat(GlassPanelCurrenciesDB.order, ","), "1792", "the defaults are saved once found")
+-- ...so gaining a currency later doesn't change the bar by itself.
+WoW.currencies[515].quantity = 1
+WoW.fire("CURRENCY_DISPLAY_UPDATE", 515, 1, 1); WoW.tick()
+eq(textOf("currencies"), "|T1003:14:14:0:0:64:64:5:59:5:59|t 1,234", "a new currency doesn't join by itself")
+WoW.currencies[515].quantity = 0
 
 -- The chooser: from the plugin's option button, and a left-click on the block.
 local panel = GlassPanel.Options._test.panel
@@ -100,6 +105,13 @@ GlassPanelCurrenciesDB.order = "junk"
 GlassPanel.Refresh("currencies"); WoW.tick()
 check(textOf("currencies"):find("1,300", 1, true), "corrupt order: defaults")
 
+-- A currency only the tab lists (not one of the known ids) is offered too.
+WoW.currencies[42] = { name = "Test Coin", icon = 1006, quantity = 3 }
+WoW.currencyTab = { { header = "Misc" }, 42 }
+local tabIds = {}
+for _, c in ipairs(T().available()) do tabIds[c.id] = true end
+check(tabIds[42], "a tab-only currency is offered (its currencyID from the list)")
+
 -- The tab lists only what isn't collapsed; a header isn't a currency.
 WoW.currencyTab = { { header = "Misc" } }
 local ids = {}
@@ -112,10 +124,33 @@ w._scripts.OnClick(w, "LeftButton")
 eq(T().window()._shown, true, "left-click opens the chooser")
 -- The open chooser follows amounts as they change.
 WoW.currencies[1792].quantity = 1450
-WoW.fire("CURRENCY_DISPLAY_UPDATE", 1792); WoW.tick()
+WoW.fire("CURRENCY_DISPLAY_UPDATE", 1792); WoW.fire("CURRENCY_DISPLAY_UPDATE", 1792)
+WoW.flushTimers(); WoW.tick()
 local hon
 for _, r in ipairs(T().rows) do if r.id == 1792 then hon = r end end
 check(hon.text._text:find("1,450", 1, true), "chooser updated on the event")
+
+-- A saved id the client doesn't resolve (and a duplicate) doesn't throw the
+-- rows off: Up/Down work on what's shown, the unresolved id is kept.
+GlassPanelCurrenciesDB.order = { 99999, 1792, 1792, 3469 }
+T().window():Hide()
+w._scripts.OnClick(w, "LeftButton")
+local rs = T().rows
+eq(rs[1].id, 1792, "first shown row: honor")
+eq(rs[2].id, 3469, "then the real, honor only once")
+eq(rs[1].up:IsEnabled(), false, "the first shown can't go up")
+eq(rs[1].down:IsEnabled(), true, "and can go down")
+eq(rs[2].down:IsEnabled(), false, "the last shown can't go down")
+rs[2].up._scripts.OnClick(rs[2].up)
+eq(table.concat(GlassPanelCurrenciesDB.order, ","), "3469,1792,99999", "moved; the unresolved id kept at the end")
+
+-- An option with get/set and a stray non-function run stays a checkbox.
+GlassPanel.RegisterBlock({ id = "strayrun", text = function() return "x" end,
+    options = { { label = "Stray", get = function() return true end, set = function() end, run = true } } })
+local panel2 = GlassPanel.Options._test.panel
+panel2:Hide(); panel2:Show()
+local sw = GlassPanel.Options._test.controls["options:strayrun:1"]
+eq(sw._type, "CheckButton", "get/set with a non-function run: a checkbox")
 
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_currencies")

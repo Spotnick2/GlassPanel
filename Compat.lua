@@ -263,3 +263,35 @@ function API.SystemHider(globalName)
     end
     return h
 end
+
+-- A glass dialog window: FULLSCREEN_DIALOG (above the Settings panel it may
+-- be opened from), clamped, Escape closes it (UISpecialFrames, as AltStable
+-- does on Forever), and an opaque backing under the glass: the glass is made
+-- for the world, and over the Settings panel its text showed through (#36).
+-- The backing sits above the shadow (-8), under the tint (-6), clipped by the
+-- glass's own rounded mask. Fields: glass, backing, title, and hint (which
+-- wraps inside the window: anchor content below `win.hint`). Hidden.
+function API.Window(name, width, height)
+    local Glass = GlassPanel.Glass
+    local win = CreateFrame("Frame", name, UIParent)
+    win:SetSize(width, height)
+    win:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
+    win:SetFrameStrata("FULLSCREEN_DIALOG")
+    win:SetClampedToScreen(true)
+    win:EnableMouse(true)
+    win:Hide()
+    local special = rawget(_G, "UISpecialFrames")
+    if type(special) == "table" and name then table.insert(special, name) end
+    win.glass = Glass.Apply(win, "small")
+    win.backing = win:CreateTexture(nil, "BACKGROUND", nil, -7)
+    win.backing:SetAllPoints(win)
+    win.backing:SetColorTexture(0.05, 0.06, 0.08, 0.96)
+    win.backing:AddMaskTexture(win.glass.mask)
+    win.title = Glass.Font(win, 14, "LEFT")
+    win.title:SetPoint("TOPLEFT", win, "TOPLEFT", 14, -12)
+    win.hint = Glass.Font(win, 11, "LEFT")
+    win.hint:SetPoint("TOPLEFT", win.title, "BOTTOMLEFT", 0, -6)
+    win.hint:SetPoint("RIGHT", win, "RIGHT", -14, 0)   -- wraps, never past the edge
+    win.hint:SetTextColor(0.75, 0.75, 0.75)
+    return win
+end

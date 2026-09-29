@@ -202,7 +202,7 @@ local function addPluginOptions()
             place(left, label(block.label or block.id, "GameFontNormal"), 22, 4)
             for i, o in ipairs(block.options) do
                 local key = "options:" .. block.id .. ":" .. i
-                if o.run then
+                if type(o.run) == "function" then
                     widgets[key] = button(left, o.label, 200, function()
                         local ok, err = pcall(o.run)
                         if not ok then API.Fail(key, err) end
