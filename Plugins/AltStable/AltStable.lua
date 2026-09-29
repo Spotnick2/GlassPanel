@@ -110,9 +110,9 @@ GlassPanel.RegisterBlock({
     -- 37 gold (Gold.lua's reason).
     icon = 8197123,
     -- The logged-in character's gold is in the total already: Gold is hidden
-    -- the first time this block loads, then it's the player's choice (#50).
+    -- while this block shows, until the player shows it again (#50).
     replaces = "gold",
-    order = 40,   -- left lane, where Gold was
+    order = 40,   -- left lane, right after Gold
     onInit = function() AS.RegisterCallback("CharactersChanged", refresh) end,
     text = function()
         local t = gather(false)

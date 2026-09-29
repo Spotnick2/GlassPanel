@@ -149,29 +149,45 @@ eq(block("altstable"), nil, "incompatible API: no block")
 check(GlassPanel.failures["altstable:api"], "recorded")
 check(table.concat(WoW.chat, "\n"):find("public API version 1 not found (got 2)", 1, true), "printed")
 
--- It replaces Gold (#50): Gold is hidden ONCE, the first time, and said.
+-- It replaces Gold (#50), live: Gold is hidden while Alts shows, and it's
+-- said once; nothing about Gold is stored until the player shows it again.
 WoW.alts.version = 1
 local both = { "GlassPanelAltStable", "GlassPanelGold" }
+local function said() return table.concat(WoW.chat, "\n") end
 loadAddon({ plugins = both })
-eq(GlassPanelDB.hidden.gold, true, "first load: Gold hidden")
-eq(GlassPanelDB.replaced.altstable, true, "recorded")
-eq(block("gold").widget._shown, false, "Gold off the bar")
-local said = table.concat(WoW.chat, "\n")
-check(said:find("Alts replaces gold", 1, true) and said:find("/gpanel show gold", 1, true), "said once, with the way back")
--- The player brings Gold back: it stays, across sessions.
-GlassPanel._test.slash("show gold")
+eq(block("gold").widget._shown, false, "Gold off the bar while Alts shows")
+eq(GlassPanelDB.hidden.gold, nil, "not stored as hidden")
+check(said():find("Alts replaces Gold, which is hidden.", 1, true) and said():find("/gpanel show gold", 1, true),
+      "said, by label, with the way back")
 local db = GlassPanelDB
 loadAddon({ plugins = both, db = db })
-eq(GlassPanelDB.hidden.gold, nil, "shown again stays shown")
-check(not table.concat(WoW.chat, "\n"):find("replaces", 1, true), "not said again")
--- Gold already hidden by the player: recorded, nothing said.
-loadAddon({ plugins = both, db = { hidden = { gold = true } } })
-eq(GlassPanelDB.replaced.altstable, true, "recorded when Gold was already hidden")
-check(not table.concat(WoW.chat, "\n"):find("replaces", 1, true), "nothing to say")
--- No AltStable block (API mismatch): Gold untouched.
+check(not said():find("replaces", 1, true), "said once")
+-- Alts hidden: Gold comes back; shown again: Gold goes.
+GlassPanel._test.slash("hide altstable")
+eq(block("gold").widget._shown, true, "Alts hidden: Gold shows")
+GlassPanel._test.slash("show altstable")
+eq(block("gold").widget._shown, false, "Alts back: Gold hidden again")
+-- The player shows Gold: kept, across sessions, even with Alts on.
+GlassPanel._test.slash("show gold")
+eq(block("gold").widget._shown, true, "shown by the player")
+eq(GlassPanelDB.keep.gold, true, "kept")
+loadAddon({ plugins = both, db = db })
+eq(block("gold").widget._shown, true, "stays shown next session")
+-- Another character without the Alts block (plugin off, or refused): Gold
+-- is there, nothing to undo.
+loadAddon({ plugins = { "GlassPanelGold" } })
+eq(block("gold").widget._shown, true, "no Alts block: Gold shows")
 WoW.alts.version = 2
 loadAddon({ plugins = both })
-eq(GlassPanelDB.hidden.gold, nil, "no replacing block, Gold stays")
+eq(block("gold").widget._shown, true, "Alts refused: Gold shows")
 WoW.alts.version = 1
+-- Alts already hidden by the player: Gold shows, nothing said.
+loadAddon({ plugins = both, db = { hidden = { altstable = true } } })
+eq(block("gold").widget._shown, true, "Alts hidden from the start: Gold shows")
+check(not said():find("replaces", 1, true), "nothing said")
+-- The bar off: nothing said (and so still said once it's on, next session).
+loadAddon({ plugins = both, db = { shown = false } })
+check(not said():find("replaces", 1, true), "bar off: nothing said")
+eq(GlassPanelDB.replaced["altstable>gold"], nil, "not recorded")
 
 done("test_altstable")

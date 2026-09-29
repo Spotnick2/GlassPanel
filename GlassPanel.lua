@@ -101,6 +101,8 @@ local function slash(msg)
                 local block = Engine.byId[id]
                 if not block then
                     names[#names + 1] = "|cff888888" .. id .. " (not loaded)|r"
+                elseif Bar.ReplacedBy(block) then
+                    names[#names + 1] = "|cff888888" .. id .. " (replaced by " .. Bar.ReplacedBy(block).id .. ")|r"
                 elseif Bar.IsHidden(block) then
                     names[#names + 1] = "|cff888888" .. id .. " (hidden)|r"
                 else
@@ -214,7 +216,6 @@ boot:SetScript("OnEvent", function(_, event, arg1)
         Glass.SetFont(db.font)
         Bar.Build()
         Bar.SetShown(db.shown)
-        for _, block in ipairs(GlassPanel.Engine.blocks) do Settings.Replaces(block) end
         SLASH_GLASSPANEL1 = "/gpanel"
         SlashCmdList.GLASSPANEL = slash
     elseif event == "PLAYER_LOGIN" then
@@ -226,6 +227,7 @@ boot:SetScript("OnEvent", function(_, event, arg1)
     elseif event == "PLAYER_ENTERING_WORLD" then
         -- Many APIs answer only once the world is up: repaint everything.
         Engine.MarkAllDirty()
+        Settings.AnnounceReplaced()   -- every plugin is registered by now
     end
 end)
 

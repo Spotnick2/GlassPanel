@@ -97,9 +97,24 @@ function Bar.RefreshIcons()
     Bar.Layout()
 end
 
+-- The block that stands in for this one right now (spec.replaces, #50:
+-- [AltStable] replaces Gold), or nil. Live, never stored: only while the
+-- replacing block is loaded and not hidden itself, and until the player shows
+-- this one again (keep[id], Settings.SetHidden). So a character with the
+-- replacing plugin off, or a refused block, keeps this one.
+function Bar.ReplacedBy(block)
+    local d = db()
+    if not d or (type(d.keep) == "table" and d.keep[block.id]) then return nil end
+    for _, other in ipairs(Engine.blocks) do
+        if other.replaces == block.id and not (d.hidden and d.hidden[other.id]) then return other end
+    end
+    return nil
+end
+
 function Bar.IsHidden(block)
     local d = db()
-    return d and d.hidden and d.hidden[block.id] == true
+    if d and d.hidden and d.hidden[block.id] == true then return true end
+    return Bar.ReplacedBy(block) ~= nil
 end
 
 local function onEnter(button)

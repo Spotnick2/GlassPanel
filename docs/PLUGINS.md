@@ -50,8 +50,8 @@ GlassPanel.RegisterBlock({
     showLabel = true,                  -- false: no caption by default (the user can still turn it on)
     caption  = function(block) end,    -- a caption that changes ("Olympus: " for Guild); nil/"" = label
     icon     = 132627,                 -- file ID or path; optional
-    replaces = "gold",                 -- another block's id: hidden ONCE, the first time this block loads
-                                       -- (said in chat); after that its Shown is the player's
+    replaces = "gold",                 -- another block's id: hidden while yours is loaded and shown (said
+                                       -- once in chat), until the player shows it again
     side     = "left",                 -- default lane: "left", "center" or "right" (users drag it anywhere)
     order    = 60,                     -- in the default lane, lower sits nearer the bar's end (default 100)
     events   = { "PLAYER_EQUIPMENT_CHANGED", "PLAYER_ENTERING_WORLD" },
