@@ -22,14 +22,20 @@
 --   anchor). Clamping the saved value, not measuring live frames, makes a
 --   second run a no-op. Anything else is listed as not moved (the adaptive
 --   bar still makes room); a system snapped to another follows it.
--- - The layout: a new Account layout "GlassPanel", inserted where Blizzard's
---   MakeNewLayout puts one (after the last Account layout, else after the
---   presets), saved with C_EditMode.SaveLayouts (the whole merged list, the
---   active index as it was) then C_EditMode.OnLayoutAdded(index, true,
---   false): Blizzard's own order. If "GlassPanel" is the active layout, it's
---   adjusted in place. An inactive "GlassPanel" is never overwritten (it's
---   account-wide: another character may use it); the player is asked to
---   select or rename it. Nothing to move: nothing is saved.
+-- - The layout: a new CHARACTER layout "GlassPanel", inserted where
+--   Blizzard's MakeNewLayout puts one (after this character's last Character
+--   layout, else after the last Account layout, else after the presets),
+--   saved with C_EditMode.SaveLayouts (the whole merged list, the active
+--   index as it was) then C_EditMode.OnLayoutAdded(index, true, false):
+--   Blizzard's own order. Not an Account layout: measured on 70009 (owner,
+--   two characters), a new Account layout goes before every character's own
+--   layouts, and characters remember their active layout BY INDEX, so
+--   another character on a Character layout found itself on GlassPanel.
+--   OnLayoutAdded doesn't repair other characters. A Character layout is in
+--   this character's list only, and last: nobody else's index moves.
+--   If "GlassPanel" is the active layout, it's adjusted in place. An
+--   inactive one isn't overwritten (it may hold the player's own edits);
+--   they're asked to select or rename it. Nothing to move: nothing saved.
 -- - Only out of combat, with Edit Mode closed and its layouts loaded, and
 --   the plan is rebuilt at Apply: a changed plan is shown again, not applied.
 -- - pcall is no transaction: "saved" and "activated" are reported apart, and
@@ -148,14 +154,16 @@ local function planMoves(layout)
     return moves, skipped
 end
 
--- Where a new Account layout goes (MakeNewLayout's rule): after the last
--- Account layout, else right after the presets.
+-- Where a new Character layout goes (MakeNewLayout's rule): after the last
+-- Character layout, else after the last Account layout, else right after
+-- the presets.
 local function insertIndex(L, T)
-    local highest
+    local lastCharacter, lastAccount
     for i, l in ipairs(L.merged) do
-        if l.layoutType == T.Account then highest = i end
+        if l.layoutType == T.Character then lastCharacter = i end
+        if l.layoutType == T.Account then lastAccount = i end
     end
-    return highest and highest + 1 or L.presets + 1
+    return (lastCharacter or lastAccount or L.presets) + 1
 end
 
 local function countType(L, t)
@@ -188,15 +196,15 @@ function Setup.Plan()
                     .. " this again), or rename it"
             end
         end
-        if plan.mode ~= "refuse" and countType(L, T.Account) >= maxPerType() then
+        if plan.mode ~= "refuse" and countType(L, T.Character) >= maxPerType() then
             plan.mode = "refuse"
-            plan.why = "you already have " .. maxPerType() .. " account layouts (delete one in Edit Mode)"
+            plan.why = "this character already has " .. maxPerType() .. " character layouts (delete one in Edit Mode)"
         end
         if plan.mode ~= "refuse" then
             plan.mode = "new"
             target = copy(source)
             target.layoutIndex = nil
-            target.layoutName, target.layoutType = Setup.NAME, T.Account
+            target.layoutName, target.layoutType = Setup.NAME, T.Character
             plan.index = insertIndex(L, T)
         end
     end
@@ -322,7 +330,7 @@ function Setup.Describe(plan)
         return lines
     end
     if plan.mode == "new" then
-        lines[#lines + 1] = "Copies your layout |cffffd100" .. tostring(plan.source) .. "|r into a new account layout |cffffd100"
+        lines[#lines + 1] = "Copies your layout |cffffd100" .. tostring(plan.source) .. "|r into a new layout for this character, |cffffd100"
             .. Setup.NAME .. "|r and switches to it."
     elseif plan.mode == "inplace" then
         lines[#lines + 1] = "Adjusts your active |cffffd100" .. Setup.NAME .. "|r layout."

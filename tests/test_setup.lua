@@ -74,7 +74,7 @@ eq(table.concat(WoW.editMode.calls, ";"), "SaveLayouts;OnLayoutAdded 4 true fals
 local gp, idx = activeLayout()
 eq(idx, 4, "active: the new layout")
 eq(gp.layoutName, "GlassPanel", "named GlassPanel")
-eq(gp.layoutType, T.Account, "an account layout")
+eq(gp.layoutType, T.Character, "a character layout (an Account one shifts other characters' index)")
 eq(gp.layoutIndex, nil, "the preset-only layoutIndex dropped")
 eq(gp.interfaceStyle, 0, "interfaceStyle kept")
 eq(sys(gp, S.Minimap).anchorInfo.offsetY, -26, "minimap: just below the 24-unit bar")
@@ -119,7 +119,7 @@ local gpSystems = modernSystems()
 for _, s in ipairs(gpSystems) do if s.system == S.Minimap or s.system == S.DamageMeter or s.systemIndex == 1 then
     s.anchorInfo.offsetY, s.isInDefaultPosition = -26, false end end
 gpSystems[1].anchorInfo.offsetY = -5
-session({ saved("Mine", T.Account), saved("GlassPanel", T.Account, gpSystems) }, 5)
+session({ saved("Mine", T.Account), saved("GlassPanel", T.Character, gpSystems) }, 5)
 plan = Setup().Plan()
 eq(plan.mode, "inplace", "active GlassPanel: adjusted in place")
 eq(#plan.moves, 1, "only what's in the strip again")
@@ -129,19 +129,24 @@ eq(table.concat(WoW.editMode.calls, ";"), "SaveLayouts;SetActiveLayout 5", "save
 eq(#WoW.editMode.saved.layouts, 2, "no new layout")
 eq(WoW.editMode.saved.layouts[2].systems[1].anchorInfo.offsetY, -26, "moved in place")
 
--- A custom layout with Character layouts: inserted after the last Account
--- layout, before the Character ones (MakeNewLayout's rule).
+-- With Account and Character layouts: appended after the last Character
+-- layout, so no existing index moves (measured: an Account layout inserted
+-- before a character's own layouts moved that character onto it).
 session({ saved("Mine", T.Account), saved("Alt", T.Character) }, 5)
 plan = Setup().Plan()
-eq(plan.index, 5, "after the last Account layout (4), before Character (5)")
+eq(plan.index, 6, "after the last Character layout (5)")
 Setup().Apply(plan)
-eq(WoW.editMode.saved.layouts[2].layoutName, "GlassPanel", "GlassPanel between them")
-eq(WoW.editMode.saved.layouts[3].layoutName, "Alt", "the character layout after it")
-eq(table.concat(WoW.editMode.calls, ";"), "SaveLayouts;OnLayoutAdded 5 true false", "announced at its index")
+eq(WoW.editMode.saved.layouts[1].layoutName, "Mine", "the account layout keeps its index")
+eq(WoW.editMode.saved.layouts[2].layoutName, "Alt", "the character layout keeps its index")
+eq(WoW.editMode.saved.layouts[3].layoutName, "GlassPanel", "GlassPanel last")
+eq(table.concat(WoW.editMode.calls, ";"), "SaveLayouts;OnLayoutAdded 6 true false", "announced at its index")
 -- ...and switch back finds the character layout by name and type.
 ok, lines = Setup().SwitchBack()
 check(ok, "switched back to a saved layout by name (" .. tostring(lines) .. ")")
-eq(WoW.editMode.saved.activeLayout, 6, "Alt, now one index later")
+eq(WoW.editMode.saved.activeLayout, 5, "Alt, at its own index")
+-- Account layouts only: right after them (no Character layout to follow).
+session({ saved("Mine", T.Account) }, 4)
+eq(Setup().Plan().index, 5, "after the last Account layout")
 
 -- Only top-to-top anchors on UIParent move; others are listed, not moved.
 local odd = modernSystems()
@@ -192,9 +197,13 @@ em.overrideLayoutInfo = {}
 check(Setup().Plan().why:find("override", 1, true), "override layout active: refused")
 em.overrideLayoutInfo = nil
 local five = {}
-for i = 1, 5 do five[i] = saved("A" .. i, T.Account) end
+for i = 1, 5 do five[i] = saved("C" .. i, T.Character) end
 session(five, 1)
-check(Setup().Plan().why:find("5 account layouts", 1, true), "account layouts full: refused")
+check(Setup().Plan().why:find("5 character layouts", 1, true), "character layouts full: refused")
+local fiveAccount = {}
+for i = 1, 5 do fiveAccount[i] = saved("A" .. i, T.Account) end
+session(fiveAccount, 1)
+eq(Setup().Plan().mode, "new", "5 account layouts: no limit on the character ones")
 
 -- A plan that changed since the preview isn't applied.
 session({}, 1)
