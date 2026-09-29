@@ -193,6 +193,18 @@ core's `ADDON_LOADED`.
   Up/Down on the shown ones; unresolved saved ids kept at the end) from a left-click or the plugin's
   option **button**; refreshed at most once per frame. Secret amount: grey `?`; measured plain for
   Honor Points (36 / 15,000).
+- **`Plugins\AltStable`** (#46): a **bridge** to the sibling addon AltStable (`## Dependencies:
+  GlassPanel, AltStable`, so it loads only with it): total gold of the characters AltStable knows,
+  a tooltip by realm (class colour, level, gold, the logged-in one marked, hidden ones left out and
+  counted), left-click `AltStable.ToggleSheet()`. Reads **only AltStable's public API**
+  (`..\AltStable\docs\PUBLIC-API.md`, `PUBLIC_API_VERSION` 1), never `AltStableDB`; any other
+  version: no block, one printed line and a failure. Repaints on its `CharactersChanged` callback
+  (no events). Default scope is every character, `GetTotals()` (the sheet's own figure); the plugin
+  option "Only this realm and faction" (`GlassPanelAltStableDB.realmOnly`) sums the logged-in
+  character's realm and faction itself, unknown until AltStable has this character; a record with no
+  realm or faction isn't counted but is flagged and said. Unknown money is a grey `?`, never 0 (no
+  known gold at all: only `?`). No block icon (Gold's reason); the bar text reads only `GetTotals()`.
+  GlassPanel keeps no character list (forgetting is AltStable's).
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable
   bag (free count or family) is left out and flagged with a grey `?`. Left-click: `ToggleAllBags`.

@@ -37,6 +37,10 @@ files run. Registering before or after the bar is built both work: an early bloc
 when the bar builds. A plugin keeps its own SavedVariables. The core stores only whether a block
 is hidden.
 
+A plugin that shows another addon's data lists that addon after the core
+(`## Dependencies: GlassPanel, AltStable`), so it loads only when that addon does, and reads it
+only through that addon's public API (`Plugins\AltStable`).
+
 ## The contract
 
 ```lua

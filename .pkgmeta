@@ -20,6 +20,7 @@ move-folders:
   GlassPanel/Plugins/Role: GlassPanelRole
   GlassPanel/Plugins/Layer: GlassPanelLayer
   GlassPanel/Plugins/GearScore: GlassPanelGearScore
+  GlassPanel/Plugins/AltStable: GlassPanelAltStable
 
 manual-changelog:
   filename: CHANGELOG.md

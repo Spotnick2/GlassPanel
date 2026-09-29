@@ -1,0 +1,11 @@
+## Interface: 16001
+## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[AltStable]|r
+## Notes: Your alts' gold from AltStable, with every character in the tooltip. Needs AltStable.
+## Author: Spotnick
+## Version: @project-version@
+## Group: GlassPanel
+## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
+## Dependencies: GlassPanel, AltStable
+## SavedVariables: GlassPanelAltStableDB
+
+AltStable.lua
