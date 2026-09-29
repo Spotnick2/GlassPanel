@@ -32,6 +32,7 @@ function Settings.EnsureDefaults()
     if type(d.hidden) ~= "table" then d.hidden = {} end
     if type(d.labelsFor) ~= "table" then d.labelsFor = {} end
     if type(d.iconsFor) ~= "table" then d.iconsFor = {} end
+    if d.editModeReturn ~= nil and type(d.editModeReturn) ~= "table" then d.editModeReturn = nil end
     if not Glass.FONTS[d.font] then d.font = Settings.DEFAULTS.font end
     if d.room ~= "auto" and d.room ~= "full" then d.room = Settings.DEFAULTS.room end
     return d

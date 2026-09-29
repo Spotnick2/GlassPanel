@@ -12,7 +12,9 @@
   from the keyboard, and `/gpanel layout reset` starts over.
 - The bar stops short of the minimap, buffs and other Blizzard frames at the top of the screen
   instead of covering them, and takes the full width again when they're moved out of the way.
-  `/gpanel room full` keeps it full width always. Buffs and debuffs count by the icons actually
+  `/gpanel room full` keeps it full width always. Or, opt-in: "Make room in Edit Mode" (Options, or
+  `/gpanel setup`) makes a GlassPanel Edit Mode layout with the minimap, buffs and damage meter just
+  below the bar, after showing what it will change; "Switch back" returns to your old layout. Buffs and debuffs count by the icons actually
   shown, so on a default layout the bar reaches your buffs instead of stopping at their empty grid.
   It also makes room for Blizzard's damage meter (top left on the default layouts), unless it's
   turned off.

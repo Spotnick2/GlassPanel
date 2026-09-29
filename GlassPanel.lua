@@ -80,6 +80,8 @@ local COMMANDS = {
     { "toggle", "show or hide the whole bar" },
     { "font arial|friz", "bar font" },
     { "options", "open the options panel (Options > AddOns > Glass Panel)" },
+    { "setup", "move Blizzard's top frames below the bar in an Edit Mode layout (shows the plan first)" },
+    { "setup back", "switch back to the Edit Mode layout you had before" },
     { "export", "the whole setup as a string, to copy to another account" },
     { "import", "paste a setup exported on another account" },
     { "failures", "errors recorded from blocks and event registration" },
@@ -170,6 +172,13 @@ local function slash(msg)
         end
     elseif cmd == "options" then
         if not GlassPanel.Options.Open() then say("find the options under Game Menu > Options > AddOns > Glass Panel") end
+    elseif cmd == "setup" then
+        if arg:lower() == "back" then
+            local _, msg = GlassPanel.Setup.SwitchBack()
+            say(msg)
+        else
+            GlassPanel.Setup.Open()
+        end
     elseif cmd == "export" then
         GlassPanel.Share.Open("export")
     elseif cmd == "import" then
