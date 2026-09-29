@@ -163,38 +163,46 @@ local function editModeOpen()
     return type(m) == "table" and m.IsShown ~= nil and API.Plain(m:IsShown()) == true
 end
 
--- Fill `out` with f's screen rect; false when it doesn't count (absent,
--- replaced, unreadable). Called under pcall: never throws out of Room.
--- Frames the player can switch off outright: then they never show, so they
--- take no room (unlike one hidden for now, which keeps its place).
+-- Frames the player can switch off outright take no room while hidden
+-- (one hidden for now keeps its place). A SHOWN frame always counts: Blizzard
+-- decides what shows (Edit Mode shows a switched-off meter), not a copy of
+-- its rules here.
 -- DamageMeter (#40): Blizzard's built-in meter, TOPLEFT of UIParent at 0,0
--- in both presets (measured). Its ShouldBeShown (Blizzard_DamageMeter/
--- DamageMeter.lua) is false for good when the damageMeterEnabled CVar is off,
--- the meter isn't available, or its Visibility setting is Hidden; InCombat
--- and InGroup keep its place while it waits.
+-- in both presets (measured). Its ShouldBeShown (wow-ui-source forever:
+-- Blizzard_DamageMeter/DamageMeter.lua) hides it while the damageMeterEnabled
+-- CVar isn't true (nil too) and for Visibility Hidden: those count as off.
+-- "Not available" doesn't: it's re-checked on PLAYER_LEVEL_CHANGED, so the
+-- meter may appear on a level-up, and keeping its place avoids a jump. Each
+-- probe runs under pcall; a probe that throws or reads secret means "not off".
 local function damageMeterOff(f)
-    local cvar = rawget(_G, "C_CVar")
-    if type(cvar) == "table" and cvar.GetCVarBool
-        and API.Plain(cvar.GetCVarBool("damageMeterEnabled")) == false then
+    local ok, enabled = pcall(function() return C_CVar.GetCVarBool("damageMeterEnabled") end)
+    if ok and not API.IsSecret(enabled) and enabled ~= true then
         return "switched off (damageMeterEnabled)"
     end
-    local dm = rawget(_G, "C_DamageMeter")
-    if type(dm) == "table" and dm.IsDamageMeterAvailable
-        and API.Plain((dm.IsDamageMeterAvailable())) == false then
-        return "not available"
-    end
-    local vis = rawget(_G, "Enum") and Enum.DamageMeterVisibility
-    if type(vis) == "table" and vis.Hidden ~= nil and API.Plain(f.visibility) == vis.Hidden then
-        return "switched off (Visibility: Hidden)"
-    end
+    local okV, hidden = pcall(function()
+        local vis = Enum.DamageMeterVisibility
+        return vis ~= nil and vis.Hidden ~= nil and API.Plain(f.visibility) == vis.Hidden
+    end)
+    if okV and hidden then return "switched off (Visibility: Hidden)" end
 end
 Room.OFF = { DamageMeter = damageMeterOff }
 
+-- The meter's windows (DamageMeterSessionWindow1..3, MAX_DAMAGE_METER_SESSION_WINDOWS
+-- in its code) are its children, but the secondary ones anchor to UIParent
+-- and can sit anywhere: their shown rects join the meter's.
+Room.EXTRA = { DamageMeter = { "DamageMeterSessionWindow1", "DamageMeterSessionWindow2",
+                               "DamageMeterSessionWindow3" } }
+
+-- Fill `out` with f's screen rect; false when it doesn't count (absent,
+-- replaced, switched off, unreadable). Called under pcall: never throws out
+-- of Room.
 local function readRect(f, out, name)
     icons[name] = nil
     if f:IsForbidden() then why[name] = "forbidden" return false end
-    local off = Room.OFF[name] and Room.OFF[name](f)
-    if off then why[name] = off return false end
+    if Room.OFF[name] and not f:IsShown() then
+        local off = Room.OFF[name](f)
+        if off then why[name] = off return false end
+    end
     if not f:IsVisible() then
         -- Hidden on its own (it comes back) counts; hidden with its parent doesn't.
         local p = f:GetParent()
@@ -240,6 +248,13 @@ local function readRect(f, out, name)
     local l, r, top, bottom = screenRect(f)
     if not l then why[name] = "unreadable" return false end
     out.l, out.r, out.top, out.bottom = l, r, top, bottom
+    for _, extra in ipairs(Room.EXTRA[name] or {}) do
+        local x = rawget(_G, extra)
+        if type(x) == "table" and x.IsShown and x:IsShown() then
+            local xl, xr, xtop, xbottom = screenRect(x)
+            if xl then grow(out, xl, xr, xtop, xbottom) end
+        end
+    end
     why[name] = "frame"
     return true
 end

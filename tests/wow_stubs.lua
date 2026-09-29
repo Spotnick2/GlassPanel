@@ -334,11 +334,14 @@ end
 
 SlashCmdList = {}
 Enum = { UITextureSliceMode = { Stretched = 0, Tiled = 1 },
+         -- Not in the 70009 dump's enum list; values from wow-ui-source (forever):
+         -- Blizzard_APIDocumentationGenerated/EditModeManagerConstantsDocumentation.lua.
          DamageMeterVisibility = { Always = 0, InCombat = 1, Hidden = 2, InGroup = 3 },
          BagIndex = { Keyring = -2, Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5 } }
 function CreateColor(r, g, b, a) return { r = r, g = g, b = b, a = a } end
 
--- CVars (WoW.cvars[name], a boolean) and the damage meter's availability.
+-- CVars (WoW.cvars[name]: a boolean, nil when unset) and the damage meter's
+-- availability.
 C_CVar = { GetCVarBool = function(name) return WoW.cvars[name] end }
 C_DamageMeter = { IsDamageMeterAvailable = function()
     if WoW.damageMeterAvailable then return true, "" end

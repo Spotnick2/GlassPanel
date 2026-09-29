@@ -341,36 +341,64 @@ rawset(_G, "EditModeManagerFrame", nil)
 loadAddon()
 R = GlassPanel.Room
 bar = GlassPanel.Bar.frame
+local function whyLine(name)
+    for _, l in ipairs(R.Explain()) do if l:find(name .. ": ", 1, true) == 1 then return l end end
+    return ""
+end
 local dmeter = blizzard("DamageMeter", { 0, 748, 200, 20 })
 dmeter.visibility = Enum.DamageMeterVisibility.Always
 R.Update()
 eq(point("TOPLEFT")[4], 200 + R.MARGIN, "the bar starts right of the damage meter")
--- Shown only in combat: it keeps its place while it waits (no jump).
-dmeter.visibility = Enum.DamageMeterVisibility.InCombat
-dmeter._shown = false
-R.Update()
-eq(point("TOPLEFT")[4], 200 + R.MARGIN, "InCombat, hidden for now: still counts")
--- Switched off outright: never shows, so no room kept for it.
+-- Shown only in combat or in a group: it keeps its place while it waits.
+for _, v in ipairs({ "InCombat", "InGroup" }) do
+    dmeter.visibility = Enum.DamageMeterVisibility[v]
+    dmeter._shown = false
+    R.Update()
+    eq(point("TOPLEFT")[4], 200 + R.MARGIN, v .. ", hidden for now: still counts")
+end
+-- Switched off, hidden: no room kept for it.
 dmeter.visibility = Enum.DamageMeterVisibility.Hidden
 R.Update()
 eq(point("TOPLEFT")[4], 0, "Visibility Hidden: takes no room")
-check(R.Explain()[8]:find("Visibility: Hidden", 1, true), "why: says so (" .. R.Explain()[8] .. ")")
-dmeter.visibility = Enum.DamageMeterVisibility.Always
+check(whyLine("DamageMeter"):find("Visibility: Hidden", 1, true), "why: says so (" .. whyLine("DamageMeter") .. ")")
+-- ...but SHOWN it always counts: Edit Mode shows a switched-off meter.
 dmeter._shown = true
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "shown (Edit Mode) though switched off: counts")
+dmeter._shown = false
+dmeter.visibility = Enum.DamageMeterVisibility.Always
 WoW.cvars.damageMeterEnabled = false
 R.Update()
 eq(point("TOPLEFT")[4], 0, "damageMeterEnabled off: takes no room")
+WoW.cvars.damageMeterEnabled = nil
+R.Update()
+eq(point("TOPLEFT")[4], 0, "damageMeterEnabled unset (nil): off, as Blizzard reads it")
 WoW.cvars.damageMeterEnabled = true
+-- Not available (level-gated, re-checked on level-up): keeps its place.
 WoW.damageMeterAvailable = false
 R.Update()
-eq(point("TOPLEFT")[4], 0, "not available: takes no room")
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "not available yet: keeps its place (no jump on a level-up)")
 WoW.damageMeterAvailable = true
--- Unreadable setting (secret): not taken for "off"; the frame still counts.
+-- A probe that throws, or a secret setting: not taken for "off".
+local realCVar = C_CVar.GetCVarBool
+C_CVar.GetCVarBool = function() error("cvar broke") end
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "a throwing CVar read: still counts")
+C_CVar.GetCVarBool = realCVar
 dmeter.visibility = WoW.Secret("visibility")
 R.Update()
 eq(point("TOPLEFT")[4], 200 + R.MARGIN, "secret visibility: counts, nothing thrown")
--- Moved down in Edit Mode (the owner's custom layout): full width.
 dmeter.visibility = Enum.DamageMeterVisibility.Always
+dmeter._shown = true
+-- A secondary session window dragged to the top edge joins the meter.
+local win2 = CreateFrame("Frame", "DamageMeterSessionWindow2", dmeter); win2._rect = { 180, 740, 160, 28 }
+R.Update()
+eq(point("TOPLEFT")[4], 340 + R.MARGIN, "a second meter window at the top: the bar gives way to it too")
+win2._shown = false
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "closed window: ignored")
+rawset(_G, "DamageMeterSessionWindow2", nil)
+-- Moved down in Edit Mode (the owner's custom layout): full width.
 dmeter._rect = { 0, 500, 200, 20 }
 R.Update()
 eq(point("TOPLEFT")[4], 0, "moved below the band: full width")
