@@ -54,6 +54,8 @@ do
     o.controls.font[2]._scripts.OnClick(o.controls.font[2])
     GlassPanel._test.slash("options")
 end
+GlassPanel._test.slash("setup")
+GlassPanel._test.slash("setup back")
 WoW.tick(1.1); WoW.tick()
 
 local ANIMATION_TYPES = { Animation = true, Alpha = true, Translation = true, Scale = true, Rotation = true }

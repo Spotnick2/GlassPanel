@@ -39,7 +39,7 @@ list; the layout keeps a disabled plugin's place. `test_toc.lua` checks every pl
 `.pkgmeta` `move-folders` line.
 
 Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` →
-`Room.lua` → `Settings.lua` → `Share.lua` → `Options.lua` → `GlassPanel.lua`. Plugins load after the
+`Room.lua` → `Settings.lua` → `Share.lua` → `Setup.lua` → `Options.lua` → `GlassPanel.lua`. Plugins load after the
 core's `ADDON_LOADED`.
 
 - **`Compat.lua`**: `GlassPanel.API`, the only route to client APIs that moved or may be absent.
@@ -206,6 +206,21 @@ core's `ADDON_LOADED`.
   the import would refuse. The window is a glass frame with a multi-line EditBox (selected for
   Ctrl+C: addons have no clipboard), in `UISpecialFrames` for Escape; Import is enabled only for a
   string that parses, and previews what it holds.
+- **`Setup.lua`** (#10): the **opt-in** full-width alternative to Room: `/gpanel setup` (or the
+  panel's "Make room in Edit Mode...") shows a plan, then writes an Edit Mode layout. Designed from
+  the forever UI source and a Codex review: copies the **active** layout whole (keeps
+  `interfaceStyle`, drops the preset-only `layoutIndex`) into a new **Account** layout
+  "GlassPanel", inserted where Blizzard's `MakeNewLayout` puts one, saved with
+  `C_EditMode.SaveLayouts` (presets + saved, active index unchanged) then `OnLayoutAdded(i, true,
+  false)`. Moves only systems anchored top-to-top on UIParent (minimap, buffs, debuffs, damage
+  meter) by clamping the **saved** `offsetY` to `-(bar height + 2)` and `isInDefaultPosition =
+  false` (StatusTrayManager re-anchors a default-position BuffFrame): a second run is a no-op. An
+  active "GlassPanel" is adjusted in place; an inactive one is **never overwritten** (account-wide).
+  Refused in combat, with Edit Mode open or not loaded, under an override layout, or at 5 Account
+  layouts; the plan is rebuilt at Apply. "Saved" and "activated" are reported apart.
+  `/gpanel setup back` returns this character to its recorded source (a preset by enum, a saved one
+  by name and type). A reload is recommended; no-reload behaviour and cross-character index handling
+  of `OnLayoutAdded` are unmeasured.
 - **`Options.lua`** (#24): Options > AddOns > Glass Panel, a canvas panel on Retail's Settings
   framework (as GlassUnitFrames #39), registered at `PLAYER_LOGIN`. **Our `Settings` local shadows
   Blizzard's global `Settings`**: the framework is read with `rawget(_G, "Settings")`. Bar (shown,

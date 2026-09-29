@@ -15,5 +15,6 @@ Bar.lua
 Room.lua
 Settings.lua
 Share.lua
+Setup.lua
 Options.lua
 GlassPanel.lua

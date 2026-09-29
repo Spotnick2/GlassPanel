@@ -112,6 +112,7 @@ function WoW.reset()
     WoW.serverTime = 100000
     WoW.settings = {}
     WoW.cvars = { damageMeterEnabled = true }
+    WoW.editMode = { presets = {}, saved = { layouts = {}, activeLayout = 1 }, calls = {} }
     WoW.damageMeterAvailable = true
 end
 
@@ -337,8 +338,49 @@ Enum = { UITextureSliceMode = { Stretched = 0, Tiled = 1 },
          -- Not in the 70009 dump's enum list; values from wow-ui-source (forever):
          -- Blizzard_APIDocumentationGenerated/EditModeManagerConstantsDocumentation.lua.
          DamageMeterVisibility = { Always = 0, InCombat = 1, Hidden = 2, InGroup = 3 },
+         -- Edit Mode (#10), from the same generated documentation (forever branch).
+         EditModeSystem = { Minimap = 2, AuraFrame = 6, DamageMeter = 23 },
+         EditModeAuraFrameSystemIndices = { BuffFrame = 1, DebuffFrame = 2, ExternalDefensivesFrame = 3 },
+         EditModeLayoutType = { Preset = 0, Account = 1, Character = 2, Override = 3 },
          BagIndex = { Keyring = -2, Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5 } }
 function CreateColor(r, g, b, a) return { r = r, g = g, b = b, a = a } end
+
+-- Edit Mode layouts (#10), shaped like the forever source: GetLayouts
+-- returns SAVED layouts only, activeLayout counts the presets before them
+-- (EditModeManager.lua UpdateLayoutInfo). WoW.editMode = { presets, saved =
+-- { layouts, activeLayout }, calls, failSave, failActivate }.
+Constants = { EditModeConsts = { EditModeMaxLayoutsPerType = 5 } }
+local function deep(v)
+    if type(v) ~= "table" then return v end
+    local o = {}
+    for k, x in pairs(v) do o[k] = deep(x) end
+    return o
+end
+C_EditMode = {
+    GetLayouts = function() return deep(WoW.editMode.saved) end,
+    SaveLayouts = function(info)
+        table.insert(WoW.editMode.calls, "SaveLayouts")
+        if WoW.editMode.failSave then error("save refused") end
+        local saved = {}
+        for _, l in ipairs(info.layouts) do
+            if l.layoutType ~= Enum.EditModeLayoutType.Preset then saved[#saved + 1] = deep(l) end
+        end
+        WoW.editMode.saved = { layouts = saved, activeLayout = info.activeLayout }
+    end,
+    OnLayoutAdded = function(index, activate, imported)
+        table.insert(WoW.editMode.calls, "OnLayoutAdded " .. index .. " " .. tostring(activate) .. " " .. tostring(imported))
+        if WoW.editMode.failActivate then error("activation refused") end
+        if activate then WoW.editMode.saved.activeLayout = index end
+    end,
+    SetActiveLayout = function(index)
+        table.insert(WoW.editMode.calls, "SetActiveLayout " .. index)
+        if WoW.editMode.failActivate then error("activation refused") end
+        WoW.editMode.saved.activeLayout = index
+    end,
+}
+EditModePresetLayoutManager = {}
+function EditModePresetLayoutManager:GetCopyOfPresetLayouts() return deep(WoW.editMode.presets) end
+function ReloadUI() WoW.reloads = (WoW.reloads or 0) + 1 end
 
 -- CVars (WoW.cvars[name]: a boolean, nil when unset) and the damage meter's
 -- availability.
