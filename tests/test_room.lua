@@ -397,6 +397,26 @@ eq(point("TOPLEFT")[4], 340 + R.MARGIN, "a second meter window at the top: the b
 win2._shown = false
 R.Update()
 eq(point("TOPLEFT")[4], 200 + R.MARGIN, "closed window: ignored")
+-- Each window is its own rect (Codex on #41): one on each edge pushes each
+-- end in (merged, their centre fell in the ignored middle)...
+win2._shown = true
+win2._rect = { 800, 740, 200, 28 }
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "meter on the left: left end pushed in")
+eq(point("TOPRIGHT")[4], -(1000 - 800 + R.MARGIN), "window on the right: right end pushed in too")
+-- ...and one below the bar doesn't widen the meter's rect.
+win2._rect = { 180, 500, 160, 28 }
+R.Update()
+eq(point("TOPLEFT")[4], 200 + R.MARGIN, "a window below the band: the meter alone counts")
+eq(point("TOPRIGHT")[4], 0, "(nothing on the right)")
+-- Windows count only when the meter does: switched off, none of them.
+win2._rect = { 800, 740, 200, 28 }
+dmeter._shown = false
+dmeter.visibility = Enum.DamageMeterVisibility.Hidden
+R.Update()
+eq(point("TOPLEFT")[4] + point("TOPRIGHT")[4], 0, "meter switched off: its windows take no room either")
+dmeter.visibility = Enum.DamageMeterVisibility.Always
+dmeter._shown = true
 rawset(_G, "DamageMeterSessionWindow2", nil)
 -- Moved down in Edit Mode (the owner's custom layout): full width.
 dmeter._rect = { 0, 500, 200, 20 }

@@ -189,7 +189,9 @@ Room.OFF = { DamageMeter = damageMeterOff }
 
 -- The meter's windows (DamageMeterSessionWindow1..3, MAX_DAMAGE_METER_SESSION_WINDOWS
 -- in its code) are its children, but the secondary ones anchor to UIParent
--- and can sit anywhere: their shown rects join the meter's.
+-- and can sit anywhere: each shown one is its own rect (never merged with the
+-- meter's: one on each edge would merge across the middle, and one below the
+-- bar would widen the meter's rect). They count only when the meter does.
 Room.EXTRA = { DamageMeter = { "DamageMeterSessionWindow1", "DamageMeterSessionWindow2",
                                "DamageMeterSessionWindow3" } }
 
@@ -248,15 +250,28 @@ local function readRect(f, out, name)
     local l, r, top, bottom = screenRect(f)
     if not l then why[name] = "unreadable" return false end
     out.l, out.r, out.top, out.bottom = l, r, top, bottom
-    for _, extra in ipairs(Room.EXTRA[name] or {}) do
-        local x = rawget(_G, extra)
-        if type(x) == "table" and x.IsShown and x:IsShown() then
-            local xl, xr, xtop, xbottom = screenRect(x)
-            if xl then grow(out, xl, xr, xtop, xbottom) end
-        end
-    end
     why[name] = "frame"
     return true
+end
+
+-- The shown extra frames of a watched frame that counts, each its own rect
+-- after rects[n]; returns the new n. Reused tables, one per extra name.
+local extraPool = {}
+local function addExtras(name, n)
+    for _, extra in ipairs(Room.EXTRA[name] or {}) do
+        local x = rawget(_G, extra)
+        local ok, xl, xr, xtop, xbottom = pcall(function()
+            if type(x) == "table" and x.IsShown and x:IsShown() then return screenRect(x) end
+        end)
+        if ok and xl then
+            local r = extraPool[extra] or {}
+            extraPool[extra] = r
+            r.l, r.r, r.top, r.bottom = xl, xr, xtop, xbottom
+            n = n + 1
+            rects[n] = r
+        end
+    end
+    return n
 end
 
 function Room.Measure()
@@ -269,6 +284,7 @@ function Room.Measure()
             if ok and counts then
                 n = n + 1
                 rects[n] = pool[i]
+                n = addExtras(name, n)
             elseif not ok then
                 why[name] = "error (see /gpanel failures)"
                 API.Fail("room:" .. name, counts)
