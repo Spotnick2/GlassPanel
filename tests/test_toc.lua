@@ -93,7 +93,7 @@ eq(#WoW.chat, 1, "core alone: and no lanes")
 
 -- Two places that must agree, never derived from each other.
 loadAddon()
-eq(GlassPanel.MEASURED_ON_BUILD, "1.60.1.70009", "MEASURED_ON_BUILD")
+eq(GlassPanel.MEASURED_ON_BUILD, "1.60.1.70124", "MEASURED_ON_BUILD")
 
 -- Every texture the material names exists in Media/.
 for size, S in pairs(GlassPanel.Glass.SIZES) do

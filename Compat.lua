@@ -8,7 +8,7 @@ GlassPanel.API = API
 
 -- The build the notes this addon relies on were measured on. Bump only after
 -- re-measuring in game; tests/test_toc.lua pins the same literal.
-GlassPanel.MEASURED_ON_BUILD = "1.60.1.70009"
+GlassPanel.MEASURED_ON_BUILD = "1.60.1.70124"
 
 function API.Print(msg)
     print("|cff7fd4ffGlassPanel|r " .. msg)

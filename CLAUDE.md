@@ -283,7 +283,7 @@ includes Titan's code and the owner's TBC plugins.
   write new addon-agnostic findings there, not into a copy here. Read "False friends" before
   porting any TBC call: several moved APIs return a struct instead of a tuple
   (`C_SkillInfo.GetSkillLineInfo`, `C_Container.GetContainerItemInfo`).
-- `C:\Projects\References\forever-api-1.60.1.70009.md` is the full API dump: functions, events,
+- `C:\Projects\References\forever-api-1.60.1.70124.md` is the full API dump: functions, events,
   **widget methods** (the only list of those) and the `_G` walk. It proves a name exists, not
   that it works. `GetProfessions` is listed but returns `nil x7`.
 - `C:\Projects\wow-ui-source` is Blizzard's UI source (Gethe/wow-ui-source), on the **`forever`**

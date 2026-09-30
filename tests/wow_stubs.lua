@@ -15,7 +15,7 @@
 --   so test_methods.lua can check each against the dump's widget methods.
 
 WoW = {}
-local DUMP = os.getenv("GLASSPANEL_API_DUMP") or "C:/Projects/References/forever-api-1.60.1.70009.md"
+local DUMP = os.getenv("GLASSPANEL_API_DUMP") or "C:/Projects/References/forever-api-1.60.1.70124.md"
 
 --------------------------------------------------------------------------------
 -- Secrets
@@ -410,7 +410,7 @@ function Ambiguate(fullName, context)
     if context == "none" then return fullName end
     return (fullName:gsub("%-.*$", ""))
 end
-function GetBuildInfo() return "1.60.1", "70009", "Sep 23 2026", 16001 end
+function GetBuildInfo() return "1.60.1", "70124", "Sep 29 2026", 16001 end
 function InCombatLockdown() return WoW.combat == true end
 function GetCursorPosition() return WoW.cursor[1], WoW.cursor[2] end
 function IsShiftKeyDown() return WoW.shift end
