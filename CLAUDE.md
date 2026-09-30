@@ -61,7 +61,7 @@ core's `ADDON_LOADED`.
   Currencies use it. `API.Plain(v)` is the one "secret becomes nil" guard;
   use it at every read. `API.Returned(v)` asks "did the client return anything" without comparing:
   **never write `raw ~= nil` on a raw read**, since comparing a secret (even with nil) throws on
-  the client, and the offline stub can't catch it. The global `GetCoinTextureString` is **absent** on 70009;
+  the client, and the offline stub can't catch it. The global `GetCoinTextureString` is **absent** (70009, still in the 70124 dump);
   use `C_CurrencyInfo`'s. `MEASURED_ON_BUILD` lives here too.
 - **`Glass.lua`**: the material, **copied** from GlassUnitFrames' **`main`** branch
   (`git -C ..\GlassUnitFrames show main:Glass.lua`), with only the namespace lines and header
@@ -283,9 +283,12 @@ includes Titan's code and the owner's TBC plugins.
   write new addon-agnostic findings there, not into a copy here. Read "False friends" before
   porting any TBC call: several moved APIs return a struct instead of a tuple
   (`C_SkillInfo.GetSkillLineInfo`, `C_Container.GetContainerItemInfo`).
-- `C:\Projects\References\forever-api-1.60.1.70009.md` is the full API dump: functions, events,
+- `C:\Projects\References\forever-api-1.60.1.70124.md` is the full API dump: functions, events,
   **widget methods** (the only list of those) and the `_G` walk. It proves a name exists, not
-  that it works. `GetProfessions` is listed but returns `nil x7`.
+  that it works. `GetProfessions` is listed but returns `nil x7`. **The `_G` walk includes the
+  globals of whatever addons were loaded** (70124 lists `GetMapID`, `GetTalentData`, `ConvertID`,
+  absent from 70009): before stubbing a global, find it in `wow-ui-source` or the documented
+  functions, not only in "Global functions".
 - `C:\Projects\wow-ui-source` is Blizzard's UI source (Gethe/wow-ui-source), on the **`forever`**
   branch: the client's own FrameXML, with the same paths and line numbers as BugSack traces. Read the
   exact Blizzard line there before guessing, and check what a Blizzard frame expects of its parent

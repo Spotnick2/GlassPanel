@@ -6,9 +6,12 @@ GlassPanel = GlassPanel or {}
 local API = {}
 GlassPanel.API = API
 
--- The build the notes this addon relies on were measured on. Bump only after
--- re-measuring in game; tests/test_toc.lua pins the same literal.
-GlassPanel.MEASURED_ON_BUILD = "1.60.1.70009"
+-- The build this addon was last checked on: loads clean in game, /gpanel
+-- failures empty, and its API dump matches the previous one (#52). Behaviours
+-- measured once (secret values, Edit Mode, the aura icons) keep the build they
+-- were measured on in their own notes. At login, any other build is said.
+-- tests/test_toc.lua pins the same literal; the stub's GetBuildInfo matches.
+GlassPanel.MEASURED_ON_BUILD = "1.60.1.70124"
 
 function API.Print(msg)
     print("|cff7fd4ffGlassPanel|r " .. msg)

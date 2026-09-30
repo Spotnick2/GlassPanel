@@ -66,7 +66,7 @@ refresh()
 check(textOf("gearscore"):find("^|cffa335ed800|r"), "800: epic purple on the ramp")
 check(has("(Superior)"), "800 is Superior on the 200 scale")
 local realBuild = GetBuildInfo
-GetBuildInfo = function() return "11.0.0", "70009", "Sep 23 2026", 110000 end
+GetBuildInfo = function() return "11.0.0", "0", "", 110000 end   -- only the interface number matters here
 loadAddon()
 check(has("(Superior)"), "a Retail-sized interface number doesn't change the scale")
 GetBuildInfo = realBuild
