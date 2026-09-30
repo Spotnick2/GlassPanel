@@ -335,7 +335,7 @@ end
 
 SlashCmdList = {}
 Enum = { UITextureSliceMode = { Stretched = 0, Tiled = 1 },
-         -- Not in the 70009 dump's enum list; values from wow-ui-source (forever):
+         -- Not in the dump's enum list (70009, 70124); values from wow-ui-source (forever):
          -- Blizzard_APIDocumentationGenerated/EditModeManagerConstantsDocumentation.lua.
          DamageMeterVisibility = { Always = 0, InCombat = 1, Hidden = 2, InGroup = 3 },
          -- Edit Mode (#10), from the same generated documentation (forever branch).

@@ -91,9 +91,19 @@ GlassPanel._test.slash("list")
 check(WoW.chat[1] and WoW.chat[1]:find("drag a block", 1, true), "core alone: /gpanel list prints its header")
 eq(#WoW.chat, 1, "core alone: and no lanes")
 
--- Two places that must agree, never derived from each other.
+-- Two places that must agree, never derived from each other; the stub's
+-- GetBuildInfo is the third: a mismatch is said at login (and only then).
+WoW.chat = {}
 loadAddon()
 eq(GlassPanel.MEASURED_ON_BUILD, "1.60.1.70124", "MEASURED_ON_BUILD")
+eq(GlassPanel.API.ClientBuild(), GlassPanel.MEASURED_ON_BUILD, "stub GetBuildInfo matches MEASURED_ON_BUILD")
+check(not table.concat(WoW.chat, "\n"):find("differs", 1, true), "same build: no notice at login")
+local realBuild = GetBuildInfo
+GetBuildInfo = function() return "1.60.1", "99999", "", 16001 end
+loadAddon()
+check(table.concat(WoW.chat, "\n"):find("client build 1.60.1.99999 differs from the measured 1.60.1.70124", 1, true),
+      "another build: said at login")
+GetBuildInfo = realBuild
 
 -- Every texture the material names exists in Media/.
 for size, S in pairs(GlassPanel.Glass.SIZES) do
