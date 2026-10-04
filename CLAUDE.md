@@ -270,7 +270,7 @@ core's `ADDON_LOADED`.
 - **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`, `layout`, `room`, `labels`,
   `labelsFor[id]`, `iconsFor[id]` (only `false` is stored), `keep[id]` and `replaced["new>old"]` (#50: the player showed a
   replaced block again; the one-time "replaces" line was said) and `notedBuild` (the last client build
-the dev notice was said for), none of them part of a shared setup). The bar is built at
+  the dev notice was said for), none of them part of a shared setup). The bar is built at
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles
   `list | move <id> <lane> [n] | layout reset | labels | label <id> | icon <id> | show <id> |
   hide <id> | toggle | font | room | options | export | import | covered | failures`.
