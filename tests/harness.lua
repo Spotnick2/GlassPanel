@@ -26,15 +26,11 @@ local pluginList
 function plugins()
     if pluginList then return pluginList end
     local out = {}
-    local p = io.popen('dir /b /ad Plugins 2>nul')
-    for d in p:lines() do
-        local q = io.popen('dir /b "Plugins\\' .. d .. '\\*.toc" 2>nul')
-        local toc = q:read("*l")
-        q:close()
+    for _, d in ipairs(WoW.list("Plugins")) do
+        local toc = WoW.list("Plugins/" .. d, ".toc")[1]
         out[#out + 1] = { folder = d, dir = "Plugins/" .. d .. "/", toc = toc,
                           name = toc and (toc:gsub("%.toc$", "")) or d }
     end
-    p:close()
     table.sort(out, function(a, b) return a.name < b.name end)
     pluginList = out
     return out
@@ -52,20 +48,80 @@ function tocFiles(toc, dir)
     return files
 end
 
+-- Every file line of the core's TOC, in load order (our .lua files and the
+-- embedded library's .xml).
+function tocLines()
+    local lines = {}
+    for line in io.lines("GlassPanel.toc") do
+        line = line:gsub("\r", "")
+        if line ~= "" and not line:match("^#") then lines[#lines + 1] = line end
+    end
+    return lines
+end
+
+-- The embedded LibGlass-1.0 comes from a checkout, not from Libs\ (gitignored,
+-- filled by the packager): $LIBGLASS, else ../LibGlass. No checkout fails the
+-- run loudly; a silently skipped library would test nothing.
+LIBGLASS_XML = "Libs\\LibGlass-1.0\\LibGlass-1.0.xml"
+function libGlassRoot()
+    local root = (os.getenv("LIBGLASS") or "../LibGlass"):gsub("\\", "/"):gsub("/$", "")
+    local f = io.open(root .. "/LibGlass-1.0.xml", "rb")
+    if not f then
+        error("LibGlass checkout not found at " .. root .. " (no LibGlass-1.0.xml): clone "
+              .. "github.com/Spotnick2/LibGlass there or set LIBGLASS", 0)
+    end
+    f:close()
+    return root
+end
+
+-- The Lua files the library's XML loads, as paths, in order: what the client
+-- runs for the TOC's XML line. A listed file that is missing fails here.
+-- Read once per test run: loadAddon runs many times.
+local libScripts
+function libGlassScripts()
+    if libScripts then return libScripts end
+    local root = libGlassRoot()
+    local f = assert(io.open(root .. "/LibGlass-1.0.xml", "rb"))
+    local xml = f:read("*a"):gsub("<!%-%-.-%-%->", "")   -- listed in a comment is not loaded
+    f:close()
+    local files = {}
+    for file in xml:gmatch('<Script%s+file="([^"]+)"') do
+        local path = root .. "/" .. file:gsub("\\", "/")
+        local src = io.open(path, "rb")
+        if not src then error("LibGlass checkout at " .. root .. " is missing " .. file, 0) end
+        src:close()
+        files[#files + 1] = path
+    end
+    if #files == 0 then error("LibGlass-1.0.xml at " .. root .. " lists no Script files", 0) end
+    libScripts = files
+    return files
+end
+
 -- Load the addon the way the client does: every TOC file with (name, ns),
--- then ADDON_LOADED, PLAYER_LOGIN, PLAYER_ENTERING_WORLD, and one frame.
+-- the library's XML expanded in place, then ADDON_LOADED, PLAYER_LOGIN,
+-- PLAYER_ENTERING_WORLD, and one frame.
 -- opts.before(): runs after the core's files load but before its ADDON_LOADED:
 -- a block registered there takes the early path (attached at Bar.Build).
 -- Real plugins load after it (below), so don't use this to stand in for one.
 function loadAddon(opts)
     opts = opts or {}
     -- A fresh session each call; client data (WoW.money, ...) set by the test stays.
-    GlassPanel, GlassPanelDB = nil, nil
+    -- LibStub too: a kept one would skip the library's load and hand out the
+    -- dead session's copy.
+    GlassPanel, GlassPanelDB, LibStub = nil, nil, nil
     WoW.frames, WoW.chat, WoW.timers = {}, {}, {}   -- a dead session's timers die with it
     local ns = {}
-    for _, file in ipairs(tocFiles()) do
-        local chunk = assert(loadfile(file))
-        chunk("GlassPanel", ns)
+    for _, line in ipairs(tocLines()) do
+        local files = { line }
+        if line == LIBGLASS_XML then
+            files = libGlassScripts()
+        elseif not line:match("%.lua$") then
+            error("the harness can't load TOC line " .. line, 0)
+        end
+        for _, file in ipairs(files) do
+            local chunk = assert(loadfile(file))
+            chunk("GlassPanel", ns)
+        end
     end
     if opts.db then GlassPanelDB = opts.db end
     if opts.before then opts.before() end

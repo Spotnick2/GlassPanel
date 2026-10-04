@@ -2,11 +2,16 @@
     deploy.ps1 - Copy GlassPanel [Core] and its [plugins] into the Forever AddOns folder.
 
     The core always deploys as AddOns\GlassPanel, whatever the repo folder is
-    called: the folder name is the addon name, and Glass.MEDIA is built from it.
-    Each Plugins\<Name>\ becomes its own top-level AddOns\<toc name> (e.g.
-    AddOns\GlassPanelXP): the client only discovers addons as top-level folders.
-    The core's stale-file sweep also removes the old Blocks\*.lua left over from
-    before the plugins split (#7).
+    called: the folder name is the addon name. Each Plugins\<Name>\ becomes its
+    own top-level AddOns\<toc name> (e.g. AddOns\GlassPanelXP): the client only
+    discovers addons as top-level folders. The core's stale-file sweep also
+    removes the old Blocks\*.lua left over from before the plugins split (#7).
+
+    The glass material is the embedded LibGlass-1.0, in the core only. The
+    packager fetches it into Libs\LibGlass-1.0 (.pkgmeta externals); for a dev
+    copy this script hands that job to the LibGlass checkout's own deploy.ps1,
+    which checks the checkout, copies only the shipped files and prints its
+    commit. The checkout is $env:LIBGLASS, else ..\LibGlass.
 
     The repo keeps "## Version: @project-version@" for the packager; the deployed
     copy gets "dev". The repo copy is never modified.
@@ -28,8 +33,18 @@ if (-not (Test-Path $AddOnsPath)) { Write-Error "AddOns path not found: $AddOnsP
 # and delete every file just copied.
 $AddOnsPath = (Resolve-Path -LiteralPath $AddOnsPath).ProviderPath
 
+$LibGlass = if ($env:LIBGLASS) { $env:LIBGLASS } else { Join-Path (Split-Path -Parent $RepoRoot) "LibGlass" }
+if (-not (Test-Path -LiteralPath (Join-Path $LibGlass "Tools\deploy.ps1"))) {
+    Write-Error "LibGlass checkout not found at $LibGlass (clone github.com/Spotnick2/LibGlass there, or set `$env:LIBGLASS)"
+    exit 1
+}
+
+# The pin check, shared with tests\run.ps1.
+. (Join-Path $PSScriptRoot "LibGlassPin.ps1")
+
 # Copy the files a TOC lists (plus the TOC) from $src to $dest, rewriting the
-# version token, and remove Lua files the TOC no longer lists.
+# version token, and remove Lua files the TOC no longer lists. Libs\ belongs
+# to the library's own deploy: neither copied nor swept here.
 function Deploy-Toc([string]$src, [string]$tocName, [string]$dest) {
     Write-Host "Deploying $tocName -> $dest" -ForegroundColor Cyan
     New-Item -ItemType Directory -Force -Path $dest | Out-Null
@@ -37,7 +52,7 @@ function Deploy-Toc([string]$src, [string]$tocName, [string]$dest) {
     (Get-Content -LiteralPath $toc -Raw) -replace '## Version: @project-version@', '## Version: dev' |
         Set-Content -LiteralPath (Join-Path $dest $tocName) -NoNewline
     $listed = Get-Content -LiteralPath $toc | ForEach-Object { $_.Trim() } |
-        Where-Object { $_ -notmatch "^#" -and $_ -match "[.](lua|xml)$" }
+        Where-Object { $_ -notmatch "^#" -and $_ -match "[.](lua|xml)$" -and $_ -notmatch "^Libs\\" }
     foreach ($f in $listed) {
         $target = Join-Path $dest $f
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
@@ -46,20 +61,30 @@ function Deploy-Toc([string]$src, [string]$tocName, [string]$dest) {
     }
     # A Lua file removed from the TOC must not linger where the client finds it.
     $keep = $listed | ForEach-Object { [IO.Path]::GetFullPath((Join-Path $dest $_)).ToLower() }
+    $libs = (Join-Path $dest "Libs\").ToLower()
     Get-ChildItem -LiteralPath $dest -Recurse -File -Filter "*.lua" |
-        Where-Object { $keep -notcontains $_.FullName.ToLower() } | ForEach-Object {
+        Where-Object { -not $_.FullName.ToLower().StartsWith($libs) -and $keep -notcontains $_.FullName.ToLower() } |
+        ForEach-Object {
             Write-Host "  removing stale $($_.Name)" -ForegroundColor DarkYellow
             Remove-Item -LiteralPath $_.FullName -Force
         }
 }
 
 $core = Join-Path $AddOnsPath "GlassPanel"
+$warning = Test-LibGlassPin $RepoRoot $LibGlass
+if ($warning) { Write-Host "  WARNING: $warning" -ForegroundColor Yellow }
+# The library first: its deploy checks the checkout and may refuse, and a
+# refusal must leave the deployed addon as it was (a new TOC naming a library
+# that never arrived loads no bar at all).
+& pwsh -NoProfile -File (Join-Path $LibGlass "Tools\deploy.ps1") -Addon GlassPanel -AddOnsPath $AddOnsPath
+if ($LASTEXITCODE -ne 0) { Write-Error "LibGlass deploy refused; GlassPanel was not touched"; exit 1 }
 Deploy-Toc $RepoRoot "GlassPanel.toc" $core
-$media = Join-Path $core "Media"
-New-Item -ItemType Directory -Force -Path $media | Out-Null
-$textures = Get-ChildItem -LiteralPath (Join-Path $RepoRoot "Media") -Filter "*.tga"
-foreach ($t in $textures) { Copy-Item -LiteralPath $t.FullName -Destination (Join-Path $media $t.Name) -Force }
-Write-Host "  Media\  ($($textures.Count) textures)"
+# The textures now ship inside Libs\LibGlass-1.0\Media; the old folder is dead weight.
+$oldMedia = Join-Path $core "Media"
+if (Test-Path -LiteralPath $oldMedia) {
+    Write-Host "  removing stale Media\ (textures now come from LibGlass)" -ForegroundColor DarkYellow
+    Remove-Item -LiteralPath $oldMedia -Recurse -Force
+}
 
 $pluginRoot = Join-Path $RepoRoot "Plugins"
 if (Test-Path $pluginRoot) {

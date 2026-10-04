@@ -63,12 +63,11 @@ do
         f:close()
         WoW.dumpAvailable = next(WoW.KNOWN_EVENTS) ~= nil
     end
+    -- Without the dump (CI: it is local only) no name can be judged, so every
+    -- one is accepted. A hand-kept fallback list goes stale (GlassUnitFrames
+    -- #64: events wired later failed to register only where the dump was missing).
     if not WoW.dumpAvailable then
-        for _, e in ipairs({ "ADDON_LOADED", "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_MONEY",
-            "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_XP_UPDATE", "BAG_UPDATE",
-            "UPDATE_INVENTORY_DURABILITY", "ZONE_CHANGED", "ZONE_CHANGED_NEW_AREA" }) do
-            WoW.KNOWN_EVENTS[e] = true
-        end
+        setmetatable(WoW.KNOWN_EVENTS, { __index = function() return true end })
     end
 end
 
@@ -615,24 +614,48 @@ end
 -- Each plugin's client APIs live in their own file, tests/stubs/<plugin>.lua,
 -- so plugins developed in parallel don't all edit this one. A stub file adds
 -- its globals and, for per-session state, a WoW.resetHooks entry.
-do
-    local p = io.popen('dir /b tests\\stubs\\*.lua 2>nul')
-    local n = 0
+-- The names in a folder, sorted: its subfolders, or its files ending in `ext`.
+-- cmd's dir on Windows, find elsewhere (CI runs on Linux).
+function WoW.list(dir, ext)
+    local cmd
+    if package.config:sub(1, 1) == "\\" then
+        local win = dir:gsub("/", "\\")
+        cmd = ext and ('dir /b "' .. win .. '\\*' .. ext .. '" 2>nul') or ('dir /b /ad "' .. win .. '" 2>nul')
+    else
+        cmd = 'find "' .. dir .. '" -mindepth 1 -maxdepth 1 '
+              .. (ext and ('-type f -name "*' .. ext .. '"') or "-type d") .. " -printf '%f\\n' 2>/dev/null"
+    end
+    local out = {}
+    local p = io.popen(cmd)
     if p then
-        for f in p:lines() do dofile("tests/stubs/" .. f); n = n + 1 end
+        for name in p:lines() do
+            name = name:gsub("\r", "")
+            if name ~= "" then out[#out + 1] = name end
+        end
         p:close()
     end
-    -- The listing needs cmd's dir: fail here, not later on a missing global.
+    table.sort(out)
+    return out
+end
+
+do
+    local n = 0
+    for _, f in ipairs(WoW.list("tests/stubs", ".lua")) do dofile("tests/stubs/" .. f); n = n + 1 end
+    -- The listing needs a shell: fail here, not later on a missing global.
     if n == 0 and io.open("tests/stubs/pvp.lua", "r") then
-        error("tests/stubs/*.lua exist but none loaded (the listing uses cmd's 'dir')")
+        error("tests/stubs/*.lua exist but none loaded (the folder listing failed)")
     end
 end
+
+-- Client string alias (Blizzard_SharedXMLBase/Compat.lua); LibStub's version check uses it.
+strmatch = string.match
 
 WoW.reset()
 
 -- Strict globals: any read of an undefined global is an error, except the
 -- addon's own globals that are legitimately nil before first assignment.
-local allowNil = { GlassPanel = true, GlassPanelDB = true }
+-- LibStub: the embedded library's own loader reads _G.LibStub before creating it.
+local allowNil = { GlassPanel = true, GlassPanelDB = true, LibStub = true }
 setmetatable(_G, { __index = function(_, k)
     if allowNil[k] then return nil end
     error("read of undefined global '" .. tostring(k) .. "' (not stubbed: is it in the API dump?)", 2)

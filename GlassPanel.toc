@@ -7,6 +7,7 @@
 ## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
 ## SavedVariables: GlassPanelDB
 
+Libs\LibGlass-1.0\LibGlass-1.0.xml
 Compat.lua
 Glass.lua
 Engine.lua

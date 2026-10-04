@@ -130,4 +130,7 @@ standard push button, and `Window(name, width, height)` a glass dialog like Glas
 arithmetic.
 
 `GlassPanel.Glass` is the material (`Apply`, `Bar`, `Font`, …) for a block that draws more than
-text, such as the XP bar. See `..\GlassUnitFrames\docs\GLASS-MATERIAL.md`.
+text, such as the XP bar. It's GlassPanel's instance of the embedded library LibGlass-1.0
+(github.com/Spotnick2/LibGlass; its `CLAUDE.md` is the contract and `docs/GLASS-MATERIAL.md` the
+write-up). `Glass.MEDIA` names only the library's own textures: ship your own art under your own
+path.

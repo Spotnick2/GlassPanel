@@ -9,9 +9,6 @@ written in **Lua 5.1**. It's a single-owner project (Spotnick), on the same stac
 as the sibling Forever addons `..\GlassUnitFrames`, `..\AltStable` and `..\Priestly`. When this
 file doesn't cover something, check how those handle it before you invent a new idiom.
 
-(The working folder may still be called `GlassXp`. The addon, TOC, namespace and deployed folder
-are **GlassPanel** regardless.)
-
 **Goal:** a streamlined, liquid-glass replacement for the owner's Titan Panel setup. It's one bar
 across the top of the screen with only the readouts actually used, plus a small plugin API so
 the owner's own Titan plugins (`C:\Projects\TitanPanelXPP`, `TitanLayer`, `TitanGearScore`,
@@ -38,7 +35,7 @@ the AddOns list: `## Group: GlassPanel`, title `Glass Panel |cFF0099FF[XP+]|r` u
 list; the layout keeps a disabled plugin's place. `test_toc.lua` checks every plugin TOC and the
 `.pkgmeta` `move-folders` line.
 
-Core TOC load order: `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` →
+Core TOC load order: `Libs\LibGlass-1.0\LibGlass-1.0.xml` → `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` →
 `Room.lua` → `Settings.lua` → `Share.lua` → `Setup.lua` → `Options.lua` → `GlassPanel.lua`. Plugins load after the
 core's `ADDON_LOADED`.
 
@@ -67,13 +64,8 @@ core's `ADDON_LOADED`.
   raw `@project-version@`), never in a release (Priestly #76: what flags an addon out of date is the
   TOC's Interface, not this notice), and **once per new build** (`GlassPanelDB.notedBuild`), not at
   every login.
-- **`Glass.lua`**: the material, **copied** from GlassUnitFrames' **`main`** branch
-  (`git -C ..\GlassUnitFrames show main:Glass.lua`), with only the namespace lines and header
-  changed. `test_toc.lua` fails when the two drift. It reads `main` through git on purpose,
-  because other sessions switch that repo's working tree between feature branches. Change the
-  material in GlassUnitFrames first (with its `docs/GLASS-MATERIAL.md`), and copy it back once
-  it merges.
-  `Tools\make_textures.py` and `Media\` are copies too.
+- **`Glass.lua`**: `GlassPanel.Glass = LibStub("LibGlass-1.0"):New()`, this addon's instance of
+  the material (#57; see "The glass material" below).
 - **`Engine.lua`**: the block registry (`GlassPanel.RegisterBlock`, `GlassPanel.Refresh`) and
   repaint scheduling:
   - one event frame for all blocks; `onEvent` runs immediately and marks the block dirty;
@@ -281,6 +273,38 @@ Forever is **Vanilla content running on Blizzard's Retail (Mainline) codebase**:
 content and the Retail API. Advice that cites a TBC or Classic API is usually stale, and that
 includes Titan's code and the owner's TBC plugins.
 
+## The glass material
+
+The material is **LibGlass-1.0**, an embedded LibStub library (`..\LibGlass`,
+github.com/Spotnick2/LibGlass, public, MIT) that every glass addon embeds (#57; the migration
+guide is `C:\Projects\References\LIBGLASS-MIGRATION.md`). Its repo owns the code, the textures,
+the generator (`Tools/make_textures.py`) and the write-up (`docs/GLASS-MATERIAL.md`: layers,
+parameters, gotchas, history), and its `CLAUDE.md` holds the contract (the API, region fields and
+texture names only grow; instances; upgrade rules).
+
+- **Material changes are LibGlass PRs**, never edits here. A bug or a need found here goes on a
+  LibGlass issue. Never edit `..\LibGlass` from this repo's session.
+- **How it's embedded:** in the **core only** (plugins depend on the core and use
+  `GlassPanel.Glass`). `.pkgmeta` externals put it in `Libs\LibGlass-1.0\` (the only supported
+  path: `MEDIA` is derived from it), and the core TOC loads its XML first. `Libs/` is gitignored;
+  a dev copy comes from the LibGlass checkout (`$env:LIBGLASS`, default `..\LibGlass`) through its
+  own `Tools\deploy.ps1`, which `Tools\deploy.ps1` here calls first (a refusal leaves the deployed
+  addon untouched). The tests load the same checkout and fail loudly without one.
+- **The pin:** `.pkgmeta` pins a commit or tag, **never `tag: latest`**, and **no comment on a
+  value line** (the packager keeps it in the value). Bump it only in a release made anyway: players
+  get library fixes earlier through whichever glass addon ships the newest copy (LibStub runs that
+  one). `tests\run.ps1` and deploy warn when the checkout isn't at the pin (one check,
+  `Tools\LibGlassPin.ps1`, reading the LibGlass entry as `fetch_libglass.sh` does). CI
+  (`.github/workflows/package-check.yml`) fetches the pin (`tests/fetch_libglass.sh`), tests
+  against it, and asserts the zip holds exactly the core, its library (that commit's shipped files)
+  and each plugin folder.
+- **`GlassPanel.Glass` is an instance**: `STYLE`, the setters and the font registry are this
+  addon's own, so our font setting never touches another glass addon. `Glass.MEDIA` resolves to
+  the winning copy's `Media\`; use it only for library textures (`bar_fill`, `bar_edge`, ...). A
+  plugin's own art goes under its own path.
+- **Colours passed to a glass bar's `SetStatusBarColor` must be plain** (the library's hook
+  compares them): never a secret.
+
 ## References: read these before touching an unfamiliar API
 
 - `C:\Projects\References\PORTING-TBC-TO-FOREVER.md` holds the canonical addon-agnostic field
@@ -327,11 +351,12 @@ There's no build system. The Lua 5.1 toolchain is at `C:\Program Files (x86)\Lua
 (`lua.exe`, `luac.exe`). Use it, not a newer Lua that may be first on `PATH`.
 
 ```powershell
-pwsh tests\run.ps1                                                 # luac -p on every TOC's files (core + plugins) + every tests\test_*.lua
+pwsh tests\run.ps1                                                 # luac -p on every TOC's .lua files (core + plugins) + every tests\test_*.lua
 & 'C:\Program Files (x86)\Lua\5.1\lua.exe' tests\test_engine.lua  # one test, run from the repo root
-pwsh Tools\deploy.ps1                                              # core -> AddOns\GlassPanel, each Plugins\X -> AddOns\<toc name>
-python Tools\make_textures.py                                      # regenerate Media\*.tga (prefer doing it in GlassUnitFrames)
+pwsh Tools\deploy.ps1                                              # LibGlass -> AddOns\GlassPanel\Libs, core -> AddOns\GlassPanel, each Plugins\X -> AddOns\<toc name>
 ```
+
+Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`).
 
 - Default AddOns path: `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns`
   (`-AddOnsPath` to override).
@@ -364,7 +389,13 @@ python Tools\make_textures.py                                      # regenerate 
 - **The stub is an allowlist**, with strict globals. Before stubbing a global, confirm it's in
   the dump and copy its signature. Defining something Forever lacks lets a broken call pass.
 - Event names are validated against the dump. `test_methods.lua` checks every widget method
-  called against the dump's widget-method list.
+  called against the dump's widget-method list. Without the dump (CI: it's local only) every
+  event name is accepted and `test_methods` skips; a test that needs an unknown name marks it
+  (`WoW.KNOWN_EVENTS.X = false`).
+- The tests run on Windows and on CI's Linux: list folders through `WoW.list(dir, ext)`, never a
+  bare `dir` or `ls`, and match file names' case exactly.
+- `loadAddon()` expands the core TOC's LibGlass XML line from the checkout (`libGlassScripts`) and
+  drops `LibStub` with the old session, so each session loads the library afresh.
 - Secrets are `newproxy` userdata that throw on use. `WoW.moneySecret = true` makes `GetMoney`
   secret. No Lua 5.1 value can make a truth test or `==` throw, so those misuses are caught only
   in game and in review.

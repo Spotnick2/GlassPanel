@@ -35,6 +35,17 @@ try {
         Write-Host "luac -p: ok ($($luaFiles.Count) files from $($tocs.Count) TOC(s))" -ForegroundColor DarkGray
     }
 
+    # The tests load the LibGlass checkout as it is ($env:LIBGLASS, default
+    # ..\LibGlass); CI loads the .pkgmeta pin. (A missing checkout fails in
+    # the tests themselves, loudly.)
+    . (Join-Path $RepoRoot "Tools\LibGlassPin.ps1")
+    $libGlass = if ($env:LIBGLASS) { $env:LIBGLASS } else { Join-Path (Split-Path -Parent $RepoRoot) "LibGlass" }
+    if (Test-Path -LiteralPath $libGlass) {
+        $warning = Test-LibGlassPin $RepoRoot $libGlass
+        if ($warning) { Write-Host "WARNING: $warning (CI tests the pin)" -ForegroundColor Yellow }
+        else { Write-Host "LibGlass: $libGlass at the pin ($(Get-LibGlassPin $RepoRoot))" -ForegroundColor DarkGray }
+    }
+
     $failed = 0
     Get-ChildItem (Join-Path $PSScriptRoot "test_*.lua") | Sort-Object Name | ForEach-Object {
         Write-Host "-- $($_.Name) " -NoNewline -ForegroundColor Cyan

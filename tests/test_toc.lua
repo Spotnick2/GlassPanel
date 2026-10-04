@@ -9,7 +9,10 @@ check(toc:find("## SavedVariables: GlassPanelDB", 1, true), "saved variables dec
 for _, f in ipairs(tocFiles()) do
     check(io.open(f, "r") ~= nil, "TOC file exists: " .. f)
 end
-eq(tocFiles()[1], "Compat.lua", "Compat loads first")
+-- The embedded material loads before any of our files: Glass.lua calls
+-- LibStub("LibGlass-1.0") at file scope.
+eq(tocLines()[1], LIBGLASS_XML, "LibGlass-1.0 loads first")
+eq(tocFiles()[1], "Compat.lua", "Compat is the first of our own files")
 for _, f in ipairs(tocFiles()) do
     local src = io.open(f):read("*a")
     check(src:find("\nGlassPanel = GlassPanel or {}\n", 1, true), "starts with the namespace line: " .. f)
@@ -123,35 +126,23 @@ loadAddon()
 check(not said():find("differs", 1, true), "another build, release: no notice")
 GetBuildInfo = realBuild
 
--- Every texture the material names exists in Media/.
+-- Every texture the material names ships with the library (Libs\LibGlass-1.0\Media
+-- in the package; the checkout's Media/ here). GlassPanel has no Media/ of its own.
+local root = libGlassRoot()
 for size, S in pairs(GlassPanel.Glass.SIZES) do
     for _, key in ipairs({ "mask", "rim", "dark", "shadow" }) do
-        local f = "Media/" .. S[key] .. ".tga"
+        local f = root .. "/Media/" .. S[key] .. ".tga"
         check(io.open(f, "rb") ~= nil, size .. " texture exists: " .. f)
     end
 end
 for _, t in ipairs({ "bar_mask", "bar_fill", "gloss", "bar_edge", "grain", "sheen2", "track_fade" }) do
-    check(io.open("Media/" .. t .. ".tga", "rb") ~= nil, "texture exists: " .. t)
+    check(io.open(root .. "/Media/" .. t .. ".tga", "rb") ~= nil, "texture exists: " .. t)
 end
-
--- Glass.lua is a copy of GlassUnitFrames' material on its MAIN branch: only
--- the namespace lines and the header may differ. Read through git, not the
--- working tree, whose branch another session may have switched.
-local upstream = io.popen('git -C ../GlassUnitFrames show main:Glass.lua 2>nul')
-local theirs = upstream and upstream:read("*a") or ""
-if upstream then upstream:close() end
-if theirs ~= "" then
-    local function body(s)
-        s = s:gsub("\r", "")
-        s = s:gsub("^.-\nlocal ADDON = %.%.%.\n", "")   -- drop the header comment
-        s = s:gsub("GlassUF", "GlassPanel")
-        return s
-    end
-    local mine = io.open("Glass.lua"):read("*a")
-    check(body(mine) == body(theirs), "Glass.lua matches GlassUnitFrames main:Glass.lua (copy it back)")
-else
-    io.write("  (Glass.lua upstream check skipped: no ../GlassUnitFrames git repo)\n")
-end
+-- Glass.MEDIA points into the embedded copy, where the packager puts it.
+eq(GlassPanel.Glass.MEDIA, "Interface\\AddOns\\GlassPanel\\Libs\\LibGlass-1.0\\Media\\", "MEDIA is the embedded copy's")
+-- An instance of our own, not the library: our font setting never reaches
+-- another glass addon's surfaces.
+check(GlassPanel.Glass ~= LibStub("LibGlass-1.0"), "Glass is an instance, not the library")
 
 -- A texture path written with single backslashes ("Interface\Icons\X")
 -- loses them in Lua 5.1 ("\I" is read as "I", no error from luac): the
