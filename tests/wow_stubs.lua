@@ -84,6 +84,7 @@ function WoW.reset()
     WoW.frames = {}
     WoW.chat = {}
     WoW.methodsCalled = {}
+    WoW.addonVersion = "v1.0.0"
     WoW.money = 12345
     WoW.moneySecret = false
     WoW.gameTime = { 18, 3 }
@@ -411,6 +412,11 @@ function Ambiguate(fullName, context)
     return (fullName:gsub("%-.*$", ""))
 end
 function GetBuildInfo() return "1.60.1", "70124", "Sep 29 2026", 16001 end
+-- Only "Version" is read. A release-shaped version by default; a test sets
+-- WoW.addonVersion = "dev" to run as a deployed development copy.
+C_AddOns = { GetAddOnMetadata = function(name, key)
+    if key == "Version" then return WoW.addonVersion end
+end }
 function InCombatLockdown() return WoW.combat == true end
 function GetCursorPosition() return WoW.cursor[1], WoW.cursor[2] end
 function IsShiftKeyDown() return WoW.shift end

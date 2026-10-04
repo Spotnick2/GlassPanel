@@ -62,7 +62,10 @@ core's `ADDON_LOADED`.
   use it at every read. `API.Returned(v)` asks "did the client return anything" without comparing:
   **never write `raw ~= nil` on a raw read**, since comparing a secret (even with nil) throws on
   the client, and the offline stub can't catch it. The global `GetCoinTextureString` is **absent** (70009, still in the 70124 dump);
-  use `C_CurrencyInfo`'s. `MEASURED_ON_BUILD` lives here too.
+  use `C_CurrencyInfo`'s. `MEASURED_ON_BUILD` lives here too; the login notice for another build
+  speaks only in a **development copy** (`API.IsDevelopmentCopy`: version `dev` from deploy, or the
+  raw `@project-version@`), never in a release (Priestly #76: what flags an addon out of date is the
+  TOC's Interface, not this notice).
 - **`Glass.lua`**: the material, **copied** from GlassUnitFrames' **`main`** branch
   (`git -C ..\GlassUnitFrames show main:Glass.lua`), with only the namespace lines and header
   changed. `test_toc.lua` fails when the two drift. It reads `main` through git on purpose,

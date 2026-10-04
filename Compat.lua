@@ -9,7 +9,8 @@ GlassPanel.API = API
 -- The build this addon was last checked on: loads clean in game, /gpanel
 -- failures empty, and its API dump matches the previous one (#52). Behaviours
 -- measured once (secret values, Edit Mode, the aura icons) keep the build they
--- were measured on in their own notes. At login, any other build is said.
+-- were measured on in their own notes. At login, any other build is said,
+-- in a development copy only (API.IsDevelopmentCopy): a release keeps quiet.
 -- tests/test_toc.lua pins the same literal; the stub's GetBuildInfo matches.
 GlassPanel.MEASURED_ON_BUILD = "1.60.1.70124"
 
@@ -42,6 +43,16 @@ end
 function API.ClientBuild()
     local version, build = GetBuildInfo()
     return tostring(version) .. "." .. tostring(build)
+end
+
+-- A development copy: `dev` from Tools/deploy.ps1, or the packager's raw
+-- token in an unpackaged checkout. The build notice speaks only there (the
+-- Priestly way, its #76): a release that still runs on a newer client gains
+-- nothing from being told it was checked on an older one, and what flags an
+-- addon out of date is the TOC's Interface number, not this.
+function API.IsDevelopmentCopy()
+    local version = C_AddOns and C_AddOns.GetAddOnMetadata("GlassPanel", "Version")
+    return version == "dev" or version == "@project-version@"
 end
 
 -- The one failure recorder: key -> last error, read by /gpanel failures.

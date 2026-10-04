@@ -220,7 +220,8 @@ boot:SetScript("OnEvent", function(_, event, arg1)
         SlashCmdList.GLASSPANEL = slash
     elseif event == "PLAYER_LOGIN" then
         local build = API.ClientBuild()
-        if build ~= GlassPanel.MEASURED_ON_BUILD then
+        -- For whoever re-measures, not for players: development copies only.
+        if build ~= GlassPanel.MEASURED_ON_BUILD and API.IsDevelopmentCopy() then
             say("client build " .. build .. " differs from the measured " .. GlassPanel.MEASURED_ON_BUILD
                 .. "; some notes may be stale")
         end
