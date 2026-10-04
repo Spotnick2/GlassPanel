@@ -53,3 +53,5 @@
   panel, or `/gpanel export` and `/gpanel import`.
 - `/gpanel` lists, shows and hides blocks.
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.
+- The glass look now comes from LibGlass, a small library shared by the Glass addons, included in
+  the download. Nothing changes on screen.

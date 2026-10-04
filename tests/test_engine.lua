@@ -162,6 +162,7 @@ eq(block("l1").widget._shown, true, "/gpanel show")
 
 -- A block whose event the client refuses is reported, and the rest still works.
 loadAddon()
+WoW.KNOWN_EVENTS.NOT_A_REAL_EVENT = false   -- unknown even without the dump (which accepts every name)
 register({ id = "badevent", events = { "NOT_A_REAL_EVENT" }, text = function() return "ok" end })
 WoW.tick()
 check(GlassPanel.failures["event:NOT_A_REAL_EVENT"], "unknown event recorded")
