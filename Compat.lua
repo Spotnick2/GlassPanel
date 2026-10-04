@@ -50,9 +50,13 @@ end
 -- Priestly way, its #76): a release that still runs on a newer client gains
 -- nothing from being told it was checked on an older one, and what flags an
 -- addon out of date is the TOC's Interface number, not this.
+-- The token is built from two pieces: the packager rewrites it whole in every
+-- file it ships, Lua included, so a literal here would read as the release's
+-- own version and every player's copy would count as a development copy (#59).
+local UNPACKAGED_VERSION = "@" .. "project-version@"
 function API.IsDevelopmentCopy()
     local version = C_AddOns and C_AddOns.GetAddOnMetadata("GlassPanel", "Version")
-    return version == "dev" or version == "@project-version@"
+    return version == "dev" or version == UNPACKAGED_VERSION
 end
 
 -- The one failure recorder: key -> last error, read by /gpanel failures.

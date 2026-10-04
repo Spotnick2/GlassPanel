@@ -24,6 +24,25 @@ for _, f in ipairs(tocFiles()) do
     seen[f] = true
 end
 
+-- The packager rewrites its keywords in every file it ships, not only the TOC
+-- (#59, Priestly #83): no shipped Lua file may hold one whole, or the release
+-- reads differently from the source these tests load. Matched by shape, since
+-- the packager has a family of them (@project-revision@, @debug@, ...). The
+-- plugins' files are checked in the loop below.
+local function noPackagerKeyword(f)
+    local n = 0
+    for line in io.lines(f) do
+        n = n + 1
+        local keyword = line:match("(@[%w%-]+@)")
+        if keyword then
+            check(false, f .. " holds the packager keyword " .. keyword .. " at line " .. n)
+            return
+        end
+    end
+    check(true, f .. " holds no packager keyword")
+end
+for _, f in ipairs(tocFiles()) do noPackagerKeyword(f) end
+
 -- [Core] and its grouped plugins (#7), AtlasLoot-style in the AddOns list,
 -- AltStable-style on disk: Plugins\<Name>\GlassPanel<Name>.toc.
 check(toc:find("## Title: |cff7fd4ffGlass|r Panel |cFF22B14C[Core]|r", 1, true), "core title says [Core]")
@@ -78,6 +97,7 @@ for _, p in ipairs(list) do
         if src then
             check(src:read("*a"):find("\nGlassPanel = GlassPanel or {}\n", 1, true), "starts with the namespace line: " .. f)
             src:close()
+            noPackagerKeyword(f)
         end
     end
     local folder = p.dir:gsub("/$", "")
