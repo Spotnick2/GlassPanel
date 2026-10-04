@@ -92,17 +92,35 @@ check(WoW.chat[1] and WoW.chat[1]:find("drag a block", 1, true), "core alone: /g
 eq(#WoW.chat, 1, "core alone: and no lanes")
 
 -- Two places that must agree, never derived from each other; the stub's
--- GetBuildInfo is the third: a mismatch is said at login (and only then).
+-- GetBuildInfo is the third: a mismatch is said at login (and only then), in a
+-- development copy only.
+local function said() return table.concat(WoW.chat, " | ") end
 WoW.chat = {}
+WoW.addonVersion = "dev"
 loadAddon()
 eq(GlassPanel.MEASURED_ON_BUILD, "1.60.1.70124", "MEASURED_ON_BUILD")
 eq(GlassPanel.API.ClientBuild(), GlassPanel.MEASURED_ON_BUILD, "stub GetBuildInfo matches MEASURED_ON_BUILD")
-check(not table.concat(WoW.chat, "\n"):find("differs", 1, true), "same build: no notice at login")
+check(not said():find("differs", 1, true), "same build: no notice at login")
 local realBuild = GetBuildInfo
 GetBuildInfo = function() return "1.60.1", "99999", "", 16001 end
 loadAddon()
-check(table.concat(WoW.chat, "\n"):find("client build 1.60.1.99999 differs from the measured 1.60.1.70124", 1, true),
-      "another build: said at login")
+check(said():find("client build 1.60.1.99999 differs from the measured 1.60.1.70124", 1, true),
+      "another build, deployed copy (dev): said at login")
+-- Once per new build: the next login on it keeps quiet, a newer one speaks.
+local saved = GlassPanelDB
+loadAddon({ db = saved })
+check(not said():find("differs", 1, true), "same new build, next login: not said again")
+GetBuildInfo = function() return "1.60.1", "99998", "", 16001 end
+loadAddon({ db = saved })
+check(said():find("client build 1.60.1.99998", 1, true), "a newer build: said once more")
+GetBuildInfo = function() return "1.60.1", "99999", "", 16001 end
+WoW.addonVersion = "@project-version@"
+loadAddon()
+check(said():find("differs", 1, true), "another build, unpackaged checkout: said too")
+-- A release keeps quiet on any build: the notice is for whoever re-measures.
+WoW.addonVersion = "v1.0.0"
+loadAddon()
+check(not said():find("differs", 1, true), "another build, release: no notice")
 GetBuildInfo = realBuild
 
 -- Every texture the material names exists in Media/.
