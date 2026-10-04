@@ -65,7 +65,8 @@ core's `ADDON_LOADED`.
   use `C_CurrencyInfo`'s. `MEASURED_ON_BUILD` lives here too; the login notice for another build
   speaks only in a **development copy** (`API.IsDevelopmentCopy`: version `dev` from deploy, or the
   raw `@project-version@`), never in a release (Priestly #76: what flags an addon out of date is the
-  TOC's Interface, not this notice).
+  TOC's Interface, not this notice), and **once per new build** (`GlassPanelDB.notedBuild`), not at
+  every login.
 - **`Glass.lua`**: the material, **copied** from GlassUnitFrames' **`main`** branch
   (`git -C ..\GlassUnitFrames show main:Glass.lua`), with only the namespace lines and header
   changed. `test_toc.lua` fails when the two drift. It reads `main` through git on purpose,
@@ -268,7 +269,8 @@ core's `ADDON_LOADED`.
   Every open, and every setting change while it's open, re-reads the state.
 - **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`, `layout`, `room`, `labels`,
   `labelsFor[id]`, `iconsFor[id]` (only `false` is stored), `keep[id]` and `replaced["new>old"]` (#50: the player showed a
-  replaced block again; the one-time "replaces" line was said), neither part of a shared setup). The bar is built at
+  replaced block again; the one-time "replaces" line was said) and `notedBuild` (the last client build
+the dev notice was said for), none of them part of a shared setup). The bar is built at
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles
   `list | move <id> <lane> [n] | layout reset | labels | label <id> | icon <id> | show <id> |
   hide <id> | toggle | font | room | options | export | import | covered | failures`.

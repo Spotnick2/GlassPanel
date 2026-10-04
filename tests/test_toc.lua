@@ -106,6 +106,14 @@ GetBuildInfo = function() return "1.60.1", "99999", "", 16001 end
 loadAddon()
 check(said():find("client build 1.60.1.99999 differs from the measured 1.60.1.70124", 1, true),
       "another build, deployed copy (dev): said at login")
+-- Once per new build: the next login on it keeps quiet, a newer one speaks.
+local saved = GlassPanelDB
+loadAddon({ db = saved })
+check(not said():find("differs", 1, true), "same new build, next login: not said again")
+GetBuildInfo = function() return "1.60.1", "99998", "", 16001 end
+loadAddon({ db = saved })
+check(said():find("client build 1.60.1.99998", 1, true), "a newer build: said once more")
+GetBuildInfo = function() return "1.60.1", "99999", "", 16001 end
 WoW.addonVersion = "@project-version@"
 loadAddon()
 check(said():find("differs", 1, true), "another build, unpackaged checkout: said too")
