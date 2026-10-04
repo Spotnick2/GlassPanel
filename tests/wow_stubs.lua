@@ -623,7 +623,7 @@ function WoW.list(dir, ext)
         cmd = ext and ('dir /b "' .. win .. '\\*' .. ext .. '" 2>nul') or ('dir /b /ad "' .. win .. '" 2>nul')
     else
         cmd = 'find "' .. dir .. '" -mindepth 1 -maxdepth 1 '
-              .. (ext and ('-type f -name "*' .. ext .. '"') or "-type d") .. ' -exec basename {} \\; 2>/dev/null'
+              .. (ext and ('-type f -name "*' .. ext .. '"') or "-type d") .. " -printf '%f\\n' 2>/dev/null"
     end
     local out = {}
     local p = io.popen(cmd)

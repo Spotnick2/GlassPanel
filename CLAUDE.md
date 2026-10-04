@@ -293,7 +293,8 @@ texture names only grow; instances; upgrade rules).
 - **The pin:** `.pkgmeta` pins a commit or tag, **never `tag: latest`**, and **no comment on a
   value line** (the packager keeps it in the value). Bump it only in a release made anyway: players
   get library fixes earlier through whichever glass addon ships the newest copy (LibStub runs that
-  one). `tests\run.ps1` and deploy warn when the checkout isn't at the pin. CI
+  one). `tests\run.ps1` and deploy warn when the checkout isn't at the pin (one check,
+  `Tools\LibGlassPin.ps1`, reading the LibGlass entry as `fetch_libglass.sh` does). CI
   (`.github/workflows/package-check.yml`) fetches the pin (`tests/fetch_libglass.sh`), tests
   against it, and asserts the zip holds exactly the core, its library (that commit's shipped files)
   and each plugin folder.
