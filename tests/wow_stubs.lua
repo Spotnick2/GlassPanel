@@ -15,7 +15,7 @@
 --   so test_methods.lua can check each against the dump's widget methods.
 
 WoW = {}
-local DUMP = os.getenv("GLASSPANEL_API_DUMP") or "C:/Projects/References/forever-api-1.60.1.70124.md"
+local DUMP = os.getenv("GLASSPANEL_API_DUMP") or "C:/Projects/References/forever-api-1.60.1.70338.md"
 
 --------------------------------------------------------------------------------
 -- Secrets
@@ -410,7 +410,7 @@ function Ambiguate(fullName, context)
     if context == "none" then return fullName end
     return (fullName:gsub("%-.*$", ""))
 end
-function GetBuildInfo() return "1.60.1", "70124", "Sep 29 2026", 16001 end
+function GetBuildInfo() return "1.60.1", "70338", "Oct  9 2026", 16001 end
 -- Only "Version" is read. A release-shaped version by default; a test sets
 -- WoW.addonVersion = "dev" to run as a deployed development copy.
 C_AddOns = { GetAddOnMetadata = function(name, key)
