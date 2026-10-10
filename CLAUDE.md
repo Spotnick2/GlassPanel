@@ -192,10 +192,13 @@ core's `ADDON_LOADED`.
 - **`Plugins\Reagents`** (#68): the class reagents the player picks, in their order (icon + count,
   a red `0` when none are left), Currencies' chooser on a **hardcoded per-class table** of item ids
   (`CLASS`, keyed by `UnitClass`'s file name; nothing in the client says which items a class uses).
-  Poisons are in the client's consumables list; the other ids are Vanilla's, unmeasured: an id
-  with no `C_Item.GetItemIconByID` is left out. Counts from `C_Item.GetItemCount` (bags); names
-  from `C_Item.GetItemNameByID`, requested once and listened for on the plugin's own frame only
-  while pending (GearScore's pattern), a grey `item <id>` until then. **No ammo, soul shards,
+  Poisons are in the client's consumables list; the other ids are Vanilla's (Informant: class
+  Reagent), unmeasured: an id with no icon, the question-mark icon (134400) or a **failed load** is
+  left out (unmeasured whether the client ever says so). Counts from `C_Item.GetItemCount` (bags);
+  names from `C_Item.GetItemNameByID`, **asked for only by the tooltip and the chooser** (the bar
+  and the default search read counts and icons), requested once and listened for on the plugin's
+  own frame only while pending (GearScore's pattern, `failed` ids never re-requested), a grey
+  `item <id>` until then. Sharing the chooser with Currencies and the loader with GearScore: #74. **No ammo, soul shards,
   healthstones or soulstones** (their own plugins, #66/#67). Hunters and warriors have no list, so
   no block. Picks per character (`GlassPanelReagentsDB`), never chosen: up to 3 carried, saved once
   found.

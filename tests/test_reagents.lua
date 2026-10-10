@@ -128,8 +128,9 @@ WoW.bagItems[17020].cached = false
 GlassPanelReagentsDB = { order = { 17020 } }
 loadAddon()
 eq(textOf("reagents"), ic(2001) .. "40", "the icon and count don't wait for the name")
+eq(WoW.itemRequests[17020], nil, "the bar alone asks for no name")
 check(tip():find("item 17020", 1, true), "tooltip: a placeholder while loading")
-eq(WoW.itemRequests[17020], 1, "requested")
+eq(WoW.itemRequests[17020], 1, "requested by the tooltip")
 check(T().pending()[17020], "pending")
 GlassPanel.Refresh("reagents"); WoW.tick()
 eq(WoW.itemRequests[17020], 1, "requested once")
@@ -137,6 +138,53 @@ WoW.bagItems[17020].cached = true
 WoW.fire("ITEM_DATA_LOAD_RESULT", 17020, true); WoW.tick()
 check(T().pending()[17020] == nil, "answered")
 check(tip():find("Arcane Powder\t40", 1, true), "the name once loaded")
+
+-- A failed load: never requested again, and the id is left out.
+mage()
+WoW.itemCounts[17020], WoW.itemCounts[17031] = 40, 5
+WoW.bagItems[17031].cached = false
+GlassPanelReagentsDB = { order = { 17020, 17031 } }
+loadAddon()
+tip()
+eq(WoW.itemRequests[17031], 1, "requested once")
+WoW.fire("ITEM_DATA_LOAD_RESULT", 17031, false); WoW.tick()
+check(T().failed()[17031], "a failed load is recorded")
+eq(textOf("reagents"), ic(2001) .. "40", "a failed id is left out of the bar")
+tip(); GlassPanel.Refresh("reagents"); WoW.tick(); tip()
+eq(WoW.itemRequests[17031], 1, "and never requested again")
+eq(T().pending()[17031], nil, "nothing left pending")
+
+-- The question-mark icon: an item with no data, left out.
+mage()
+WoW.itemCounts[17020], WoW.itemCounts[17056] = 40, 3
+WoW.bagItems[17056].icon = 134400
+GlassPanelReagentsDB = { order = { 17020, 17056 } }
+loadAddon()
+eq(textOf("reagents"), ic(2001) .. "40", "question-mark icon: left out")
+local offered = {}
+for _, c in ipairs(T().available()) do offered[c.id] = true end
+check(not offered[17056], "and not offered")
+
+-- The default search and the bar read no names: counts and icons only.
+mage()
+WoW.itemCounts[17032] = 2
+GlassPanelReagentsDB = nil
+local nameReads, realName = 0, C_Item.GetItemNameByID
+C_Item.GetItemNameByID = function(...) nameReads = nameReads + 1 return realName(...) end
+loadAddon()
+eq(textOf("reagents"), ic(2003) .. "2", "the carried one, by default")
+eq(nameReads, 0, "no name read for the bar or the default search")
+C_Item.GetItemNameByID = realName
+
+-- The shaman's water reagents are offered.
+WoW.playerClass = { "Shaman", "SHAMAN", 7 }
+WoW.bagItems = { [17030] = { name = "Ankh", icon = 1 }, [17058] = { name = "Fish Oil", icon = 2 },
+                 [17057] = { name = "Shiny Fish Scales", icon = 3 } }
+GlassPanelReagentsDB = nil
+loadAddon()
+local sh = {}
+for _, c in ipairs(T().available()) do sh[#sh + 1] = c.name end
+eq(table.concat(sh, ","), "Ankh,Fish Oil,Shiny Fish Scales", "shaman: Ankh, Fish Oil, Shiny Fish Scales")
 
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_reagents")

@@ -3,10 +3,15 @@
 -- per class, since nothing in the client says which items a class uses.
 --
 -- Forever (70338 dump): C_Item.GetItemCount(id) for the count (bags only),
--- C_Item.GetItemIconByID(id) for the icon (nil: the client doesn't know the
--- id, and it's left out), C_Item.GetItemNameByID(id) for the name (nil until
--- the item's data is loaded: requested once, on our own frame, as GearScore
--- does). The global GetItemInfo is absent.
+-- C_Item.GetItemIconByID(id) for the icon, C_Item.GetItemNameByID(id) for the
+-- name (nil until the item's data is loaded: requested once, on our own
+-- frame, as GearScore does; a failed load is never requested again). The
+-- global GetItemInfo is absent. Only the tooltip and the chooser ask for
+-- names: the bar shows icons and counts.
+--
+-- UNMEASURED: what the client answers for an id it doesn't serve. Left out:
+-- no icon, the question-mark icon (134400), or a failed load. A Retail
+-- client may know every Vanilla id's icon anyway, so this may never trigger.
 --
 -- Ammo (#66) and the warlock's shards and stones (#67) have their own
 -- plugins and aren't listed here. Picks are per character
@@ -35,13 +40,14 @@ local CLASS = {
     },
     MAGE    = { 17020, 17031, 17032, 17056 },       -- Arcane Powder, Runes of Teleportation and Portals, Light Feather
     PRIEST  = { 17028, 17029, 17056 },              -- Holy Candle, Sacred Candle, Light Feather
-    SHAMAN  = { 17030 },                            -- Ankh
+    SHAMAN  = { 17030, 17058, 17057 },              -- Ankh, Fish Oil, Shiny Fish Scales
     PALADIN = { 17033, 21177 },                     -- Symbol of Divinity, Symbol of Kings
     DRUID   = { 17021, 17026,                       -- Wild Berries, Wild Thornroot
                 17034, 17035, 17036, 17037, 17038 }, -- Maple, Stranglethorn, Ashwood, Hornbeam, Ironwood Seed
     WARLOCK = { 5565, 16583 },                      -- Infernal Stone, Demonic Figurine
 }
 local DEFAULT_MAX = 3   -- first-run picks: up to this many carried
+local QUESTION_MARK = 134400   -- the icon of an item with no data
 
 local function db()
     local d = rawget(_G, "GlassPanelReagentsDB")
@@ -62,9 +68,11 @@ end
 --------------------------------------------------------------------------------
 -- Names load late: requested once, answered on our own frame, which listens
 -- only while one of ours is pending (the load events fire for every item).
+-- A load that fails (success false) marks the id failed: never requested
+-- again this session, and left out as unknown.
 --------------------------------------------------------------------------------
 
-local pending = {}
+local pending, failed = {}, {}
 local LOAD_EVENTS = { "ITEM_DATA_LOAD_RESULT", "GET_ITEM_INFO_RECEIVED" }
 local loader = CreateFrame("Frame")
 local listening = false
@@ -76,10 +84,11 @@ local function listen(on)
         if on then API.RegisterEvent(loader, e, "Reagents") else loader:UnregisterEvent(e) end
     end
 end
-loader:SetScript("OnEvent", function(_, _, rawId)
+loader:SetScript("OnEvent", function(_, _, rawId, success)
     local id = P(rawId)
     if id and pending[id] then
         pending[id] = nil
+        if P(success) == false then failed[id] = true end
         GlassPanel.Refresh("reagents")
         refreshWindowSoon()
     end
@@ -87,44 +96,64 @@ loader:SetScript("OnEvent", function(_, _, rawId)
 end)
 
 local function request(id)
-    if pending[id] then return end
+    if pending[id] or failed[id] then return end
     pending[id] = true
     C_Item.RequestLoadItemDataByID(id)
     listen(true)
 end
 
--- One item by id: { id, name (nil while loading), count (nil = unreadable),
--- icon }, or nil when the client doesn't know the id.
-local function info(id)
-    local okI, icon = pcall(C_Item.GetItemIconByID, id)
-    icon = okI and P(icon) or nil
-    if type(icon) ~= "number" and type(icon) ~= "string" then return nil end
-    local okN, name = pcall(C_Item.GetItemNameByID, id)
-    name = okN and P(name) or nil
-    if type(name) ~= "string" or name == "" then
-        name = nil
-        request(id)
-    end
-    local okC, count = pcall(C_Item.GetItemCount, id)
-    count = okC and P(count) or nil
-    return { id = id, name = name, count = type(count) == "number" and count or nil, icon = icon }
+-- The id's icon, or nil when the client doesn't seem to know it.
+local function knownIcon(id)
+    if failed[id] then return nil end
+    local ok, icon = pcall(C_Item.GetItemIconByID, id)
+    icon = ok and P(icon) or nil
+    if icon == QUESTION_MARK or (type(icon) ~= "number" and type(icon) ~= "string") then return nil end
+    return icon
 end
 
--- The class's reagents the client knows, in the table's order.
+local function count(id)
+    local ok, n = pcall(C_Item.GetItemCount, id)
+    n = ok and P(n) or nil
+    return type(n) == "number" and n or nil
+end
+
+-- One item by id: { id, name (nil while loading, or when not asked for),
+-- count (nil = unreadable), icon }, or nil when the client doesn't know the
+-- id. withName: read the name, and request it while it's missing.
+local function info(id, withName)
+    local icon = knownIcon(id)
+    if not icon then return nil end
+    local name
+    if withName then
+        local okN, n = pcall(C_Item.GetItemNameByID, id)
+        name = okN and P(n) or nil
+        if type(name) ~= "string" or name == "" then
+            name = nil
+            request(id)
+        end
+    end
+    return { id = id, name = name, count = count(id), icon = icon }
+end
+
+-- The class's reagents the client knows, in the table's order, named (the
+-- chooser's list).
 local function available()
     local list = {}
-    for _, id in ipairs(classList()) do list[#list + 1] = info(id) end
+    for _, id in ipairs(classList()) do list[#list + 1] = info(id, true) end
     return list
 end
 
 -- The picked ids, in order (each once). Never chosen: the carried ones,
--- saved now so they stay put.
-local function picks(avail)
+-- saved now so they stay put. The search reads counts first, so an id that
+-- isn't carried costs one call.
+local function picks()
     local d = db()
     if not d.order then
         local out = {}
-        for _, c in ipairs(avail or available()) do
-            if c.count and c.count > 0 and #out < DEFAULT_MAX then out[#out + 1] = c.id end
+        for _, id in ipairs(classList()) do
+            if #out >= DEFAULT_MAX then break end
+            local n = count(id)
+            if n and n > 0 and knownIcon(id) then out[#out + 1] = id end
         end
         if #out == 0 then return out end   -- nothing carried yet: decide when there is
         d.order = out
@@ -161,8 +190,8 @@ end
 
 --------------------------------------------------------------------------------
 -- The chooser window: the class's reagents, a checkbox to show each, Up/Down
--- to order the shown ones. (A copy of Currencies' chooser; a shared one is a
--- possible follow-up once a third plugin wants it.)
+-- to order the shown ones. (A copy of Currencies' chooser; sharing it, and
+-- the name loader with GearScore, is #74.)
 --------------------------------------------------------------------------------
 
 local win, rows = nil, {}
@@ -175,8 +204,8 @@ local function entries()
     local byId = {}
     for _, c in ipairs(avail) do byId[c.id] = c end
     local list, shown, used = {}, {}, {}
-    for _, id in ipairs(picks(avail)) do
-        local c = byId[id] or info(id)
+    for _, id in ipairs(picks()) do
+        local c = byId[id] or info(id, true)
         if c then
             list[#list + 1] = c
             shown[#shown + 1] = id
@@ -323,7 +352,7 @@ local block = GlassPanel.RegisterBlock({
     tooltip = function(_, tt)
         tt:AddLine("Reagents")
         for _, id in ipairs(picks()) do
-            local c = info(id)
+            local c = info(id, true)
             if c then tt:AddDoubleLine(icon(c, 14) .. " " .. name(c), amount(c), 1, 0.82, 0, 1, 1, 1) end
         end
         tt:AddLine(" ")
@@ -338,5 +367,6 @@ local block = GlassPanel.RegisterBlock({
 
 if block then
     block._test = { CLASS = CLASS, available = available, picks = picks, rows = rows,
-                    window = function() return win end, pending = function() return pending end }
+                    window = function() return win end, pending = function() return pending end,
+                    failed = function() return failed end }
 end

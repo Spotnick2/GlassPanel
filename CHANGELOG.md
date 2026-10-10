@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Reagents: pick which of your class's reagents to show and in what order (powders, candles,
-  runes, seeds, poisons, Ankhs, Symbols), with a red 0 when you've run out. Left-click to choose.
+  runes, seeds, poisons, Ankhs, Fish Oil, Symbols), with a red 0 when you've run out. Left-click to choose.
 - A liquid-glass bar across the top of the screen, with gold and clock blocks.
 - XP+: a glass XP bar (with TitanPanelXPP's purple XP icon) with rested and quest XP, and a tooltip with time played, XP per hour and
   time to level. Hidden at the level cap. Left-click refreshes time played, right-click resets
