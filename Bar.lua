@@ -360,6 +360,46 @@ function Bar.Layout()
     end
 end
 
+-- The bar's glass (#65): AltStable's two presets (..\AltStable\Skin.lua),
+-- the body only (tint, grain, wash); the rim stays the instance's. Clear is
+-- the library's default look. The class colour is shaded by the preset's
+-- classShade at the preset's own alpha: at full strength it reads as
+-- painted plastic (AltStable, measured in game).
+Bar.GLASS = {
+    clear  = { tint = { 0.13, 0.16, 0.22, 0.24 }, grain = 0.45, wash = 0.18, classShade = 0.6 },
+    smoked = { tint = { 0.05, 0.06, 0.08, 0.62 }, grain = 0.35, wash = 0.14, classShade = 0.3 },
+}
+
+-- The player's class colour (plain numbers), or nil.
+local function classColor()
+    local ok, _, class = pcall(UnitClass, "player")
+    class = ok and API.Plain(class) or nil
+    if type(class) ~= "string" then return nil end
+    local ok2, c = pcall(C_ClassColor.GetClassColor, class)
+    if not ok2 or type(c) ~= "table" then return nil end
+    local r, g, b = API.Plain(c.r), API.Plain(c.g), API.Plain(c.b)
+    if type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then return nil end
+    return r, g, b
+end
+
+-- Paint the bar's body: material "clear"|"smoked", tint "neutral"|"class".
+-- Unknown values fall back to clear and neutral; an unknown class keeps the
+-- preset's own colour. Live, on the one surface (no reload). The tint needs
+-- LibGlass r3's SetSurfaceTint: without it the body keeps its built colour.
+function Bar.ApplyGlass(material, tint)
+    local g = Bar.glass
+    if not g then return end
+    local p = Bar.GLASS[material] or Bar.GLASS.clear
+    local r, gg, b, a = p.tint[1], p.tint[2], p.tint[3], p.tint[4]
+    if tint == "class" then
+        local cr, cg, cb = classColor()
+        if cr then r, gg, b = cr * p.classShade, cg * p.classShade, cb * p.classShade end
+    end
+    if type(Glass.SetSurfaceTint) == "function" then Glass.SetSurfaceTint(g, r, gg, b, a) end
+    g.grain:SetAlpha(p.grain)
+    g.wash:SetGradient("VERTICAL", CreateColor(1, 1, 1, 0), CreateColor(1, 1, 1, p.wash))
+end
+
 function Bar.Build()
     if Bar.frame then return end
     local f = CreateFrame("Frame", "GlassPanelBar", UIParent)
@@ -369,6 +409,8 @@ function Bar.Build()
     f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", 0, 0)
     f:EnableMouse(false)   -- empty bar space clicks through to the world
     Bar.glass = Glass.Apply(f, "small")
+    local d = GlassPanelDB or {}
+    Bar.ApplyGlass(d.glass, d.glassTint)
 
     -- Blocks sit between the body and the rim, like GlassUF's bars.
     local content = CreateFrame("Frame", nil, f)

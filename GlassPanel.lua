@@ -79,6 +79,8 @@ local COMMANDS = {
     { "hide <id>", "hide a block" },
     { "toggle", "show or hide the whole bar" },
     { "font arial|friz", "bar font" },
+    { "glass clear|smoked", "the bar's glass" },
+    { "tint neutral|class", "the glass's colour: neutral, or your class colour" },
     { "options", "open the options panel (Options > AddOns > Glass Panel)" },
     { "setup", "move Blizzard's top frames below the bar in an Edit Mode layout (shows the plan first)" },
     { "setup back", "switch back to the Edit Mode layout you had before" },
@@ -163,6 +165,10 @@ local function slash(msg)
         Settings.SetShown(not db.shown)
     elseif cmd == "font" then
         if not Settings.SetFont(arg:lower()) then say("fonts: arial, friz") end
+    elseif cmd == "glass" then
+        if not Settings.SetGlass(arg:lower()) then say("glass: clear or smoked (now " .. db.glass .. ")") end
+    elseif cmd == "tint" then
+        if not Settings.SetGlassTint(arg:lower()) then say("tint: neutral or class (now " .. db.glassTint .. ")") end
     elseif cmd == "room" then
         if arg:lower() == "why" then
             say("room (" .. db.room .. "): what each watched frame measured, screen px")
@@ -232,6 +238,8 @@ boot:SetScript("OnEvent", function(_, event, arg1)
         -- Many APIs answer only once the world is up: repaint everything.
         Engine.MarkAllDirty()
         Settings.AnnounceReplaced()   -- every plugin is registered by now
+        -- The class colour, in case the class wasn't known at ADDON_LOADED.
+        Bar.ApplyGlass(GlassPanelDB.glass, GlassPanelDB.glassTint)
     end
 end)
 

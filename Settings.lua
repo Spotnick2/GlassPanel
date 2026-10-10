@@ -7,7 +7,9 @@ local Glass, Bar, Layout = GlassPanel.Glass, GlassPanel.Bar, GlassPanel.Layout
 local Settings = {}
 GlassPanel.Settings = Settings
 
-Settings.DEFAULTS = { font = "arial", shown = true, room = "auto", labels = true }
+Settings.DEFAULTS = { font = "arial", shown = true, room = "auto", labels = true,
+                      glass = "clear", glassTint = "neutral" }
+Settings.GLASS_TINTS = { neutral = true, class = true }
 
 local function db() return GlassPanelDB end
 
@@ -37,7 +39,27 @@ function Settings.EnsureDefaults()
     if d.editModeReturn ~= nil and type(d.editModeReturn) ~= "table" then d.editModeReturn = nil end
     if not Glass.FONTS[d.font] then d.font = Settings.DEFAULTS.font end
     if d.room ~= "auto" and d.room ~= "full" then d.room = Settings.DEFAULTS.room end
+    if not Bar.GLASS[d.glass] then d.glass = Settings.DEFAULTS.glass end
+    if not Settings.GLASS_TINTS[d.glassTint] then d.glassTint = Settings.DEFAULTS.glassTint end
     return d
+end
+
+-- The bar's glass (#65). false when the material isn't "clear" or "smoked".
+function Settings.SetGlass(material)
+    if not Bar.GLASS[material] then return false end
+    db().glass = material
+    Bar.ApplyGlass(db().glass, db().glassTint)
+    changed()
+    return true
+end
+
+-- false when the tint isn't "neutral" or "class".
+function Settings.SetGlassTint(tint)
+    if not Settings.GLASS_TINTS[tint] then return false end
+    db().glassTint = tint
+    Bar.ApplyGlass(db().glass, db().glassTint)
+    changed()
+    return true
 end
 
 -- false when the font isn't known.
@@ -132,9 +154,11 @@ end
 function Settings.ApplyAll(setup)
     local d = db()
     d.font, d.shown, d.room, d.labels = setup.font, setup.shown, setup.room, setup.labels
+    d.glass, d.glassTint = setup.glass, setup.glassTint
     d.hidden, d.labelsFor, d.iconsFor = copyMap(setup.hidden), copyMap(setup.labelsFor), copyMap(setup.iconsFor)
     d.layout = Layout.Clean(setup.layout)
     Glass.SetFont(d.font)
+    Bar.ApplyGlass(d.glass, d.glassTint)
     for _, block in ipairs(GlassPanel.Engine.blocks) do
         Bar.UpdateIcon(block)
         Bar.UpdateCaption(block)
