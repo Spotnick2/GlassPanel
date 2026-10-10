@@ -89,10 +89,13 @@ core's `ADDON_LOADED`.
   visual order. Ids of blocks that aren't loaded are kept. Blocks never placed follow
   `side`/`order`. `Layout.Current()` is the cached read; mutators use `Lanes()` then `Save`.
 - **`Bar.lua`**: the strip (`GlassPanelBar`, full width at the top of `UIParent`, strata
-  `MEDIUM`, `Glass.Apply(..., "small")` painted by `Bar.ApplyGlass` (#65: `Bar.GLASS` clear/smoked,
-  AltStable's presets for tint, grain and wash; the class colour from `C_ClassColor` × the preset's
-  `classShade` through `Glass.SetSurfaceTint`, so **LibGlass r3+**; without it the body keeps its
-  built colour; re-applied at `PLAYER_ENTERING_WORLD` for a class not known at load), mouse-less so
+  `MEDIUM`, `Glass.Apply(..., "small")` painted by `Bar.ApplyGlass` (#65: `Bar.GLASS` and
+  `Bar.GLASS_TINTS` are the one allowlist. Clear is the surface **as built** (`SetSurfaceTint(g)`,
+  the instance's grain and wash), so it follows the library; smoked is AltStable's body, its grain
+  and wash as region-alpha scales of the built ones; the class colour from `C_ClassColor` × the
+  preset's `classShade` through `Glass.SetSurfaceTint` (**LibGlass r3+**, embedded r5). Painted last
+  in `Bar.Build`, under pcall (`API.Fail("bar:glass")`); a class colour not readable yet sets
+  `Bar.glassPending`, is said once by the setter, and is retried at `PLAYER_ENTERING_WORLD`), mouse-less so
   empty space clicks through), one plain
   `Button` per block (icon, a gold **caption** `b.caption` "Label: " (#23; `Bar.ShowsCaption`: never
   on graphical blocks, then `labelsFor[id]`, then `labels`, then the spec's `showLabel`), the

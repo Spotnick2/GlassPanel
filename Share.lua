@@ -277,7 +277,7 @@ function Share.Clean(raw)
     if not (type(glass) == "string" and GlassPanel.Bar.GLASS[glass]) then return nil, "unknown glass" end
     out.glass = glass
     local tint = raw.glassTint == nil and D.glassTint or raw.glassTint
-    if not (type(tint) == "string" and Settings.GLASS_TINTS[tint]) then return nil, "unknown glass tint" end
+    if not (type(tint) == "string" and GlassPanel.Bar.GLASS_TINTS[tint]) then return nil, "unknown glass tint" end
     out.glassTint = tint
     for _, k in ipairs({ "shown", "labels" }) do
         local v = raw[k]

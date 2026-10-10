@@ -238,8 +238,8 @@ boot:SetScript("OnEvent", function(_, event, arg1)
         -- Many APIs answer only once the world is up: repaint everything.
         Engine.MarkAllDirty()
         Settings.AnnounceReplaced()   -- every plugin is registered by now
-        -- The class colour, in case the class wasn't known at ADDON_LOADED.
-        Bar.ApplyGlass(GlassPanelDB.glass, GlassPanelDB.glassTint)
+        -- The class colour, only if it couldn't be read when last painted.
+        if Bar.glassPending then Bar.ApplyGlass(GlassPanelDB.glass, GlassPanelDB.glassTint) end
     end
 end)
 

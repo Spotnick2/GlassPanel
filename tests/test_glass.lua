@@ -11,7 +11,7 @@ local function tintIs(r, gg, b, a, msg)
     check(near(c[1], r) and near(c[2], gg) and near(c[3], b) and near(c[4], a),
           msg .. " (got " .. table.concat({ tostring(c[1]), tostring(c[2]), tostring(c[3]), tostring(c[4]) }, ", ") .. ")")
 end
-local function washTop() return g().wash._gradient[3].a end
+local function washAlpha() return g().wash._alpha or 1 end
 
 -- Defaults: clear and neutral, which is the library's own look.
 WoW.playerClass = { "Hunter", "HUNTER", 3 }
@@ -21,14 +21,15 @@ eq(GlassPanelDB.glassTint, "neutral", "default tint: neutral")
 local st = GlassPanel.Glass.STYLE
 tintIs(st.tint[1], st.tint[2], st.tint[3], st.tint[4], "clear neutral = the built tint")
 eq(g().grain._alpha, st.grain, "clear: the library's grain")
-eq(washTop(), st.wash, "clear: the library's wash")
+eq(washAlpha(), 1, "clear: the wash as built")
+eq(g().wash._gradient[3].a, st.wash, "the wash's gradient is the library's own")
 
 -- Smoked: AltStable's darker preset, painted at once.
 GlassPanel._test.slash("glass smoked")
 eq(GlassPanelDB.glass, "smoked", "/gpanel glass smoked")
 tintIs(0.05, 0.06, 0.08, 0.62, "smoked body")
-eq(g().grain._alpha, 0.35, "smoked grain")
-eq(washTop(), 0.14, "smoked wash")
+check(near(g().grain._alpha, 0.35), "smoked grain")
+check(near(washAlpha() * st.wash, 0.14), "smoked wash")
 
 -- The class colour, shaded by the preset, at the preset's own alpha.
 GlassPanel._test.slash("tint class")
@@ -75,13 +76,36 @@ WoW.playerClass = { "Mage", "MAGE", 8 }
 WoW.fire("PLAYER_ENTERING_WORLD", false, true)
 tintIs(0.25 * 0.6, 0.78 * 0.6, 0.92 * 0.6, 0.24, "class colour at PLAYER_ENTERING_WORLD")
 
--- An older library copy without SetSurfaceTint: no error, the body keeps
--- its built colour, grain and wash still follow the preset.
-loadAddon({ db = { glass = "smoked", glassTint = "class" }, before = function()
-    GlassPanel.Glass.SetSurfaceTint = nil
+-- Clear follows the library: its built colour, whatever the defaults are.
+loadAddon({ before = function() GlassPanel.Glass.STYLE.tint = { 0.2, 0.2, 0.2, 0.3 } end })
+tintIs(0.2, 0.2, 0.2, 0.3, "clear: whatever tint the library built")
+GlassPanel._test.slash("glass smoked")
+GlassPanel._test.slash("glass clear")
+tintIs(0.2, 0.2, 0.2, 0.3, "back to clear: the built tint again")
+
+-- Asking for the class colour while it can't be read: said, not silent;
+-- retried at PLAYER_ENTERING_WORLD only while it's pending.
+WoW.playerClass = { "Nobody", "NOBODY", 99 }
+loadAddon()
+WoW.chat = {}
+GlassPanel._test.slash("tint class")
+check(said():find("class colour can't be read yet", 1, true), "unreadable class colour: said")
+eq(GlassPanel.Bar.glassPending, true, "and pending")
+WoW.playerClass = { "Mage", "MAGE", 8 }
+WoW.fire("PLAYER_ENTERING_WORLD", false, false)
+tintIs(0.25 * 0.6, 0.78 * 0.6, 0.92 * 0.6, 0.24, "painted once readable")
+eq(GlassPanel.Bar.glassPending, false, "no longer pending")
+local calls, real = 0, GlassPanel.Bar.ApplyGlass
+GlassPanel.Bar.ApplyGlass = function(...) calls = calls + 1 return real(...) end
+WoW.fire("PLAYER_ENTERING_WORLD", false, false)
+eq(calls, 0, "a later loading screen doesn't repaint")
+GlassPanel.Bar.ApplyGlass = real
+
+-- A throw while painting is recorded, and the bar is still built whole.
+loadAddon({ db = { glass = "smoked", glassTint = "neutral" }, before = function()
+    GlassPanel.Glass.SetSurfaceTint = function() error("boom") end
 end })
-tintIs(st.tint[1], st.tint[2], st.tint[3], st.tint[4], "no SetSurfaceTint: built tint kept")
-eq(g().grain._alpha, 0.35, "no SetSurfaceTint: grain still smoked")
-eq(next(GlassPanel.failures or {}), nil, "no SetSurfaceTint: nothing failed")
+check(GlassPanel.failures and GlassPanel.failures["bar:glass"], "paint failure recorded")
+check(GlassPanel.Bar.frame and GlassPanel.Bar.content and GlassPanel.Bar.marker, "bar built anyway")
 
 done("test_glass")

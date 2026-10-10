@@ -9,7 +9,6 @@ GlassPanel.Settings = Settings
 
 Settings.DEFAULTS = { font = "arial", shown = true, room = "auto", labels = true,
                       glass = "clear", glassTint = "neutral" }
-Settings.GLASS_TINTS = { neutral = true, class = true }
 
 local function db() return GlassPanelDB end
 
@@ -40,27 +39,24 @@ function Settings.EnsureDefaults()
     if not Glass.FONTS[d.font] then d.font = Settings.DEFAULTS.font end
     if d.room ~= "auto" and d.room ~= "full" then d.room = Settings.DEFAULTS.room end
     if not Bar.GLASS[d.glass] then d.glass = Settings.DEFAULTS.glass end
-    if not Settings.GLASS_TINTS[d.glassTint] then d.glassTint = Settings.DEFAULTS.glassTint end
+    if not Bar.GLASS_TINTS[d.glassTint] then d.glassTint = Settings.DEFAULTS.glassTint end
     return d
 end
 
--- The bar's glass (#65). false when the material isn't "clear" or "smoked".
-function Settings.SetGlass(material)
-    if not Bar.GLASS[material] then return false end
-    db().glass = material
-    Bar.ApplyGlass(db().glass, db().glassTint)
+-- The bar's glass (#65): material "clear"|"smoked", tint "neutral"|"class";
+-- false when the value isn't one of them. A class colour that can't be read
+-- right now is said, and painted once it can be (Bar.glassPending).
+local function setGlass(key, value, allowed)
+    if not allowed[value] then return false end
+    db()[key] = value
+    if not Bar.ApplyGlass(db().glass, db().glassTint) then
+        GlassPanel.API.Print("your class colour can't be read yet: the glass takes it when it can.")
+    end
     changed()
     return true
 end
-
--- false when the tint isn't "neutral" or "class".
-function Settings.SetGlassTint(tint)
-    if not Settings.GLASS_TINTS[tint] then return false end
-    db().glassTint = tint
-    Bar.ApplyGlass(db().glass, db().glassTint)
-    changed()
-    return true
-end
+function Settings.SetGlass(material) return setGlass("glass", material, Bar.GLASS) end
+function Settings.SetGlassTint(tint) return setGlass("glassTint", tint, Bar.GLASS_TINTS) end
 
 -- false when the font isn't known.
 function Settings.SetFont(key)
