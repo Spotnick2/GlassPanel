@@ -189,6 +189,16 @@ core's `ADDON_LOADED`.
   Up/Down on the shown ones; unresolved saved ids kept at the end) from a left-click or the plugin's
   option **button**; refreshed at most once per frame. Secret amount: grey `?`; measured plain for
   Honor Points (36 / 15,000).
+- **`Plugins\Reagents`** (#68): the class reagents the player picks, in their order (icon + count,
+  a red `0` when none are left), Currencies' chooser on a **hardcoded per-class table** of item ids
+  (`CLASS`, keyed by `UnitClass`'s file name; nothing in the client says which items a class uses).
+  Poisons are in the client's consumables list; the other ids are Vanilla's, unmeasured: an id
+  with no `C_Item.GetItemIconByID` is left out. Counts from `C_Item.GetItemCount` (bags); names
+  from `C_Item.GetItemNameByID`, requested once and listened for on the plugin's own frame only
+  while pending (GearScore's pattern), a grey `item <id>` until then. **No ammo, soul shards,
+  healthstones or soulstones** (their own plugins, #66/#67). Hunters and warriors have no list, so
+  no block. Picks per character (`GlassPanelReagentsDB`), never chosen: up to 3 carried, saved once
+  found.
 - **`Plugins\AltStable`** (#46): a **bridge** to the sibling addon AltStable (`## Dependencies:
   GlassPanel, AltStable`, so it loads only with it): total gold of the characters AltStable knows,
   a tooltip by realm (class colour, level, gold, the logged-in one marked, hidden ones left out and
