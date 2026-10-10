@@ -342,6 +342,9 @@ Enum = { UITextureSliceMode = { Stretched = 0, Tiled = 1 },
          EditModeSystem = { Minimap = 2, AuraFrame = 6, DamageMeter = 23 },
          EditModeAuraFrameSystemIndices = { BuffFrame = 1, DebuffFrame = 2, ExternalDefensivesFrame = 3 },
          EditModeLayoutType = { Preset = 0, Account = 1, Character = 2, Override = 3 },
+         -- Item classes (Ammo, #66), from ItemConstantsDocumentation.lua (forever).
+         ItemClass = { Weapon = 2, Projectile = 6 },
+         ItemWeaponSubclass = { Bows = 2, Guns = 3, Thrown = 16, Crossbow = 18, Wand = 19 },
          BagIndex = { Keyring = -2, Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5 } }
 function CreateColor(r, g, b, a) return { r = r, g = g, b = b, a = a } end
 

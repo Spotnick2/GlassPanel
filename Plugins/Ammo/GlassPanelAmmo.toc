@@ -1,0 +1,11 @@
+## Interface: 16001
+## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[Ammo]|r
+## Notes: Arrows, bullets or thrown weapons left, yellow when low and red when critical. Hunters, warriors and rogues.
+## Author: Spotnick
+## Version: @project-version@
+## Group: GlassPanel
+## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
+## Dependencies: GlassPanel
+## SavedVariables: GlassPanelAmmoDB
+
+Ammo.lua

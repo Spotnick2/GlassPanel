@@ -21,6 +21,7 @@ move-folders:
   GlassPanel/Plugins/Layer: GlassPanelLayer
   GlassPanel/Plugins/GearScore: GlassPanelGearScore
   GlassPanel/Plugins/AltStable: GlassPanelAltStable
+  GlassPanel/Plugins/Ammo: GlassPanelAmmo
 
 manual-changelog:
   filename: CHANGELOG.md
