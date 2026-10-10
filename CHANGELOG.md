@@ -23,10 +23,10 @@
 - Durability: the lowest durability among your equipped items, coloured, with the repair cost;
   the tooltip lists damaged items.
 - Bags: used and total bag slots, coloured as they fill; quivers and soul bags listed apart.
+  Left-click opens or closes your bags.
 - Ammo (hunters, warriors and rogues): the arrows, bullets or thrown weapons you have left, chosen
   from your ranged weapon. Yellow when low and red when critical; left-click to set when, for your
   class. A red `!` means you have no ammo equipped, or the wrong kind for the weapon.
-  Left-click opens or closes your bags.
 - Gold captions before values, Titan-style ("Bags: 45/74"). `/gpanel labels on|off`, or
   `/gpanel label <id> on|off|default` for one block.
 - PvP: whether you're flagged, with the countdown before the flag drops (type /pvp to toggle it).

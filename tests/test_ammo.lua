@@ -127,6 +127,41 @@ setup("WARRIOR", BOW, ARROWS, 500)
 WoW.playerClass = { "secret", "secret", 1 }; refresh()
 check(hidden(), "unreadable class: no block")
 
+-- Equipped ammo whose class can't be read: trusted, the slot counted, no "!".
+setup("HUNTER", BOW, 204, 700)
+WoW.items[204] = { classID = "secret", subClassID = 2, icon = 2004, name = "Odd Arrow" }; refresh()
+eq(textOf("ammo"), ICON(2004) .. "|cffffffff700|r", "unreadable ammo class: the slot, not 'wrong'")
+check(not has("doesn't fit this weapon"), "no wrong-ammo warning")
+
+-- Thrown, the stack unreadable: what the bags hold, marked unsure.
+setup("ROGUE", THROWN, nil, nil, {
+    [0] = { slots = 2, free = 0, family = 0, items = { { id = THROWN, count = 200 }, "secret" } },
+})
+WoW.invCount[18] = "secret"; refresh()
+eq(textOf("ammo"), ICON(1004) .. "|cffffffff200|r|cff888888?|r", "secret thrown stack: the bags', unsure")
+check(has("equipped stack can't be read"), "said in the tooltip")
+check(has("Some bag slots can't be read"), "an unreadable spare slot is said for thrown too")
+
+-- A projectile's kind is looked up once per item, not on every bag walk.
+setup("HUNTER", BOW, nil, nil, {
+    [0] = { slots = 2, free = 0, family = 0, items = { { id = ARROWS, count = 200 }, { id = BULLETS, count = 200 } } },
+}); refresh()
+local lookups, realInstant = 0, C_Item.GetItemInfoInstant
+C_Item.GetItemInfoInstant = function(id)
+    if id == ARROWS or id == BULLETS then lookups = lookups + 1 end
+    return realInstant(id)
+end
+refresh(); refresh()
+eq(lookups, 0, "bag projectiles: kinds cached")
+C_Item.GetItemInfoInstant = realInstant
+
+-- An older client without UnitUsesAmmo (before 70338): the weapon decides.
+setup("WARRIOR", BOW, ARROWS, 60)
+local realUses = UnitUsesAmmo
+UnitUsesAmmo = nil; refresh()
+eq(textOf("ammo"), ICON(2001) .. "|cffffd20060|r", "no UnitUsesAmmo: shown from the weapon")
+UnitUsesAmmo = realUses
+
 -- Thresholds: validation.
 local T = block("ammo")._test
 local lo, cr, err = T.validate("300", "100"); eq(lo, 300, "low"); eq(cr, 100, "critical"); eq(err, nil, "no error")
@@ -187,4 +222,16 @@ WoW.fire("PLAYER_EQUIPMENT_CHANGED", 18, true); WoW.tick()
 check(hidden(), "swapping to a wand hides it")
 
 check(next(GlassPanel.failures) == nil, "no failures")
+
+-- A scan that throws: recorded, the last good state kept, tried again.
+setup("HUNTER", BOW, ARROWS, 900); refresh()
+local realSlots = C_Container.GetContainerNumSlots
+WoW.invCount[0] = "secret"   -- forces the bag walk
+C_Container.GetContainerNumSlots = function() error("boom") end
+refresh()
+check(GlassPanel.failures["ammo:scan"], "scan failure recorded")
+eq(textOf("ammo"), ICON(2001) .. "|cffffffff900|r", "last good state kept")
+C_Container.GetContainerNumSlots = realSlots
+WoW.invCount[0] = 300
+eq(block("ammo")._test.state().count, 300, "still stale: the next read scans again")
 done("test_ammo")

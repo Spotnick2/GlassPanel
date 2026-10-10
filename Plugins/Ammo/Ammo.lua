@@ -17,8 +17,12 @@
 --
 -- UNMEASURED on the client: whether GetInventoryItemCount on the ammo slot
 -- totals that ammo across the bags (Vanilla) or counts the slot alone; what
--- UnitUsesAmmo says for warriors and rogues; the thrown stack's count. When
--- the slot count can't be read, the same item is counted in the bags.
+-- UnitUsesAmmo says for warriors and rogues; the thrown stack's count, and
+-- whether it already includes the same weapon in the bags (then "Equipped"
+-- and "In your bags" in the tooltip count those stacks twice). When a slot's
+-- count can't be read, the same item is counted in the bags instead (the
+-- thrown figure then carries a grey "?"). Equipped ammo whose item class
+-- can't be read is trusted: the slot is counted, not called the wrong kind.
 --
 -- No ammo equipped, or the wrong kind for the weapon: the matching
 -- projectiles in the bags are counted, with a red "!" (you can't shoot until
@@ -172,54 +176,77 @@ end
 local state = { kind = nil }
 local stale = true
 
-local function scan()
-    stale = false
+-- id -> "arrow" | "bullet" | false (not a projectile); nil while unreadable.
+-- An item's class never changes: known answers are kept for the session, so
+-- a bag walk with nothing equipped doesn't look every item up again.
+local kindOf = {}
+local function projectileKind(id)
+    local k = kindOf[id]
+    if k ~= nil then return k end
+    local c, sub = itemClass(id)
+    if c == nil or (c == PROJECTILE and sub == nil) then return nil end
+    k = c == PROJECTILE and KIND_OF_PROJECTILE[sub] or false
+    kindOf[id] = k
+    return k
+end
+
+local function build()
     local s = { class = playerClass() }
-    state = s
-    if not (s.class and DEFAULTS[s.class]) then return end
+    if not (s.class and DEFAULTS[s.class]) then return s end
     s.weapon = equippedID(RANGED_SLOT)
-    if not s.weapon then return end
+    if not s.weapon then return s end
     local classID, subClassID, icon = itemClass(s.weapon)
-    if classID ~= WEAPON then return end
+    if classID ~= WEAPON then return s end
     local kind = KIND_OF_WEAPON[subClassID]
-    if not kind then return end
-    if kind ~= "thrown" and clientSaysNoAmmo() then return end
+    if not kind then return s end
+    if kind ~= "thrown" and clientSaysNoAmmo() then return s end
     s.kind, s.weaponIcon = kind, icon
 
     if kind == "thrown" then
-        s.count = slotCount(RANGED_SLOT)
         s.icon = icon
-        s.spare = bagCount(function(id) return id == s.weapon end)
-        return
+        s.count = slotCount(RANGED_SLOT)
+        s.spare, s.spareUnsure = bagCount(function(id) return id == s.weapon end)
+        if s.count == nil then
+            -- The stack can't be read: what the bags hold, marked unsure.
+            s.count, s.fromBags, s.unsure = s.spare, true, true
+        end
+        return s
     end
 
     s.ammo = equippedID(AMMO_SLOT)
     if s.ammo then
-        local aClass, aSub, aIcon = itemClass(s.ammo)
-        s.ammoKind = aClass == PROJECTILE and KIND_OF_PROJECTILE[aSub] or nil
-        s.icon = aIcon
-        if s.ammoKind == kind then
+        local _, _, aIcon = itemClass(s.ammo)
+        local ak = projectileKind(s.ammo)
+        s.ammoKind, s.icon = ak or nil, aIcon
+        -- The right kind, or a class that can't be read (trusted): the slot.
+        if ak == kind or ak == nil then
             s.count = slotCount(AMMO_SLOT)
             if s.count == nil then
                 local n, unsure = bagCount(function(id) return id == s.ammo end)
                 if not unsure then s.count = n end
             end
-            return
+            return s
         end
         s.wrong = true
     end
     -- Nothing usable equipped: what the bags hold of the right kind.
     s.missing = true
-    s.icon = s.icon and not s.wrong and s.icon or KIND_ICON[kind]
-    local n, unsure = bagCount(function(id)
-        local c, sub = itemClass(id)
-        return c == PROJECTILE and KIND_OF_PROJECTILE[sub] == kind
-    end)
-    s.count, s.unsure = n, unsure
+    s.icon = KIND_ICON[kind]
+    s.count, s.unsure = bagCount(function(id) return projectileKind(id) == kind end)
+    return s
 end
 
+-- A scan that throws keeps the last good state and stays stale (tried again
+-- on the next repaint), as Durability's does.
 local function current()
-    if stale then scan() end
+    if stale then
+        local ok, s = pcall(build)
+        if ok then
+            state, stale = s, false
+        else
+            API.Fail("ammo:scan", s)
+        end
+    end
     return state
 end
 
@@ -342,9 +369,17 @@ local block = GlassPanel.RegisterBlock({
         end
         tt:AddDoubleLine("Weapon", itemName(s.weapon) or "?", 1, 0.82, 0, 1, 1, 1)
         if s.kind == "thrown" then
-            tt:AddDoubleLine("Equipped", s.count and BreakUpLargeNumbers(s.count) or "?", 1, 0.82, 0, 1, 1, 1)
+            if s.fromBags then
+                tt:AddLine("The equipped stack can't be read right now: the count is what your bags hold.",
+                    0.7, 0.7, 0.7, true)
+            else
+                tt:AddDoubleLine("Equipped", s.count and BreakUpLargeNumbers(s.count) or "?", 1, 0.82, 0, 1, 1, 1)
+            end
             if s.spare and s.spare > 0 then
                 tt:AddDoubleLine("In your bags", BreakUpLargeNumbers(s.spare), 1, 0.82, 0, 1, 1, 1)
+            end
+            if s.spareUnsure then
+                tt:AddLine("Some bag slots can't be read right now and aren't counted.", 0.7, 0.7, 0.7, true)
             end
         else
             if s.ammo then

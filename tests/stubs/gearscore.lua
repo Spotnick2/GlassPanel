@@ -62,11 +62,6 @@ function C_Item.GetItemInfo(item)
         "Armor", "Misc", 1, e.equipLoc, 134400, 0, 4, 0, 1, 0
 end
 function C_Item.GetItemInfoInstant(item)
-    -- An item from the Ammo stubs' catalogue (stubs/ammo.lua): its own class.
-    local c = WoW.items and WoW.items[item]
-    if c then
-        return item, "Item", "Item", "", sv(c.icon, "icon"), sv(c.classID, "classID"), sv(c.subClassID, "subClassID")
-    end
     local e = byItem(item)
     if not e then return nil end
     return e.id, "Armor", "Misc", sv(e.equipLoc, "equipLoc"), 134400, 4, 0

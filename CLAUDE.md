@@ -216,13 +216,16 @@ core's `ADDON_LOADED`.
   enum (item data). `UnitUsesAmmo` (**new in 70338**; Blizzard shows `CharacterAmmoSlot` on it) is
   the client's gate: a plain `false` hides arrows/bullets (thrown ignores it); absent or unreadable,
   the weapon decides. Count: `GetInventoryItemCount("player", 0)`, or that ammo in the bags when
-  the count can't be read; none equipped or the wrong kind: the matching projectiles in the bags
-  with a red `!`. Yellow under low, red under critical (strictly below), per class in
+  the count can't be read (an unreadable thrown stack: its bags, with a grey `?`); none equipped or
+  the wrong kind: the matching projectiles in the bags with a red `!`. Equipped ammo whose class
+  can't be read is trusted (the slot), never "wrong". Projectile kinds are cached per item id. The
+  scan runs under pcall (Durability's pattern: `ammo:scan` recorded, still stale). Yellow under low, red under critical (strictly below), per class in
   `GlassPanelAmmoDB.thresholds[CLASS]` (defaults hunter 600/200, warrior and rogue 100/40; a
   corrupt pair falls back), set in a small window (left-click or the plugin option button).
   **Unmeasured:** whether the ammo slot's count totals the bags (Vanilla) or the slot alone;
-  `UnitUsesAmmo` for warriors and rogues; the thrown count. The stub's `C_Item.GetItemInfoInstant`
-  (gearscore.lua) reads `WoW.items` (stubs/ammo.lua) first.
+  `UnitUsesAmmo` for warriors and rogues; the thrown count, and whether it includes the same weapon
+  in the bags (the tooltip would count those twice). stubs/ammo.lua wraps `C_Item.GetItemInfoInstant`
+  once at the first reset: `WoW.items` first, else gearscore's.
 - **`Plugins\Durability`** (#12): lowest durability and repair cost. Events only mark the
   cache stale; it's rebuilt at most once per repaint (tooltip data is heavy, and only for damaged
   items). An unreadable item marks the figure with a grey `?` and makes the cost unknown; the cost comes from
