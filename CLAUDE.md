@@ -210,6 +210,12 @@ core's `ADDON_LOADED`.
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable
   bag (free count or family) is left out and flagged with a grey `?`. Left-click: `ToggleAllBags`.
+- **`Plugins\Warlock`** (#67): warlocks only (`UnitClass` file token; else nil text). Soul Shards (6265,
+  `C_Item.GetItemCount`; yellow under 5, red at 0) and a mark per stone carried, any rank (healthstones
+  incl. the talented 19004-19013, soulstones; best rank named in the tooltip). An unreadable count is
+  a grey `?` for shards and no mark for a stone (the tooltip says unknown); a lower rank readable as
+  carried still counts. Cooldowns from `C_Container.GetItemCooldown(itemID)`; a function `interval`
+  (1 s while a carried stone's cooldown runs, else 30 s). No click (using a stone is secure).
 - **`Plugins\Durability`** (#12): lowest durability and repair cost. Events only mark the
   cache stale; it's rebuilt at most once per repaint (tooltip data is heavy, and only for damaged
   items). An unreadable item marks the figure with a grey `?` and makes the cost unknown; the cost comes from
