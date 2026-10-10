@@ -315,7 +315,7 @@ texture names only grow; instances; upgrade rules).
 - `C:\Projects\References\forever-api-1.60.1.70338.md` is the full API dump: functions, events,
   **widget methods** (the only list of those) and the `_G` walk. It proves a name exists, not
   that it works. `GetProfessions` is listed but returns `nil x7`. **The `_G` walk includes the
-  globals of whatever addons were loaded** (70124 lists `GetMapID`, `GetTalentData`, `ConvertID`,
+  globals of whatever addons were loaded** (70124 and 70338 list `GetMapID`, `GetTalentData`, `ConvertID`,
   absent from 70009): before stubbing a global, find it in `wow-ui-source` or the documented
   functions, not only in "Global functions".
 - `C:\Projects\wow-ui-source` is Blizzard's UI source (Gethe/wow-ui-source), on the **`forever`**
