@@ -193,8 +193,11 @@ core's `ADDON_LOADED`.
   a red `0` when none are left), Currencies' chooser on a **hardcoded per-class table** of item ids
   (`CLASS`, keyed by `UnitClass`'s file name; nothing in the client says which items a class uses).
   Poisons are in the client's consumables list; the other ids are Vanilla's (Informant: class
-  Reagent), unmeasured: an id with no icon or the question-mark icon (134400) is left out
-  (unmeasured whether the client ever says so). Counts from `C_Item.GetItemCount` (bags);
+  Reagent), unmeasured. Icons from `C_Item.GetItemInfoInstant` (no item data needed), else
+  `GetItemIconByID`; a class id with neither (or the question mark, 134400) is **pending, not
+  unknown** (a fresh cache): requested through the name loader, kept (bar, chooser, default picks)
+  drawn as the question mark, and left out only once its load fails with still no icon (#71).
+  Counts from `C_Item.GetItemCount` (bags);
   names from `C_Item.GetItemNameByID`, **asked for only by the tooltip and the chooser** (the bar
   and the default search read counts and icons), requested only while `IsItemDataCachedByID` says
   not cached, once, and listened for on the plugin's own frame only while pending (GearScore's

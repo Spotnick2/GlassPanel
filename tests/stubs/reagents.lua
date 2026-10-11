@@ -18,10 +18,27 @@ C_Item.GetItemCount = C_Item.GetItemCount or function(item)
     if n == "secret" then return WoW.Secret("itemCount " .. tostring(item)) end
     return n or 0
 end
--- C_Item.GetItemIconByID(itemInfo) -> optional icon
+-- C_Item.GetItemIconByID(itemInfo) -> optional icon. e.icon: nil is the
+-- question mark (134400), false no icon at all; e.iconByID, when set,
+-- overrides this call's answer alone (false: nil).
 function C_Item.GetItemIconByID(item)
     local e = WoW.bagItems[item]
-    return e and (e.icon or 134400) or nil
+    if not e then return nil end
+    if e.iconByID ~= nil then return e.iconByID or nil end
+    if e.icon == false then return nil end
+    return e.icon or 134400
+end
+-- C_Item.GetItemInfoInstant(itemInfo) -> itemID, itemType, itemSubType,
+-- itemEquipLoc, icon, classID, subClassID (MayReturnNothing). A bag item
+-- answers from e.icon (false: nothing); anything else asks gearscore.lua's.
+local otherInstant = C_Item.GetItemInfoInstant
+function C_Item.GetItemInfoInstant(item)
+    local e = WoW.bagItems[item]
+    if e then
+        if e.icon == false then return nil end
+        return item, "Reagent", "Reagent", "", e.icon or 134400, 5, 0
+    end
+    if otherInstant then return otherInstant(item) end
 end
 -- C_Item.GetItemNameByID(itemInfo) -> optional itemName. Plugins' stubs
 -- chain it: each answers from its own data, else asks the one before (any

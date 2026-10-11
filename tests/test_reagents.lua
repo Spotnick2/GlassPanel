@@ -134,7 +134,7 @@ GlassPanelReagentsDB.order = { 99999, 17020 }
 WoW.bagItems[17056] = nil
 local ids = {}
 for _, c in ipairs(T().available()) do ids[c.id] = true end
-check(not ids[17056] and ids[17020], "a class id the client doesn't know isn't offered")
+check(ids[17056] and ids[17020], "a class id with no icon yet is still offered (pending its load)")
 mage()
 WoW.itemCounts[17020] = 40
 GlassPanelReagentsDB.order = "junk"
@@ -196,16 +196,73 @@ loadAddon()
 tip(); WoW.tick(); tip()
 eq(WoW.itemRequests[17031], nil, "cached but nameless: no request")
 
--- The question-mark icon: an item with no data, left out.
+-- The icon comes from GetItemInfoInstant first (no item data needed).
+mage()
+WoW.itemCounts[17020] = 40
+WoW.bagItems[17020].iconByID = false
+GlassPanelReagentsDB = { order = { 17020 } }
+loadAddon()
+eq(textOf("reagents"), ic(2001) .. "40", "GetItemIconByID has none: GetItemInfoInstant's icon")
+
+-- A fresh cache: a class id with no icon yet (from either call) is pending,
+-- not unknown. Requested, kept (the question mark), and drawn once it loads.
+local function offeredIds()
+    local o = {}
+    for _, c in ipairs(T().available()) do o[c.id] = true end
+    return o
+end
 mage()
 WoW.itemCounts[17020], WoW.itemCounts[17056] = 40, 3
-WoW.bagItems[17056].icon = 134400
+WoW.bagItems[17056].icon, WoW.bagItems[17056].cached = false, false
+GlassPanelReagentsDB = nil
+loadAddon()
+WoW.fire("BAG_UPDATE_DELAYED"); WoW.tick()
+eq(table.concat(GlassPanelReagentsDB.order, ","), "17020,17056", "carried with no icon: still a default pick")
+eq(textOf("reagents"), ic(2001) .. "40  " .. ic(134400) .. "3", "carried with no icon: on the bar, a question mark")
+eq(WoW.itemRequests[17056], 1, "its data is requested")
+check(T().pending()[17056], "pending")
+check(offeredIds()[17056], "and offered, unnamed")
+for _ = 1, 3 do GlassPanel.Refresh("reagents"); WoW.tick(); tip() end
+eq(WoW.itemRequests[17056], 1, "requests don't climb on repaints")
+WoW.bagItems[17056].icon, WoW.bagItems[17056].cached = 2004, true
+WoW.fire("ITEM_DATA_LOAD_RESULT", 17056, true); WoW.tick()
+eq(textOf("reagents"), ic(2001) .. "40  " .. ic(2004) .. "3", "loaded: its icon")
+check(tip():find("Light Feather	3", 1, true), "and its name")
+eq(WoW.itemRequests[17056], 1, "requested once")
+
+-- In the chooser too: a pending id is listed, and gains its icon on load.
+mage()
+WoW.bagItems[17032].icon, WoW.bagItems[17032].cached = false, false
+GlassPanelReagentsDB = { order = { 17020 } }
+loadAddon()
+B().widget._scripts.OnClick(B().widget, "LeftButton")
+local rs = T().rows
+eq(rs[3].id, 17032, "the chooser lists the pending id")
+check(rs[3].text:GetText():find("|T134400:16", 1, true) and rs[3].text:GetText():find("item 17032", 1, true),
+      "with the question mark and a grey name")
+WoW.bagItems[17032].icon, WoW.bagItems[17032].cached = 2003, true
+WoW.fire("ITEM_DATA_LOAD_RESULT", 17032, true); WoW.tick(); WoW.flushTimers(0)
+check(rs[3].text:GetText():find("|T2003:16", 1, true) and rs[3].text:GetText():find("Rune of Portals", 1, true),
+      "loaded: the chooser shows its icon and name")
+T().window():Hide()
+
+-- A failed load with still no icon: left out (bar, chooser, defaults), and
+-- not requested again.
+mage()
+WoW.itemCounts[17020], WoW.itemCounts[17056] = 40, 3
+WoW.bagItems[17056].icon, WoW.bagItems[17056].cached = false, false
 GlassPanelReagentsDB = { order = { 17020, 17056 } }
 loadAddon()
-eq(textOf("reagents"), ic(2001) .. "40", "question-mark icon: left out")
-local offered = {}
-for _, c in ipairs(T().available()) do offered[c.id] = true end
-check(not offered[17056], "and not offered")
+eq(WoW.itemRequests[17056], 1, "requested")
+WoW.fire("ITEM_DATA_LOAD_RESULT", 17056, false); WoW.tick()
+check(T().failed()[17056], "a failed load is recorded")
+eq(textOf("reagents"), ic(2001) .. "40", "failed with no icon: left out")
+check(not offeredIds()[17056], "and not offered")
+tip(); GlassPanel.Refresh("reagents"); WoW.tick()
+eq(WoW.itemRequests[17056], 1, "and never requested again")
+GlassPanelReagentsDB = nil
+WoW.fire("BAG_UPDATE_DELAYED"); WoW.tick()
+eq(table.concat(GlassPanelReagentsDB.order, ","), "17020", "and not a default pick")
 
 -- The default search and the bar read no names: counts and icons only.
 mage()

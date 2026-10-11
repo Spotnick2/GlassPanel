@@ -3,16 +3,18 @@
 -- per class, since nothing in the client says which items a class uses.
 --
 -- Forever (70338 dump): C_Item.GetItemCount(id) for the count (bags only),
--- C_Item.GetItemIconByID(id) for the icon, C_Item.GetItemNameByID(id) for the
--- name (nil until the item's data is loaded: requested once, on our own
+-- C_Item.GetItemInfoInstant(id)'s icon (no item data needed), else
+-- C_Item.GetItemIconByID(id), for the icon, C_Item.GetItemNameByID(id) for
+-- the name (nil until the item's data is loaded: requested once, on our own
 -- frame, as GearScore does; an answered id is never requested again). The
 -- global GetItemInfo is absent. Only the tooltip and the chooser ask for
 -- names: the bar shows icons and counts.
 --
--- UNMEASURED: what the client answers for an id it doesn't serve. Left out:
--- no icon, or the question-mark icon (134400). A failed name load only costs
--- the name. A Retail client may know every Vanilla id's icon anyway, so this
--- may never trigger.
+-- UNMEASURED: what the client answers for an id it doesn't serve. A class id
+-- with no icon (or the question-mark icon, 134400) is pending, not unknown:
+-- its data is requested and it's kept, drawn with the question mark; only a
+-- failed load (ITEM_DATA_LOAD_RESULT false) with still no icon leaves it out.
+-- A failed load of an id with an icon only costs the name.
 --
 -- Ammo (#66) and the warlock's shards and stones (#67) have their own
 -- plugins and aren't listed here. Picks are per character
@@ -79,9 +81,12 @@ end
 -- An answered id (loaded or failed) is never requested again this session:
 -- one that loads but stays nameless would otherwise loop (request, load,
 -- repaint, tooltip, request). It keeps its icon and count, named "item <id>".
+-- Icons go through the same loader: a class id with no icon is requested
+-- too, and `failed` holds the ids whose load failed with still no icon.
 --------------------------------------------------------------------------------
 
-local pending, answered = {}, {}
+local pending, answered, failed = {}, {}, {}
+local knownIcon
 local LOAD_EVENTS = { "ITEM_DATA_LOAD_RESULT", "GET_ITEM_INFO_RECEIVED" }
 local loader = CreateFrame("Frame")
 local listening = false
@@ -93,11 +98,12 @@ local function listen(on)
         if on then API.RegisterEvent(loader, e, "Reagents") else loader:UnregisterEvent(e) end
     end
 end
-loader:SetScript("OnEvent", function(_, _, rawId)
+loader:SetScript("OnEvent", function(_, _, rawId, success)
     local id = P(rawId)
     if id and pending[id] then
         pending[id] = nil
         answered[id] = true
+        if P(success) == false and not knownIcon(id) then failed[id] = true end
         GlassPanel.Refresh("reagents")
         refreshWindowSoon()
     end
@@ -113,13 +119,26 @@ local function request(id)
     listen(true)
 end
 
--- The id's icon, or nil when the client doesn't seem to know it. (A failed
--- name load doesn't count: it costs the name, never the icon and count.)
-local function knownIcon(id)
-    local ok, icon = pcall(C_Item.GetItemIconByID, id)
-    icon = ok and P(icon) or nil
+-- The id's icon, or nil while the client has none for it: GetItemInfoInstant
+-- needs no item data, GetItemIconByID may.
+local function usable(icon)
+    icon = P(icon)
     if icon == QUESTION_MARK or (type(icon) ~= "number" and type(icon) ~= "string") then return nil end
     return icon
+end
+knownIcon = function(id)
+    local ok, _, _, _, _, icon = pcall(C_Item.GetItemInfoInstant, id)
+    icon = ok and usable(icon) or nil
+    if icon then return icon end
+    local okI, byId = pcall(C_Item.GetItemIconByID, id)
+    return okI and usable(byId) or nil
+end
+
+local function isClassId(id)
+    for _, v in ipairs(classList()) do
+        if v == id then return true end
+    end
+    return false
 end
 
 local function count(id)
@@ -129,11 +148,15 @@ local function count(id)
 end
 
 -- One item by id: { id, name (nil while loading, or when not asked for),
--- count (nil = unreadable), icon }, or nil when the client doesn't know the
--- id. withName: read the name, and request it while it's missing.
+-- count (nil = unreadable), icon (nil while loading) }, or nil when the
+-- client doesn't know the id (a class id: only once its load failed).
+-- withName: read the name, and request it while it's missing.
 local function info(id, withName)
     local icon = knownIcon(id)
-    if not icon then return nil end
+    if not icon then
+        if failed[id] or not isClassId(id) then return nil end
+        request(id)
+    end
     local name
     if withName then
         local okN, n = pcall(C_Item.GetItemNameByID, id)
@@ -146,8 +169,8 @@ local function info(id, withName)
     return { id = id, name = name, count = count(id), icon = icon }
 end
 
--- The class's reagents the client knows, in the table's order, named (the
--- chooser's list).
+-- The class's reagents, in the table's order, named (the chooser's list),
+-- but for those whose load failed.
 local function available()
     local list = {}
     for _, id in ipairs(classList()) do list[#list + 1] = info(id, true) end
@@ -169,7 +192,7 @@ local function picks()
         for _, id in ipairs(classList()) do
             if #out >= DEFAULT_MAX then break end
             local n = count(id)
-            if n and n > 0 and knownIcon(id) then out[#out + 1] = id end
+            if n and n > 0 and not failed[id] then out[#out + 1] = id end
         end
         -- Nothing carried yet, or a partial read: decide later.
         if #out == 0 or not bagsSettled then return out end
@@ -190,8 +213,9 @@ local function setPicks(order)
     GlassPanel.Refresh("reagents")
 end
 
+-- An icon still loading is drawn as the question mark.
 local function icon(c, size)
-    return string.format("|T%s:%d:%d:0:0:64:64:5:59:5:59|t", tostring(c.icon), size, size)
+    return string.format("|T%s:%d:%d:0:0:64:64:5:59:5:59|t", tostring(c.icon or QUESTION_MARK), size, size)
 end
 
 -- None left is red: the spell won't cast.
@@ -389,5 +413,5 @@ local block = GlassPanel.RegisterBlock({
 if block then
     block._test = { CLASS = CLASS, available = available, picks = picks, rows = rows,
                     window = function() return win end, pending = function() return pending end,
-                    answered = function() return answered end }
+                    answered = function() return answered end, failed = function() return failed end }
 end
