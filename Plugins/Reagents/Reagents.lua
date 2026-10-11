@@ -5,20 +5,21 @@
 -- Forever (70338 dump): C_Item.GetItemCount(id) for the count (bags only),
 -- C_Item.GetItemIconByID(id) for the icon, C_Item.GetItemNameByID(id) for the
 -- name (nil until the item's data is loaded: requested once, on our own
--- frame, as GearScore does; a failed load is never requested again). The
+-- frame, as GearScore does; an answered id is never requested again). The
 -- global GetItemInfo is absent. Only the tooltip and the chooser ask for
 -- names: the bar shows icons and counts.
 --
 -- UNMEASURED: what the client answers for an id it doesn't serve. Left out:
--- no icon, the question-mark icon (134400), or a failed load. A Retail
--- client may know every Vanilla id's icon anyway, so this may never trigger.
+-- no icon, or the question-mark icon (134400). A failed name load only costs
+-- the name. A Retail client may know every Vanilla id's icon anyway, so this
+-- may never trigger.
 --
 -- Ammo (#66) and the warlock's shards and stones (#67) have their own
 -- plugins and aren't listed here. Picks are per character
 -- (## SavedVariablesPerCharacter). Never chosen: up to 3 of the class's
--- reagents the character carries, saved the first time they're found so the
--- bar doesn't change by itself. Every number through API.Plain: a secret
--- count is a grey "?", never a guess.
+-- reagents the character carries, saved the first time they're found once
+-- bags have settled, so the bar doesn't change by itself. Every number
+-- through API.Plain: a secret count is a grey "?", never a guess.
 
 GlassPanel = GlassPanel or {}
 local API, Glass = GlassPanel.API, GlassPanel.Glass
@@ -46,6 +47,12 @@ local CLASS = {
                 17034, 17035, 17036, 17037, 17038 }, -- Maple, Stranglethorn, Ashwood, Hornbeam, Ironwood Seed
     WARLOCK = { 5565, 16583 },                      -- Infernal Stone, Demonic Figurine
 }
+-- A class with no list (hunter, warrior) gets no block. A class that can't be
+-- read now gets the block, which stays empty while it can't.
+local _, classFile = UnitClass("player")
+classFile = P(classFile)
+if type(classFile) == "string" and not CLASS[classFile] then return end
+
 local DEFAULT_MAX = 3   -- first-run picks: up to this many carried
 local QUESTION_MARK = 134400   -- the icon of an item with no data
 
@@ -66,13 +73,15 @@ local function classList()
 end
 
 --------------------------------------------------------------------------------
--- Names load late: requested once, answered on our own frame, which listens
+-- Names load late: requested only while the client says the item isn't
+-- cached (GearScore's guard), once, answered on our own frame, which listens
 -- only while one of ours is pending (the load events fire for every item).
--- A load that fails (success false) marks the id failed: never requested
--- again this session, and left out as unknown.
+-- An answered id (loaded or failed) is never requested again this session:
+-- one that loads but stays nameless would otherwise loop (request, load,
+-- repaint, tooltip, request). It keeps its icon and count, named "item <id>".
 --------------------------------------------------------------------------------
 
-local pending, failed = {}, {}
+local pending, answered = {}, {}
 local LOAD_EVENTS = { "ITEM_DATA_LOAD_RESULT", "GET_ITEM_INFO_RECEIVED" }
 local loader = CreateFrame("Frame")
 local listening = false
@@ -84,11 +93,11 @@ local function listen(on)
         if on then API.RegisterEvent(loader, e, "Reagents") else loader:UnregisterEvent(e) end
     end
 end
-loader:SetScript("OnEvent", function(_, _, rawId, success)
+loader:SetScript("OnEvent", function(_, _, rawId)
     local id = P(rawId)
     if id and pending[id] then
         pending[id] = nil
-        if P(success) == false then failed[id] = true end
+        answered[id] = true
         GlassPanel.Refresh("reagents")
         refreshWindowSoon()
     end
@@ -96,15 +105,17 @@ loader:SetScript("OnEvent", function(_, _, rawId, success)
 end)
 
 local function request(id)
-    if pending[id] or failed[id] then return end
+    if pending[id] or answered[id] then return end
+    local ok, cached = pcall(C_Item.IsItemDataCachedByID, id)
+    if ok and P(cached) == true then return end   -- loaded: a missing name won't come
     pending[id] = true
     C_Item.RequestLoadItemDataByID(id)
     listen(true)
 end
 
--- The id's icon, or nil when the client doesn't seem to know it.
+-- The id's icon, or nil when the client doesn't seem to know it. (A failed
+-- name load doesn't count: it costs the name, never the icon and count.)
 local function knownIcon(id)
-    if failed[id] then return nil end
     local ok, icon = pcall(C_Item.GetItemIconByID, id)
     icon = ok and P(icon) or nil
     if icon == QUESTION_MARK or (type(icon) ~= "number" and type(icon) ~= "string") then return nil end
@@ -143,9 +154,14 @@ local function available()
     return list
 end
 
+-- Bags fill after PLAYER_ENTERING_WORLD: the first BAG_UPDATE_DELAYED of the
+-- session says the counts are settled.
+local bagsSettled = false
+
 -- The picked ids, in order (each once). Never chosen: the carried ones,
--- saved now so they stay put. The search reads counts first, so an id that
--- isn't carried costs one call.
+-- saved once bags are settled so they stay put (until then, worked out
+-- again each time). The search reads counts first, so an id that isn't
+-- carried costs one call.
 local function picks()
     local d = db()
     if not d.order then
@@ -155,7 +171,8 @@ local function picks()
             local n = count(id)
             if n and n > 0 and knownIcon(id) then out[#out + 1] = id end
         end
-        if #out == 0 then return out end   -- nothing carried yet: decide when there is
+        -- Nothing carried yet, or a partial read: decide later.
+        if #out == 0 or not bagsSettled then return out end
         d.order = out
     end
     local seen, out = {}, {}
@@ -198,42 +215,43 @@ local win, rows = nil, {}
 local ROW_W, ROW_H = 340, 26
 
 -- The rows: the shown ones first, in order (only those the client resolves),
--- then the rest in the class's order. `shown` is that first part, as ids.
+-- then the rest in the class's order. `shown` is that first part, as ids;
+-- `unresolved` the saved ids the client doesn't resolve right now.
 local function entries()
     local avail = available()
     local byId = {}
     for _, c in ipairs(avail) do byId[c.id] = c end
-    local list, shown, used = {}, {}, {}
+    local list, shown, used, unresolved = {}, {}, {}, {}
     for _, id in ipairs(picks()) do
         local c = byId[id] or info(id, true)
         if c then
             list[#list + 1] = c
             shown[#shown + 1] = id
             used[id] = true
+        else
+            unresolved[#unresolved + 1] = id
         end
     end
     for _, c in ipairs(avail) do
         if not used[c.id] then list[#list + 1] = c end
     end
-    return list, shown, used
+    return list, shown, used, unresolved
 end
 
 local refreshWindow
 
--- Write `shown` (the visible order) back, keeping saved ids the client
--- doesn't resolve right now at the end, untouched.
-local function saveShown(shown)
-    local keep, inShown = {}, {}
-    for _, id in ipairs(shown) do inShown[id] = true; keep[#keep + 1] = id end
-    for _, id in ipairs(picks()) do
-        if not inShown[id] and not info(id) then keep[#keep + 1] = id end
-    end
+-- Write `shown` (the visible order) back, keeping the unresolved saved ids
+-- at the end, untouched.
+local function saveShown(shown, unresolved)
+    local keep = {}
+    for _, id in ipairs(shown) do keep[#keep + 1] = id end
+    for _, id in ipairs(unresolved) do keep[#keep + 1] = id end
     setPicks(keep)
     refreshWindow()
 end
 
 local function move(id, step)
-    local _, shown = entries()
+    local _, shown, _, unresolved = entries()
     for i, v in ipairs(shown) do
         if v == id then
             local j = i + step
@@ -241,17 +259,17 @@ local function move(id, step)
             break
         end
     end
-    saveShown(shown)
+    saveShown(shown, unresolved)
 end
 
 local function toggle(id, on)
-    local _, shown = entries()
+    local _, shown, _, unresolved = entries()
     local out = {}
     for _, v in ipairs(shown) do
         if v ~= id then out[#out + 1] = v end
     end
     if on then out[#out + 1] = id end
-    saveShown(out)
+    saveShown(out, unresolved)
 end
 
 local function row(i)
@@ -338,8 +356,11 @@ local block = GlassPanel.RegisterBlock({
     side = "right",
     order = 125,
     events = { "PLAYER_ENTERING_WORLD", "BAG_UPDATE_DELAYED" },
-    onEvent = function() refreshWindowSoon() end,
-    -- nil hides the block: nothing picked (a hunter or warrior has no list).
+    onEvent = function(_, event)
+        if event == "BAG_UPDATE_DELAYED" then bagsSettled = true end
+        refreshWindowSoon()
+    end,
+    -- nil hides the block: nothing picked.
     text = function()
         local parts = {}
         for _, id in ipairs(picks()) do
@@ -368,5 +389,5 @@ local block = GlassPanel.RegisterBlock({
 if block then
     block._test = { CLASS = CLASS, available = available, picks = picks, rows = rows,
                     window = function() return win end, pending = function() return pending end,
-                    failed = function() return failed end }
+                    answered = function() return answered end }
 end

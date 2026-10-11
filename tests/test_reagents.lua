@@ -13,6 +13,7 @@ end
 local function mage()
     WoW.playerClass = { "Mage", "MAGE", 8 }
     WoW.itemCounts = {}
+    WoW.itemRequests = {}
     WoW.bagItems = {
         [17020] = { name = "Arcane Powder", icon = 2001 },
         [17031] = { name = "Rune of Teleportation", icon = 2002 },
@@ -42,12 +43,17 @@ eq(table.concat(names, ","), "Arcane Powder,Rune of Teleportation,Rune of Portal
    "the mage's reagents, in the table's order")
 eq(GlassPanelReagentsDB.order, nil, "nothing saved while nothing is carried")
 
--- A warrior: no list, no block, nothing offered.
+-- A warrior: no list, no block (no Options row, no empty chooser).
 WoW.playerClass = { "Warrior", "WARRIOR", 1 }
 GlassPanelReagentsDB = nil
 loadAddon()
-eq(#T().available(), 0, "a warrior is offered nothing")
-eq(B().widget._shown, false, "a warrior: hidden")
+eq(B(), nil, "a warrior: no block")
+-- A class that can't be read at load: the block, empty and hidden.
+WoW.playerClass = { "secret", "secret", 1 }
+loadAddon()
+check(B() ~= nil, "unreadable class: the block is there")
+eq(#T().available(), 0, "and offers nothing")
+eq(B().widget._shown, false, "and stays hidden")
 
 -- First run carrying powder and teleport runes: shown by default, saved once.
 mage()
@@ -59,7 +65,15 @@ GlassPanelReagentsDB = nil
 loadAddon()
 eq(textOf("reagents"), ic(2001) .. "40  " .. ic(2002) .. "5  " .. ic(2003) .. "3",
    "carried reagents shown by default, up to 3, in the class's order")
-eq(table.concat(GlassPanelReagentsDB.order, ","), "17020,17031,17032", "the defaults are saved once found")
+eq(GlassPanelReagentsDB.order, nil, "bags not settled yet: nothing saved")
+-- Bags still filling: the defaults follow what's there until they settle.
+WoW.itemCounts[17031] = nil
+GlassPanel.Refresh("reagents"); WoW.tick()
+eq(textOf("reagents"), ic(2001) .. "40  " .. ic(2003) .. "3  " .. ic(2004) .. "12",
+   "before bags settle: worked out again")
+WoW.itemCounts[17031] = 5
+WoW.fire("BAG_UPDATE_DELAYED"); WoW.tick()
+eq(table.concat(GlassPanelReagentsDB.order, ","), "17020,17031,17032", "the defaults are saved once bags settle")
 check(tip():find("Arcane Powder\t40", 1, true), "tooltip: name and count")
 -- Using them up: red 0, and the pick stays.
 WoW.itemCounts[17031] = 0
@@ -111,6 +125,12 @@ WoW.itemCounts[17020] = 40
 GlassPanelReagentsDB.order = { 99999, 17020 }
 GlassPanel.Refresh("reagents"); WoW.tick()
 eq(textOf("reagents"), ic(2001) .. "40", "unknown id skipped")
+w._scripts.OnClick(w, "LeftButton")
+eq(rows[1].id, 17020, "the chooser lists the resolved pick")
+rows[2].check:SetChecked(true); rows[2].check._scripts.OnClick(rows[2].check)
+eq(table.concat(GlassPanelReagentsDB.order, ","), "17020,17031,99999", "an unresolved saved id is kept at the end")
+T().window():Hide()
+GlassPanelReagentsDB.order = { 99999, 17020 }
 WoW.bagItems[17056] = nil
 local ids = {}
 for _, c in ipairs(T().available()) do ids[c.id] = true end
@@ -139,7 +159,7 @@ WoW.fire("ITEM_DATA_LOAD_RESULT", 17020, true); WoW.tick()
 check(T().pending()[17020] == nil, "answered")
 check(tip():find("Arcane Powder\t40", 1, true), "the name once loaded")
 
--- A failed load: never requested again, and the id is left out.
+-- A failed name load: never requested again, and only the name is lost.
 mage()
 WoW.itemCounts[17020], WoW.itemCounts[17031] = 40, 5
 WoW.bagItems[17031].cached = false
@@ -148,11 +168,33 @@ loadAddon()
 tip()
 eq(WoW.itemRequests[17031], 1, "requested once")
 WoW.fire("ITEM_DATA_LOAD_RESULT", 17031, false); WoW.tick()
-check(T().failed()[17031], "a failed load is recorded")
-eq(textOf("reagents"), ic(2001) .. "40", "a failed id is left out of the bar")
+check(T().answered()[17031], "a failed load is recorded")
+eq(textOf("reagents"), ic(2001) .. "40  " .. ic(2002) .. "5", "a failed name keeps the icon and count")
+check(tip():find("item 17031|r\t5", 1, true), "tooltip: the fallback name")
 tip(); GlassPanel.Refresh("reagents"); WoW.tick(); tip()
 eq(WoW.itemRequests[17031], 1, "and never requested again")
 eq(T().pending()[17031], nil, "nothing left pending")
+
+-- A load that succeeds but leaves no name: no request loop through the open
+-- tooltip (answer, repaint, tooltip redraw, request).
+mage()
+WoW.itemCounts[17031] = 5
+WoW.bagItems[17031].cached = false
+GlassPanelReagentsDB = { order = { 17031 } }
+loadAddon()
+tip()
+eq(WoW.itemRequests[17031], 1, "requested by the tooltip")
+for _ = 1, 5 do WoW.fire("ITEM_DATA_LOAD_RESULT", 17031, true); WoW.tick() end
+eq(WoW.itemRequests[17031], 1, "loaded but nameless: not requested again")
+check(tip():find("item 17031|r\t5", 1, true), "the fallback name")
+-- The client says it's cached but has no name: never requested at all.
+mage()
+WoW.itemCounts[17031] = 5
+WoW.bagItems[17031].name = nil
+GlassPanelReagentsDB = { order = { 17031 } }
+loadAddon()
+tip(); WoW.tick(); tip()
+eq(WoW.itemRequests[17031], nil, "cached but nameless: no request")
 
 -- The question-mark icon: an item with no data, left out.
 mage()
