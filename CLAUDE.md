@@ -11,7 +11,7 @@ file doesn't cover something, check how those handle it before you invent a new 
 
 **Goal:** a streamlined, liquid-glass replacement for the owner's Titan Panel setup. It's one bar
 across the top of the screen with only the readouts actually used, plus a small plugin API so
-the owner's own Titan plugins (`C:\Projects\TitanPanelXPP`, `TitanLayer`, `TitanGearScore`,
+the owner's own Titan plugins (`C:\Projects\WoW\TitanPanelXPP`, `TitanLayer`, `TitanGearScore`,
 `TitanProfessions`) can be ported as separate addons. Plan and roadmap: `docs/PLAN.md`. Plugin
 contract: `docs/PLUGINS.md`.
 
@@ -58,7 +58,7 @@ core's `ADDON_LOADED`.
   Currencies use it. `API.Plain(v)` is the one "secret becomes nil" guard;
   use it at every read. `API.Returned(v)` asks "did the client return anything" without comparing:
   **never write `raw ~= nil` on a raw read**, since comparing a secret (even with nil) throws on
-  the client, and the offline stub can't catch it. The global `GetCoinTextureString` is **absent** (70009, still in the 70124 dump);
+  the client, and the offline stub can't catch it. The global `GetCoinTextureString` is **absent** (70009, still in the 70338 dump);
   use `C_CurrencyInfo`'s. `MEASURED_ON_BUILD` lives here too; the login notice for another build
   speaks only in a **development copy** (`API.IsDevelopmentCopy`: version `dev` from deploy, or the
   raw `@project-version@`), never in a release (Priestly #76: what flags an addon out of date is the
@@ -293,7 +293,7 @@ includes Titan's code and the owner's TBC plugins.
 
 The material is **LibGlass-1.0**, an embedded LibStub library (`..\LibGlass`,
 github.com/Spotnick2/LibGlass, public, MIT) that every glass addon embeds (#57; the migration
-guide is `C:\Projects\References\LIBGLASS-MIGRATION.md`). Its repo owns the code, the textures,
+guide is `C:\Projects\WoW\References\LIBGLASS-MIGRATION.md`). Its repo owns the code, the textures,
 the generator (`Tools/make_textures.py`) and the write-up (`docs/GLASS-MATERIAL.md`: layers,
 parameters, gotchas, history), and its `CLAUDE.md` holds the contract (the API, region fields and
 texture names only grow; instances; upgrade rules).
@@ -323,18 +323,18 @@ texture names only grow; instances; upgrade rules).
 
 ## References: read these before touching an unfamiliar API
 
-- `C:\Projects\References\PORTING-TBC-TO-FOREVER.md` holds the canonical addon-agnostic field
+- `C:\Projects\WoW\References\PORTING-TBC-TO-FOREVER.md` holds the canonical addon-agnostic field
   notes, measured on the live client. Treat them as fact. Other sessions edit this file, so
   write new addon-agnostic findings there, not into a copy here. Read "False friends" before
   porting any TBC call: several moved APIs return a struct instead of a tuple
   (`C_SkillInfo.GetSkillLineInfo`, `C_Container.GetContainerItemInfo`).
-- `C:\Projects\References\forever-api-1.60.1.70124.md` is the full API dump: functions, events,
+- `C:\Projects\WoW\References\forever-api-1.60.1.70338.md` is the full API dump: functions, events,
   **widget methods** (the only list of those) and the `_G` walk. It proves a name exists, not
   that it works. `GetProfessions` is listed but returns `nil x7`. **The `_G` walk includes the
-  globals of whatever addons were loaded** (70124 lists `GetMapID`, `GetTalentData`, `ConvertID`,
+  globals of whatever addons were loaded** (70124 and 70338 list `GetMapID`, `GetTalentData`, `ConvertID`,
   absent from 70009): before stubbing a global, find it in `wow-ui-source` or the documented
   functions, not only in "Global functions".
-- `C:\Projects\wow-ui-source` is Blizzard's UI source (Gethe/wow-ui-source), on the **`forever`**
+- `C:\Projects\WoW\wow-ui-source` is Blizzard's UI source (Gethe/wow-ui-source), on the **`forever`**
   branch: the client's own FrameXML, with the same paths and line numbers as BugSack traces. Read the
   exact Blizzard line there before guessing, and check what a Blizzard frame expects of its parent
   before hiding or reparenting it (#39). Other sessions share it, so check the branch first.

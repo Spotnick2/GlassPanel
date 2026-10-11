@@ -46,6 +46,13 @@ try {
         else { Write-Host "LibGlass: $libGlass at the pin ($(Get-LibGlassPin $RepoRoot))" -ForegroundColor DarkGray }
     }
 
+    # Without the API dump the tests accept every event name and skip the
+    # method check, and still pass: say so locally (CI has no dump, by design).
+    $dump = & $Lua -e "dofile('tests/wow_stubs.lua') io.write(WoW.dumpAvailable and '' or WoW.DUMP)"
+    if ($dump -and -not $env:CI) {
+        Write-Host "WARNING: no API dump at $dump (set GLASSPANEL_API_DUMP): event names and widget methods are NOT checked" -ForegroundColor Yellow
+    }
+
     $failed = 0
     Get-ChildItem (Join-Path $PSScriptRoot "test_*.lua") | Sort-Object Name | ForEach-Object {
         Write-Host "-- $($_.Name) " -NoNewline -ForegroundColor Cyan

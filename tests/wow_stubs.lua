@@ -15,7 +15,9 @@
 --   so test_methods.lua can check each against the dump's widget methods.
 
 WoW = {}
-local DUMP = os.getenv("GLASSPANEL_API_DUMP") or "C:/Projects/References/forever-api-1.60.1.70124.md"
+-- The one default dump path: test_methods reads it as WoW.DUMP.
+local DUMP = os.getenv("GLASSPANEL_API_DUMP") or "C:/Projects/WoW/References/forever-api-1.60.1.70338.md"
+WoW.DUMP = DUMP
 
 --------------------------------------------------------------------------------
 -- Secrets
@@ -335,7 +337,7 @@ end
 
 SlashCmdList = {}
 Enum = { UITextureSliceMode = { Stretched = 0, Tiled = 1 },
-         -- Not in the dump's enum list (70009, 70124); values from wow-ui-source (forever):
+         -- Not in the dump's enum list (70009, 70124, still absent in 70338); values from wow-ui-source (forever):
          -- Blizzard_APIDocumentationGenerated/EditModeManagerConstantsDocumentation.lua.
          DamageMeterVisibility = { Always = 0, InCombat = 1, Hidden = 2, InGroup = 3 },
          -- Edit Mode (#10), from the same generated documentation (forever branch).
@@ -413,7 +415,7 @@ function Ambiguate(fullName, context)
     if context == "none" then return fullName end
     return (fullName:gsub("%-.*$", ""))
 end
-function GetBuildInfo() return "1.60.1", "70124", "Sep 29 2026", 16001 end
+function GetBuildInfo() return "1.60.1", "70338", "Oct  9 2026", 16001 end
 -- Only "Version" is read. A release-shaped version by default; a test sets
 -- WoW.addonVersion = "dev" to run as a deployed development copy.
 C_AddOns = { GetAddOnMetadata = function(name, key)
