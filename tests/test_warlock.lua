@@ -1,6 +1,7 @@
 -- The Warlock plugin (#67).
 dofile("tests/wow_stubs.lua")
 dofile("tests/harness.lua")
+PLUGINS = { "GlassPanelWarlock" }
 
 local HS, SS = "|TInterface\\Icons\\INV_Stone_04:14:14:0:0:64:64:5:59:5:59|t",
                "|TInterface\\Icons\\INV_Misc_Orb_04:14:14:0:0:64:64:5:59:5:59|t"
