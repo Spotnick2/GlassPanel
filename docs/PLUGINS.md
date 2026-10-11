@@ -57,8 +57,6 @@ GlassPanel.RegisterBlock({
     events   = { "PLAYER_EQUIPMENT_CHANGED", "PLAYER_ENTERING_WORLD" },
     unitEvents = { UNIT_FACTION = "player" },  -- an every-unit event, for one unit only
     interval = nil,                    -- seconds (>= 1), or function(block) -> seconds, for data with no event
-                                       -- (a function is asked when due, and after any of your events or a
-                                       -- Refresh: the sooner answer wins)
     onInit   = function(block) end,    -- once, at registration (before your SavedVariables load!)
     onEvent  = function(block, event, ...) end,  -- every event, immediately: update state here
     text     = function(block) return "GS: 2057" end,  -- plain string, or nil/"" for no space

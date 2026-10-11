@@ -72,8 +72,7 @@ core's `ADDON_LOADED`.
   - dirty blocks repaint **once per rendered frame** (the flush frame is shown only while work
     is pending);
   - one shared 1 s clock drives `interval` blocks (seconds, or a function returning them, asked
-    each time the block comes due, and again on the next tick after an event or `Refresh`, the
-    sooner answer winning); `unitEvents = { EVENT = "player" }` lets an event that fires
+    each time the block comes due); `unitEvents = { EVENT = "player" }` lets an event that fires
     for every unit reach a block only for the unit it names;
   - after a repaint, a tooltip open on that block is redrawn (`Bar.RefreshTooltip`, on-screen
     blocks only);

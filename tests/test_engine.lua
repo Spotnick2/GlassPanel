@@ -141,26 +141,6 @@ eq(m, base, "not due before 3 s")
 WoW.tick(1.0); WoW.tick()
 eq(m, base + 1, "due at 3 s")
 
--- An event (or Refresh) asks a function interval again on the next tick, and
--- the sooner answer wins: a countdown that starts while the block waits 30 s
--- ticks within a second. A later answer never postpones the block.
-loadAddon()
-local every, k = 30, 0
-register({ id = "cd", interval = function() return every end, events = { "BAG_UPDATE_COOLDOWN" },
-           text = function() k = k + 1; return "c" .. k end })
-WoW.tick()
-every = 1
-WoW.fire("BAG_UPDATE_COOLDOWN"); WoW.tick()
-local k0 = k
-WoW.tick(1.0); WoW.tick()
-WoW.tick(1.0); WoW.tick()
-eq(k, k0 + 2, "after the event: every second")
-every = 30
-GlassPanel.Refresh("cd"); WoW.tick()
-k0 = k
-WoW.tick(1.0); WoW.tick()
-eq(k, k0 + 1, "a later answer doesn't postpone what was already due")
-
 -- Layout: lanes, order, hidden and empty blocks take no space.
 loadAddon()
 for _, blk in ipairs(GlassPanel.Engine.blocks) do GlassPanelDB.hidden[blk.id] = true end

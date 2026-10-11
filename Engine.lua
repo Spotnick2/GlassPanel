@@ -108,7 +108,6 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
         if not want or unit == want then
             if block.onEvent then call(block, "onEvent", block.onEvent, block, event, ...) end
             Engine.MarkDirty(block)
-            block._reask = true   -- a function interval may want to be sooner now
         end
     end
 end)
@@ -131,15 +130,6 @@ clockFrame:SetScript("OnUpdate", function(_, elapsed)
     acc = 0
     for _, block in ipairs(Engine.blocks) do
         if block.interval then
-            -- An event or Refresh since the last tick: ask a function interval
-            -- again and take the sooner (a countdown that just started).
-            if block._reask then
-                block._reask = nil
-                if type(block.interval) == "function" then
-                    local s = Engine.NextInterval(block)
-                    if s < (block._due or 0) then block._due = s end
-                end
-            end
             block._due = (block._due or 0) - step
             if block._due <= 0 then
                 block._due = Engine.NextInterval(block)
@@ -274,10 +264,7 @@ end
 -- For a plugin whose data changed without an event: repaint on the next frame.
 function GlassPanel.Refresh(id)
     local block = Engine.byId[id]
-    if block then
-        Engine.MarkDirty(block)
-        block._reask = true
-    end
+    if block then Engine.MarkDirty(block) end
 end
 
 GlassPanel.Engine._test = { listeners = listeners, dirty = dirty, flushFrame = flushFrame, clockFrame = clockFrame }
