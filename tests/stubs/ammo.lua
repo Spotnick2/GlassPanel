@@ -42,9 +42,15 @@ GetInventoryItemCount = rawget(_G, "GetInventoryItemCount")
     or function(unit, slot) return sv(WoW.invCount[slot], "inv count") end
 
 C_Item = rawget(_G, "C_Item") or {}
-C_Item.GetItemNameByID = C_Item.GetItemNameByID or function(id)
+-- Plugins' stubs chain this one: each answers from its own data, else asks
+-- the one before (any load order). WoW.itemNames is stubs/warlock.lua's.
+local otherItemName = C_Item.GetItemNameByID
+function C_Item.GetItemNameByID(id)
+    local n = type(WoW.itemNames) == "table" and WoW.itemNames[id] or nil
+    if n ~= nil then return n end
     local c = WoW.items and WoW.items[id]
-    return c and c.name or nil
+    if c then return c.name end
+    if otherItemName then return otherItemName(id) end
 end
 
 C_Container.GetContainerItemInfo = C_Container.GetContainerItemInfo or function(bag, slot)
