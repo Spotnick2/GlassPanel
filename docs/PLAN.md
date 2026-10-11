@@ -45,6 +45,7 @@ The owner's TBC Titan bar, still to port:
 
 New:
 - **PvP flag** (#14): flagged or not, and the time left on the flag.
+- **Warlock** (#67): soul shards, Healthstone and Soulstone carried, their cooldowns.
 - **Ammo** (#66): arrows, bullets or thrown left, by the ranged weapon; low/critical colours per class.
 
 Also: an opt-in Edit Mode layout for a full-width bar (#10); hiding Blizzard's XP bar safely (#9).
