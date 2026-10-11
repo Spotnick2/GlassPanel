@@ -80,11 +80,11 @@ For GlassPanel, good things to hand Codex:
 - any plan that grows scope back toward full Titan Panel.
 
 **Always hand it `CLAUDE.md` alongside the diff or plan**, plus
-`C:/Projects/References/PORTING-TBC-TO-FOREVER.md` and any `docs/` probe results. Those findings
+`C:/Projects/WoW/References/PORTING-TBC-TO-FOREVER.md` and any `docs/` probe results. Those findings
 were measured on the live client. Without them, a cold reviewer argues from Classic-era or Retail
 behaviour that doesn't hold here: that some numbers (money, stats) are secret, that secure
 snippets and state drivers are broken, that `GetCoinTextureString` is gone.
-`C:/Projects/References/forever-api-1.60.1.70338.md` is the full API surface when a question
+`C:/Projects/WoW/References/forever-api-1.60.1.70338.md` is the full API surface when a question
 turns on whether something exists. Titan (`C:/Program Files (x86)/World of Warcraft/_anniversary_/Interface/AddOns/Titan*`) is the data reference only.
 
 Say what you have already established and ask it not to repeat that work. A clean "no defect found"

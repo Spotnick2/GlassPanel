@@ -16,7 +16,7 @@
 
 WoW = {}
 -- The one default dump path: test_methods reads it as WoW.DUMP.
-local DUMP = os.getenv("GLASSPANEL_API_DUMP") or "C:/Projects/References/forever-api-1.60.1.70338.md"
+local DUMP = os.getenv("GLASSPANEL_API_DUMP") or "C:/Projects/WoW/References/forever-api-1.60.1.70338.md"
 WoW.DUMP = DUMP
 
 --------------------------------------------------------------------------------
