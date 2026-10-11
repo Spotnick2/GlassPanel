@@ -23,13 +23,15 @@ local P = API.Plain
 local SHARD = 6265
 local LOW = 5   -- fewer shards than this: yellow; none: red
 
--- Best rank first, so the tooltip names the best one carried.
+-- Best rank first, so the tooltip names the best one carried; within a rank,
+-- most healing first (the talented 19004-19013 come in a weaker and a
+-- stronger copy: forever-consumables 70009).
 local HEALTHSTONES = {
-    { 19013, "Major Healthstone" }, { 19012, "Major Healthstone" }, { 9421, "Major Healthstone" },
-    { 19011, "Greater Healthstone" }, { 19010, "Greater Healthstone" }, { 5510, "Greater Healthstone" },
-    { 19009, "Healthstone" }, { 19008, "Healthstone" }, { 5509, "Healthstone" },
-    { 19007, "Lesser Healthstone" }, { 19006, "Lesser Healthstone" }, { 5511, "Lesser Healthstone" },
-    { 19005, "Minor Healthstone" }, { 19004, "Minor Healthstone" }, { 5512, "Minor Healthstone" },
+    { 19013, "Major Healthstone" }, { 9421, "Major Healthstone" }, { 19012, "Major Healthstone" },
+    { 19011, "Greater Healthstone" }, { 5510, "Greater Healthstone" }, { 19010, "Greater Healthstone" },
+    { 19009, "Healthstone" }, { 5509, "Healthstone" }, { 19008, "Healthstone" },
+    { 19007, "Lesser Healthstone" }, { 5511, "Lesser Healthstone" }, { 19006, "Lesser Healthstone" },
+    { 19005, "Minor Healthstone" }, { 5512, "Minor Healthstone" }, { 19004, "Minor Healthstone" },
 }
 local SOULSTONES = {
     { 16896, "Major Soulstone" }, { 16895, "Greater Soulstone" }, { 16893, "Soulstone" },

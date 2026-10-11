@@ -126,6 +126,13 @@ eq(textOf("warlock"), "7 " .. HS, "every better rank readable: marker")
 check(tip():find("Healthstone\tHealthstone (|cff40ff40ready|r)", 1, true), "lower rank named")
 check(not tip():find("can't be read", 1, true), "all readable: no footnote")
 
+-- Two copies of one rank carried: the one that heals more (9421: 1,440,
+-- 19012: 1,320).
+WoW.itemCounts = { [6265] = 7, [19012] = 1, [9421] = 1 }
+eq(block("warlock")._test.carried(block("warlock")._test.HEALTHSTONES)[1], 9421, "same rank: the stronger copy")
+WoW.itemCounts = { [6265] = 7, [19008] = 1, [5509] = 1 }
+eq(block("warlock")._test.carried(block("warlock")._test.HEALTHSTONES)[1], 5509, "same rank: the stronger copy (Healthstone)")
+
 eq(block("warlock").onClick, nil, "no click (using a stone is secure)")
 
 check(next(GlassPanel.failures) == nil, "no failures")
