@@ -210,6 +210,18 @@ core's `ADDON_LOADED`.
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable
   bag (free count or family) is left out and flagged with a grey `?`. Left-click: `ToggleAllBags`.
+- **`Plugins\Warlock`** (#67): warlocks only: another class **doesn't register the block** (class read at
+  load; unreadable then: registered, nil text until it reads WARLOCK, then kept). Soul Shards (6265,
+  `C_Item.GetItemCount`; yellow under 5, red at 0) and a mark per stone carried, any rank (healthstones
+  incl. the talented 19004-19013, soulstones; best rank named in the tooltip). An unreadable count is
+  a grey `?` for shards and no mark for a stone (the tooltip says unknown); an unreadable better rank
+  makes the best stone unknown too, never a lower rank guessed. Counts are a snapshot (Durability's
+  stale pattern). Cooldowns from `C_Container.GetItemCooldown(itemID)`, read only when the tooltip is
+  drawn, so `BAG_UPDATE_COOLDOWN` (most casts) isn't registered; an unreadable one is a grey `?` and
+  the footnote says so. `enable == 0` with a duration is "waiting" (held, greyed in the bags), <= 1.5 s
+  is the GCD (ready). No `interval`: a 1 s `C_Timer` ticker runs only while the tooltip is open on the
+  block with a cooldown counting down ("waiting" alone doesn't tick). Names from `C_Item.GetItemNameByID` (localised), English fallback. No click
+  (using a stone is secure).
 - **`Plugins\Durability`** (#12): lowest durability and repair cost. Events only mark the
   cache stale; it's rebuilt at most once per repaint (tooltip data is heavy, and only for damaged
   items). An unreadable item marks the figure with a grey `?` and makes the cost unknown; the cost comes from
