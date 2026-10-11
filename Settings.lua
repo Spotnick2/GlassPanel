@@ -7,7 +7,8 @@ local Glass, Bar, Layout = GlassPanel.Glass, GlassPanel.Bar, GlassPanel.Layout
 local Settings = {}
 GlassPanel.Settings = Settings
 
-Settings.DEFAULTS = { font = "arial", shown = true, room = "auto", labels = true }
+Settings.DEFAULTS = { font = "arial", shown = true, room = "auto", labels = true,
+                      glass = "clear", glassTint = "neutral" }
 
 local function db() return GlassPanelDB end
 
@@ -37,8 +38,25 @@ function Settings.EnsureDefaults()
     if d.editModeReturn ~= nil and type(d.editModeReturn) ~= "table" then d.editModeReturn = nil end
     if not Glass.FONTS[d.font] then d.font = Settings.DEFAULTS.font end
     if d.room ~= "auto" and d.room ~= "full" then d.room = Settings.DEFAULTS.room end
+    if not Bar.GLASS[d.glass] then d.glass = Settings.DEFAULTS.glass end
+    if not Bar.GLASS_TINTS[d.glassTint] then d.glassTint = Settings.DEFAULTS.glassTint end
     return d
 end
+
+-- The bar's glass (#65): material "clear"|"smoked", tint "neutral"|"class";
+-- false when the value isn't one of them. A class colour that can't be read
+-- right now is said, and painted once it can be (Bar.glassPending).
+local function setGlass(key, value, allowed)
+    if not allowed[value] then return false end
+    db()[key] = value
+    if not Bar.ApplyGlass(db().glass, db().glassTint) then
+        GlassPanel.API.Print("your class colour can't be read yet: the glass takes it when it can.")
+    end
+    changed()
+    return true
+end
+function Settings.SetGlass(material) return setGlass("glass", material, Bar.GLASS) end
+function Settings.SetGlassTint(tint) return setGlass("glassTint", tint, Bar.GLASS_TINTS) end
 
 -- false when the font isn't known.
 function Settings.SetFont(key)
@@ -132,9 +150,11 @@ end
 function Settings.ApplyAll(setup)
     local d = db()
     d.font, d.shown, d.room, d.labels = setup.font, setup.shown, setup.room, setup.labels
+    d.glass, d.glassTint = setup.glass, setup.glassTint
     d.hidden, d.labelsFor, d.iconsFor = copyMap(setup.hidden), copyMap(setup.labelsFor), copyMap(setup.iconsFor)
     d.layout = Layout.Clean(setup.layout)
     Glass.SetFont(d.font)
+    Bar.ApplyGlass(d.glass, d.glassTint)
     for _, block in ipairs(GlassPanel.Engine.blocks) do
         Bar.UpdateIcon(block)
         Bar.UpdateCaption(block)

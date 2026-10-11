@@ -246,6 +246,10 @@ local function build()
     widgets.room = radios(left, "Width", { { "auto", "Stop short of Blizzard's top frames" },
         { "full", "Always full width" } },
         function() return db().room end, Settings.SetRoom)
+    widgets.glass = radios(left, "Glass", { { "clear", "Clear" }, { "smoked", "Smoked" } },
+        function() return db().glass end, Settings.SetGlass)
+    widgets.glassTint = radios(left, "Tint", { { "neutral", "Neutral" }, { "class", "Class colour" } },
+        function() return db().glassTint end, Settings.SetGlassTint)
 
     header(left, "Layout")
     note(left, "Drag a block to move it; shift-drag moves its whole lane.")
