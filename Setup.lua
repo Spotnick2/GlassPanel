@@ -9,7 +9,7 @@
 -- presets the damage meter (top left), the minimap and the buffs (top right)
 -- reach into the bar's band; a customised layout may need nothing.
 --
--- Built from the forever UI source (C:\Projects\wow-ui-source) and reviewed
+-- Built from the forever UI source (C:\Projects\WoW\wow-ui-source) and reviewed
 -- by Codex before any code (issue #10):
 -- - The source is the ACTIVE layout, copied whole (keeping interfaceStyle,
 --   which Edit Mode's selection uses; dropping the preset-only layoutIndex).
