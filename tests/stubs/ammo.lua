@@ -1,8 +1,11 @@
 -- Ammo stubs (Plugins/Ammo). WoW.items[id] = { classID, subClassID, icon,
--- name }: the item catalogue C_Item.GetItemInfoInstant / GetItemNameByID read.
--- GetItemInfoInstant is wrapped once, after every stub file has loaded (at the
--- first reset): the catalogue first, else whatever another stub (gearscore)
--- defined. No other plugin's stub file is edited. WoW.invCount[slot]
+-- name, pending }: the item catalogue C_Item.GetItemInfoInstant / GetItemNameByID
+-- read; pending = true: the client hasn't seen it (GetItemInfoInstant returns
+-- nothing, IsItemDataCachedByID false). GetItemInfoInstant and
+-- IsItemDataCachedByID are wrapped once, after every stub file has loaded (at
+-- the first reset): the catalogue first, else whatever another stub
+-- (gearscore, reagents) defined. RequestLoadItemDataByID (WoW.itemRequests)
+-- is gearscore.lua's. No other plugin's stub file is edited. WoW.invCount[slot]
 -- is GetInventoryItemCount's answer; WoW.bags[bag].items[slot] = { id, count }
 -- what the bags hold. WoW.usesAmmo is UnitUsesAmmo's answer (nil: the
 -- function returns nil). A value set to "secret" comes back secret.
@@ -22,10 +25,18 @@ local function wrapInfoInstant()
     C_Item.GetItemInfoInstant = function(item)
         local c = WoW.items and WoW.items[item]
         if c then
+            if c.pending then return nil end
             return item, "Item", "Item", "", sv(c.icon, "icon"), sv(c.classID, "classID"), sv(c.subClassID, "subClassID")
         end
         if original then return original(item) end
         return nil
+    end
+    local originalCached = C_Item.IsItemDataCachedByID
+    C_Item.IsItemDataCachedByID = function(item)
+        local c = WoW.items and WoW.items[item]
+        if c then return not c.pending end
+        if originalCached then return originalCached(item) end
+        return false
     end
 end
 

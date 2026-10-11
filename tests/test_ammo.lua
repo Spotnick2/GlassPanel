@@ -127,11 +127,12 @@ setup("WARRIOR", BOW, ARROWS, 500)
 WoW.playerClass = { "secret", "secret", 1 }; refresh()
 check(hidden(), "unreadable class: no block")
 
--- Equipped ammo whose class can't be read: trusted, the slot counted, no "!".
+-- Equipped ammo whose class can't be read: the slot counted, unsure, no "!".
 setup("HUNTER", BOW, 204, 700)
 WoW.items[204] = { classID = "secret", subClassID = 2, icon = 2004, name = "Odd Arrow" }; refresh()
-eq(textOf("ammo"), ICON(2004) .. "|cffffffff700|r", "unreadable ammo class: the slot, not 'wrong'")
+eq(textOf("ammo"), ICON(2004) .. "|cffffffff700|r|cff888888?|r", "unreadable ammo class: the slot, unsure, not 'wrong'")
 check(not has("doesn't fit this weapon"), "no wrong-ammo warning")
+check(has("kind isn't known yet"), "said in the tooltip")
 
 -- Thrown, the stack unreadable: what the bags hold, marked unsure.
 setup("ROGUE", THROWN, nil, nil, {
@@ -154,6 +155,64 @@ end
 refresh(); refresh()
 eq(lookups, 0, "bag projectiles: kinds cached")
 C_Item.GetItemInfoInstant = realInstant
+
+-- Items the client hasn't seen (GetItemInfoInstant returns nothing): pending,
+-- requested once, rescanned when they load, with no other event.
+local NEWGUN, NEWARROWS, NEWAMMO = 301, 302, 303
+local function loaded(id, event)
+    WoW.items[id].pending = nil
+    WoW.fire(event or "ITEM_DATA_LOAD_RESULT", id, true); WoW.tick()
+end
+
+-- A ranged weapon: no block until it loads, then the right kind.
+setup("HUNTER", NEWGUN, BULLETS, 900)
+WoW.items[NEWGUN] = { classID = 2, subClassID = 3, icon = 1301, name = "New Gun", pending = true }
+WoW.itemRequests = {}; refresh()
+check(hidden(), "unresolved weapon: no block yet")
+eq(WoW.itemRequests[NEWGUN], 1, "the weapon's data requested")
+refresh(); refresh()
+eq(WoW.itemRequests[NEWGUN], 1, "and not again on every repaint")
+loaded(NEWGUN)
+eq(textOf("ammo"), ICON(2002) .. "|cffffffff900|r", "the weapon loads: the block appears, bullets")
+eq(next(block("ammo")._test.pending()), nil, "nothing pending")
+WoW.items[NEWGUN].pending = true; refresh()
+eq(textOf("ammo"), ICON(2002) .. "|cffffffff900|r", "a known weapon isn't lost to a later miss")
+
+-- A bag projectile: the count unsure until it loads, then counted.
+setup("HUNTER", BOW, nil, nil, {
+    [0] = { slots = 2, free = 0, family = 0, items = { { id = ARROWS, count = 200 }, { id = NEWARROWS, count = 300 } } },
+})
+WoW.items[NEWARROWS] = { classID = 6, subClassID = 2, icon = 1302, name = "Fresh Arrow", pending = true }
+WoW.itemRequests = {}; refresh()
+eq(textOf("ammo"), ICON("Interface\\Icons\\INV_Ammo_Arrow_02") .. "|cffffd200200|r|cff888888?|r|cffff4040!|r",
+   "unresolved bag projectile: unsure, not a definite count")
+eq(WoW.itemRequests[NEWARROWS], 1, "its data requested")
+refresh(); refresh()
+eq(WoW.itemRequests[NEWARROWS], 1, "and not again on every repaint")
+loaded(NEWARROWS, "GET_ITEM_INFO_RECEIVED")
+eq(textOf("ammo"), ICON("Interface\\Icons\\INV_Ammo_Arrow_02") .. "|cffffd200500|r|cffff4040!|r",
+   "it loads: counted, no ?")
+
+-- Equipped ammo of unknown kind: the slot counted, unsure, never "wrong".
+setup("HUNTER", BOW, NEWAMMO, 700)
+WoW.items[NEWAMMO] = { classID = 6, subClassID = 2, icon = 1303, name = "Mystery Arrow", pending = true }
+WoW.itemRequests = {}; refresh()
+eq(textOf("ammo"), "|cffffffff700|r|cff888888?|r", "unresolved equipped ammo: counted, unsure")
+check(not has("doesn't fit this weapon"), "not called the wrong kind")
+eq(WoW.itemRequests[NEWAMMO], 1, "its data requested")
+refresh(); refresh()
+eq(WoW.itemRequests[NEWAMMO], 1, "and not again on every repaint")
+loaded(NEWAMMO)
+eq(textOf("ammo"), ICON(1303) .. "|cffffffff700|r", "it loads: the right kind, no ?")
+
+-- A load that still leaves the item unresolved: asked once, never again (no loop).
+setup("HUNTER", BOW, 304, 700)
+WoW.items[304] = { classID = 6, subClassID = 2, icon = 1304, name = "Ghost Arrow", pending = true }
+WoW.itemRequests = {}; refresh()
+WoW.fire("ITEM_DATA_LOAD_RESULT", 304, false); WoW.tick()
+refresh(); refresh()
+eq(WoW.itemRequests[304], 1, "an answered id isn't requested again")
+eq(textOf("ammo"), "|cffffffff700|r|cff888888?|r", "and stays unsure")
 
 -- An older client without UnitUsesAmmo (before 70338): the weapon decides.
 setup("WARRIOR", BOW, ARROWS, 60)

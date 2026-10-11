@@ -21,8 +21,16 @@
 -- whether it already includes the same weapon in the bags (then "Equipped"
 -- and "In your bags" in the tooltip count those stacks twice). When a slot's
 -- count can't be read, the same item is counted in the bags instead (the
--- thrown figure then carries a grey "?"). Equipped ammo whose item class
--- can't be read is trusted: the slot is counted, not called the wrong kind.
+-- thrown figure then carries a grey "?").
+--
+-- C_Item.GetItemInfoInstant may return nothing for an item the client hasn't
+-- seen yet: that item is pending, not definite. Its data is requested (only
+-- while the client says it isn't cached, once per id, on our own frame that
+-- listens only while one of ours is pending: Reagents' and GearScore's way)
+-- and the block rescans when it arrives. Meanwhile: an unresolved ranged
+-- weapon shows no block; an unresolved bag item leaves the count unsure
+-- (grey "?"); equipped ammo of unknown kind is counted (the slot) with a
+-- grey "?", never called the wrong kind.
 --
 -- No ammo equipped, or the wrong kind for the weapon: the matching
 -- projectiles in the bags are counted, with a red "!" (you can't shoot until
@@ -105,15 +113,73 @@ local function setThresholds(class, low, crit)
     GlassPanel.Refresh("ammo")
 end
 
+-- The cache, rebuilt at most once per repaint after an event (a bag walk).
+-- kind: "arrow" | "bullet" | "thrown" | nil (no block). count: nil = unknown.
+local state = { kind = nil }
+local stale = true
+
+--------------------------------------------------------------------------------
+-- Item data loads late: an unresolved id is requested while the client says
+-- it isn't cached, once (an answered id is never requested again: no request
+-- loop), on our own frame, which listens only while one of ours is pending
+-- (the load events fire for every item). An arrival rescans.
+--------------------------------------------------------------------------------
+
+local pending, answered = {}, {}
+local LOAD_EVENTS = { "ITEM_DATA_LOAD_RESULT", "GET_ITEM_INFO_RECEIVED" }
+local loader = CreateFrame("Frame")
+local listening = false
+local function listen(on)
+    if on == listening then return end
+    listening = on
+    for _, e in ipairs(LOAD_EVENTS) do
+        if on then API.RegisterEvent(loader, e, "Ammo") else loader:UnregisterEvent(e) end
+    end
+end
+loader:SetScript("OnEvent", function(_, _, rawId)
+    local id = P(rawId)
+    if id and pending[id] then
+        pending[id] = nil
+        answered[id] = true
+        stale = true
+        GlassPanel.Refresh("ammo")
+    end
+    if next(pending) == nil then listen(false) end
+end)
+
+local function request(id)
+    if pending[id] or answered[id] then return end
+    local ok, cached = pcall(C_Item.IsItemDataCachedByID, id)
+    if ok and P(cached) == true then return end   -- loaded: nothing more will come
+    pending[id] = true
+    C_Item.RequestLoadItemDataByID(id)
+    listen(true)
+end
+
 --------------------------------------------------------------------------------
 -- Reading the client
 --------------------------------------------------------------------------------
 
--- id -> classID, subClassID, icon (nil when unknown).
+-- id -> classID, subClassID, icon; classID nil while the client has nothing
+-- for the item (requested) or it can't be read. An item's class never
+-- changes: a full answer is kept for the session, so a bag walk doesn't look
+-- every item up again. Nothing unresolved is kept.
+local classOf = {}
 local function itemClass(id)
+    local k = classOf[id]
+    if k then return k.class, k.sub, k.icon end
     local ok, _, _, _, _, icon, classID, subClassID = pcall(C_Item.GetItemInfoInstant, id)
-    if not ok then return nil end
-    return P(classID), P(subClassID), P(icon)
+    if ok then
+        classID, subClassID, icon = P(classID), P(subClassID), P(icon)
+    else
+        classID, subClassID, icon = nil, nil, nil
+    end
+    if classID == nil or subClassID == nil then
+        request(id)
+    else
+        classOf[id] = { class = classID, sub = subClassID, icon = icon }
+    end
+    return classID, subClassID, icon
 end
 
 local function itemName(id)
@@ -134,8 +200,9 @@ local function slotCount(slot)
     return type(n) == "number" and n or nil
 end
 
--- What the bags hold: match(id) -> true to count it. Returns the count and
--- whether some slot couldn't be read (the count may then be short).
+-- What the bags hold: match(id) -> true to count it, nil while it can't tell
+-- (an unresolved item). Returns the count and whether some slot couldn't be
+-- read or told apart (the count may then be short).
 local BI = Enum and Enum.BagIndex or {}
 local function bagCount(match)
     local total, unsure = 0, false
@@ -152,8 +219,13 @@ local function bagCount(match)
                     local id, n = P(info.itemID), P(info.stackCount)
                     if type(id) ~= "number" or type(n) ~= "number" then
                         unsure = true
-                    elseif match(id) then
-                        total = total + n
+                    else
+                        local m = match(id)
+                        if m == nil then
+                            unsure = true
+                        elseif m then
+                            total = total + n
+                        end
                     end
                 end
             end
@@ -171,23 +243,11 @@ local function clientSaysNoAmmo()
     return ok and P(uses) == false
 end
 
--- The cache, rebuilt at most once per repaint after an event (a bag walk).
--- kind: "arrow" | "bullet" | "thrown" | nil (no block). count: nil = unknown.
-local state = { kind = nil }
-local stale = true
-
--- id -> "arrow" | "bullet" | false (not a projectile); nil while unreadable.
--- An item's class never changes: known answers are kept for the session, so
--- a bag walk with nothing equipped doesn't look every item up again.
-local kindOf = {}
+-- id -> "arrow" | "bullet" | false (not a projectile); nil while unresolved.
 local function projectileKind(id)
-    local k = kindOf[id]
-    if k ~= nil then return k end
     local c, sub = itemClass(id)
     if c == nil or (c == PROJECTILE and sub == nil) then return nil end
-    k = c == PROJECTILE and KIND_OF_PROJECTILE[sub] or false
-    kindOf[id] = k
-    return k
+    return c == PROJECTILE and KIND_OF_PROJECTILE[sub] or false
 end
 
 local function build()
@@ -195,6 +255,7 @@ local function build()
     if not (s.class and DEFAULTS[s.class]) then return s end
     s.weapon = equippedID(RANGED_SLOT)
     if not s.weapon then return s end
+    -- An unresolved weapon (requested) is pending: no block until it loads.
     local classID, subClassID, icon = itemClass(s.weapon)
     if classID ~= WEAPON then return s end
     local kind = KIND_OF_WEAPON[subClassID]
@@ -218,8 +279,10 @@ local function build()
         local _, _, aIcon = itemClass(s.ammo)
         local ak = projectileKind(s.ammo)
         s.ammoKind, s.icon = ak or nil, aIcon
-        -- The right kind, or a class that can't be read (trusted): the slot.
+        -- The right kind, or a kind not known yet (the slot is the client's
+        -- own: counted, marked unsure): the slot.
         if ak == kind or ak == nil then
+            if ak == nil then s.ammoUnknown, s.unsure = true, true end
             s.count = slotCount(AMMO_SLOT)
             if s.count == nil then
                 local n, unsure = bagCount(function(id) return id == s.ammo end)
@@ -232,7 +295,11 @@ local function build()
     -- Nothing usable equipped: what the bags hold of the right kind.
     s.missing = true
     s.icon = KIND_ICON[kind]
-    s.count, s.unsure = bagCount(function(id) return projectileKind(id) == kind end)
+    s.count, s.unsure = bagCount(function(id)
+        local k = projectileKind(id)
+        if k == nil then return nil end
+        return k == kind
+    end)
     return s
 end
 
@@ -392,7 +459,9 @@ local block = GlassPanel.RegisterBlock({
             elseif s.missing then
                 tt:AddLine("No ammo equipped. The count is what your bags hold.", 1, 0.25, 0.25, true)
             end
-            if s.unsure then
+            if s.ammoUnknown then
+                tt:AddLine("The equipped ammo's kind isn't known yet.", 0.7, 0.7, 0.7, true)
+            elseif s.unsure then
                 tt:AddLine("Some bag slots can't be read right now and aren't counted.", 0.7, 0.7, 0.7, true)
             end
         end
@@ -410,5 +479,6 @@ local block = GlassPanel.RegisterBlock({
 
 if block then
     block._test = { validate = validate, thresholds = thresholds, window = function() return win end,
-                    state = current, save = save }
+                    state = current, save = save,
+                    pending = function() return pending end, answered = function() return answered end }
 end
