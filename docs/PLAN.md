@@ -45,6 +45,7 @@ The owner's TBC Titan bar, still to port:
 
 New:
 - **PvP flag** (#14): flagged or not, and the time left on the flag.
+- **Warlock** (#67): soul shards, Healthstone and Soulstone carried, their cooldowns.
 - **Reagents** (#68): the class reagents you pick, Currencies-style. Ammo (#66) and Warlock (#67)
   are their own plugins.
 

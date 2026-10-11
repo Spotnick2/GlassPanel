@@ -47,6 +47,8 @@
   with each character's level and gold in the tooltip, grouped by realm. Left-click opens
   AltStable's sheet. An option counts only this realm and faction. While it shows, the Gold block
   is hidden (your gold is in its total); it says so once, and showing Gold again keeps it.
+- Warlock (warlocks only): your soul shards, yellow when few and red at none, with a mark for a
+  Healthstone and a Soulstone in your bags; the tooltip names them and counts down their cooldowns.
 - Options panel under Game Menu > Options > AddOns > Glass Panel (`/gpanel options`): show the bar,
   captions, font and width, reset the layout, and for each plugin whether it's shown and shows its
   caption and icon (`/gpanel icon <id> on|off` too).
