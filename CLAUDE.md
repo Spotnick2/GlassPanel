@@ -189,6 +189,26 @@ core's `ADDON_LOADED`.
   Up/Down on the shown ones; unresolved saved ids kept at the end) from a left-click or the plugin's
   option **button**; refreshed at most once per frame. Secret amount: grey `?`; measured plain for
   Honor Points (36 / 15,000).
+- **`Plugins\Reagents`** (#68): the class reagents the player picks, in their order (icon + count,
+  a red `0` when none are left), Currencies' chooser on a **hardcoded per-class table** of item ids
+  (`CLASS`, keyed by `UnitClass`'s file name; nothing in the client says which items a class uses).
+  Poisons are in the client's consumables list; the other ids are Vanilla's (Informant: class
+  Reagent), unmeasured. Icons from `C_Item.GetItemInfoInstant` (no item data needed), else
+  `GetItemIconByID`; a class id with neither (or the question mark, 134400) is **pending, not
+  unknown** (a fresh cache): requested through the name loader, kept (bar, chooser, default picks)
+  drawn as the question mark, and left out only once its load fails with still no icon (#71).
+  Counts from `C_Item.GetItemCount` (bags);
+  names from `C_Item.GetItemNameByID`, **asked for only by the tooltip and the chooser** (the bar
+  and the default search read counts and icons), requested only while `IsItemDataCachedByID` says
+  not cached, once, and listened for on the plugin's own frame only while pending (GearScore's
+  pattern); an **answered** id (loaded or failed) is never re-requested (a nameless load would loop
+  through the open tooltip), and a missing name only costs the name: a grey `item <id>`, icon and
+  count kept. Sharing the chooser with Currencies and the loader with GearScore: #74. **No ammo, soul shards,
+  healthstones or soulstones** (their own plugins, #66/#67). Hunters and warriors have no list, so
+  no block (not registered when `UnitClass` reads plainly at load; a class unreadable then gets the
+  block, hidden and offering nothing while it stays unreadable). Picks per character
+  (`GlassPanelReagentsDB`), never chosen: up to 3 carried, worked out again until the session's first
+  `BAG_UPDATE_DELAYED` (bags fill after `PLAYER_ENTERING_WORLD`), then saved once found.
 - **`Plugins\AltStable`** (#46): a **bridge** to the sibling addon AltStable (`## Dependencies:
   GlassPanel, AltStable`, so it loads only with it): total gold of the characters AltStable knows,
   a tooltip by realm (class colour, level, gold, the logged-in one marked, hidden ones left out and
