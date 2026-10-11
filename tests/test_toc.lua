@@ -120,14 +120,15 @@ eq(#WoW.chat, 1, "core alone: and no lanes")
 local function said() return table.concat(WoW.chat, " | ") end
 WoW.chat = {}
 WoW.addonVersion = "dev"
+local MEASURED = "1.60.1.70338"
 loadAddon()
-eq(GlassPanel.MEASURED_ON_BUILD, "1.60.1.70338", "MEASURED_ON_BUILD")
+eq(GlassPanel.MEASURED_ON_BUILD, MEASURED, "MEASURED_ON_BUILD")
 eq(GlassPanel.API.ClientBuild(), GlassPanel.MEASURED_ON_BUILD, "stub GetBuildInfo matches MEASURED_ON_BUILD")
 check(not said():find("differs", 1, true), "same build: no notice at login")
 local realBuild = GetBuildInfo
 GetBuildInfo = function() return "1.60.1", "99999", "", 16001 end
 loadAddon()
-check(said():find("client build 1.60.1.99999 differs from the measured " .. GlassPanel.MEASURED_ON_BUILD, 1, true),
+check(said():find("client build 1.60.1.99999 differs from the measured " .. MEASURED, 1, true),
       "another build, deployed copy (dev): said at login")
 -- Once per new build: the next login on it keeps quiet, a newer one speaks.
 local saved = GlassPanelDB
