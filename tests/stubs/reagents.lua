@@ -23,16 +23,19 @@ function C_Item.GetItemIconByID(item)
     local e = WoW.bagItems[item]
     return e and (e.icon or 134400) or nil
 end
--- C_Item.GetItemNameByID(itemInfo) -> optional itemName. stubs/warlock.lua
--- (#67) defines it too, from WoW.itemNames, only if missing: this one reads
--- WoW.itemNames first, then WoW.bagItems, so both plugins' tests pass
--- whichever file loads first.
+-- C_Item.GetItemNameByID(itemInfo) -> optional itemName. Plugins' stubs
+-- chain it: each answers from its own data, else asks the one before (any
+-- load order). WoW.itemNames is stubs/warlock.lua's (#67).
+local otherItemName = C_Item.GetItemNameByID
 function C_Item.GetItemNameByID(item)
     local n = type(WoW.itemNames) == "table" and WoW.itemNames[item] or nil
     if n ~= nil then return n end
     local e = WoW.bagItems[item]
-    if not e or e.cached == false then return nil end
-    return e.name
+    if e then
+        if e.cached == false then return nil end
+        return e.name
+    end
+    if otherItemName then return otherItemName(item) end
 end
 -- C_Item.IsItemDataCachedByID(itemInfo) -> isCached: a bag item unless
 -- cached = false; anything else asks gearscore.lua's (equipped items).
