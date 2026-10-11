@@ -12,7 +12,7 @@ GlassPanel.API = API
 -- were measured on in their own notes. At login, any other build is said,
 -- in a development copy only (API.IsDevelopmentCopy): a release keeps quiet.
 -- tests/test_toc.lua pins the same literal; the stub's GetBuildInfo matches.
-GlassPanel.MEASURED_ON_BUILD = "1.60.1.70124"
+GlassPanel.MEASURED_ON_BUILD = "1.60.1.70338"
 
 function API.Print(msg)
     print("|cff7fd4ffGlassPanel|r " .. msg)
