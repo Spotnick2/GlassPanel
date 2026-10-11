@@ -4,15 +4,16 @@
 -- can't be read then registers it, and its text stays nil until it can.
 --
 -- Forever (70338 dump): C_Item.GetItemCount(item), C_Container.GetItemCooldown
--- (itemID) -> start, duration, enable, BAG_UPDATE_DELAYED, BAG_UPDATE_COOLDOWN.
+-- (itemID) -> start, duration, enable, BAG_UPDATE_DELAYED.
 -- Item ids: Soul Shard 6265; the stones from the consumables list (70009),
 -- talented healthstones (19004-19013) included since the client has them.
 -- Every number through API.Plain: unreadable is a grey "?", never a guess.
 -- Counts are a snapshot: bag events mark it stale and it's rebuilt at most
--- once per repaint (Durability's pattern); BAG_UPDATE_COOLDOWN, which fires on
--- most casts, doesn't touch it (cooldowns are read only by the tooltip). The
--- countdown is in the tooltip only, so it ticks (a 1 s C_Timer) only while
--- the tooltip is open on the block with a cooldown running.
+-- once per repaint (Durability's pattern). Cooldowns are read only by the
+-- tooltip, fresh each time it's drawn, so BAG_UPDATE_COOLDOWN (it fires on
+-- most casts, and the bar text can't change from it) isn't registered. The
+-- countdown ticks (a 1 s C_Timer) only while the tooltip is open on the block
+-- with a cooldown counting down ("waiting" doesn't count: nothing changes).
 -- No click: using a stone is a secure action.
 
 GlassPanel = GlassPanel or {}
@@ -63,13 +64,17 @@ local function itemName(stone)
 end
 
 -- The best stone carried from a list: { id, name }, false (none), or nil
--- (none readable as carried, and some count couldn't be read).
+-- (unknown: a count that could be the best one couldn't be read; a lower
+-- rank carried under it isn't presented as the best).
 local function carried(list)
     local unknown = false
     for _, s in ipairs(list) do
         local n = count(s[1])
         if n == nil then unknown = true
-        elseif n > 0 then return s end
+        elseif n > 0 then
+            if unknown then return nil end
+            return s
+        end
     end
     if unknown then return nil end
     return false
@@ -105,10 +110,11 @@ local function cooldown(id)
     return left > 0 and math.ceil(left) or 0
 end
 
-local function running(left) return left == "waiting" or (type(left) == "number" and left > 0) end
+-- Counting down (the tooltip's ticker runs for it); "waiting" doesn't change.
+local function running(left) return type(left) == "number" and left > 0 end
 
+-- The longest stone cooldown is 30 min: minutes and seconds.
 local function clock(s)
-    if s >= 3600 then return string.format("%d:%02d:%02d", math.floor(s / 3600), math.floor(s / 60) % 60, s % 60) end
     return string.format("%d:%02d", math.floor(s / 60), s % 60)
 end
 
@@ -121,8 +127,8 @@ local function shardText(n)
     return tostring(n)
 end
 
--- A stone's tooltip line: its name and whether it's ready. Returns true
--- while its cooldown runs.
+-- A stone's tooltip line: its name and whether it's ready. Returns whether
+-- its cooldown counts down, and whether that cooldown couldn't be read.
 local function stoneLine(tt, label, stone)
     if stone == nil then
         tt:AddDoubleLine(label, UNKNOWN, 1, 0.82, 0, 1, 1, 1)
@@ -135,12 +141,12 @@ local function stoneLine(tt, label, stone)
             or left > 0 and ("|cffffd200" .. clock(left) .. "|r")
             or "|cff40ff40ready|r"
         tt:AddDoubleLine(label, itemName(stone) .. " (" .. shown .. ")", 1, 0.82, 0, 1, 1, 1)
-        return running(left)
+        return running(left), left == nil
     end
-    return false
+    return false, false
 end
 
-local class = classFile()
+local class = classFile()   -- kept once it reads plainly
 if class and class ~= "WARLOCK" then return end
 
 local block
@@ -168,13 +174,12 @@ block = GlassPanel.RegisterBlock({
     showLabel = false,   -- the shard icon says it
     icon = ICON_SHARD,
     side = "right",
-    order = 140,
-    events = { "PLAYER_ENTERING_WORLD", "BAG_UPDATE_DELAYED", "BAG_UPDATE_COOLDOWN" },
-    onEvent = function(_, event)
-        if event ~= "BAG_UPDATE_COOLDOWN" then stale = true end
-    end,
+    order = 145,   -- right lane, between Role and Professions
+    events = { "PLAYER_ENTERING_WORLD", "BAG_UPDATE_DELAYED" },
+    onEvent = function() stale = true end,
     text = function()
-        if classFile() ~= "WARLOCK" then return nil end
+        if class == nil then class = classFile() end
+        if class ~= "WARLOCK" then return nil end
         ensure()
         local t = shardText(state.shards)
         if state.healthstone then t = t .. " " .. icon(ICON_HEALTHSTONE) end
@@ -185,10 +190,11 @@ block = GlassPanel.RegisterBlock({
         ensure()
         tt:AddLine("Warlock")
         tt:AddDoubleLine("Soul Shards", shardText(state.shards), 1, 0.82, 0, 1, 1, 1)
-        local hs = stoneLine(tt, "Healthstone", state.healthstone)
-        local ss = stoneLine(tt, "Soulstone", state.soulstone)
-        if state.shards == nil or state.healthstone == nil or state.soulstone == nil then
-            tt:AddLine("Some counts can't be read right now.", 0.7, 0.7, 0.7, true)
+        local hs, hsUnread = stoneLine(tt, "Healthstone", state.healthstone)
+        local ss, ssUnread = stoneLine(tt, "Soulstone", state.soulstone)
+        if state.shards == nil or state.healthstone == nil or state.soulstone == nil
+            or hsUnread or ssUnread then
+            tt:AddLine("Some counts or cooldowns can't be read right now.", 0.7, 0.7, 0.7, true)
         end
         if hs or ss then startTicker() else stopTicker() end
     end,
