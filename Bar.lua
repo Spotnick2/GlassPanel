@@ -360,6 +360,72 @@ function Bar.Layout()
     end
 end
 
+-- The bar's glass (#65): AltStable's two presets (..\AltStable\Skin.lua),
+-- the body only (tint, grain, wash); the rim stays the instance's. Clear is
+-- the surface as the library built it (SetSurfaceTint(g), the instance's
+-- grain, the wash at its built strength), so it follows the library's look.
+-- Smoked is AltStable's darker body; its grain and wash are scales of the
+-- built ones (AltStable's 0.35 / 0.45 and 0.14 / 0.18), set as region alpha,
+-- which LibGlass's contract allows (GLASS-MATERIAL.md, "Region fields").
+-- The class colour is shaded by the preset's classShade at the surface's
+-- alpha: at full strength it reads as painted plastic (AltStable, in game).
+Bar.GLASS = {
+    clear  = { classShade = 0.6 },
+    smoked = { tint = { 0.05, 0.06, 0.08, 0.62 }, grain = 0.35 / 0.45, wash = 0.14 / 0.18, classShade = 0.3 },
+}
+Bar.GLASS_TINTS = { neutral = true, class = true }
+
+-- The player's class colour (plain numbers), or nil.
+local function classColor()
+    local ok, _, class = pcall(UnitClass, "player")
+    class = ok and API.Plain(class) or nil
+    if type(class) ~= "string" then return nil end
+    local ok2, c = pcall(C_ClassColor.GetClassColor, class)
+    if not ok2 or type(c) ~= "table" then return nil end
+    local r, g, b = API.Plain(c.r), API.Plain(c.g), API.Plain(c.b)
+    if type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then return nil end
+    return r, g, b
+end
+
+-- false while the class colour is wanted but unreadable.
+local function paintGlass(g, material, tint)
+    local p = Bar.GLASS[material] or Bar.GLASS.clear
+    local known, cr, cg, cb = true, nil, nil, nil
+    if tint == "class" then
+        cr, cg, cb = classColor()
+        known = cr ~= nil
+    end
+    if cr then
+        -- nil alpha: the surface's own (clear); smoked brings its own.
+        Glass.SetSurfaceTint(g, cr * p.classShade, cg * p.classShade, cb * p.classShade, p.tint and p.tint[4])
+    elseif p.tint then
+        Glass.SetSurfaceTint(g, p.tint[1], p.tint[2], p.tint[3], p.tint[4])
+    else
+        Glass.SetSurfaceTint(g)   -- the colour it was built with
+    end
+    g.grain:SetAlpha(Glass.STYLE.grain * (p.grain or 1))
+    g.wash:SetAlpha(p.wash or 1)
+    return known
+end
+
+-- Paint the bar's body: material "clear"|"smoked", tint "neutral"|"class".
+-- Unknown values fall back to clear and neutral. Live, on the one surface (no
+-- reload). Returns false while the class colour is wanted but unreadable
+-- (Bar.glassPending: PLAYER_ENTERING_WORLD tries again). A throw is recorded,
+-- never raised: painting is optional, and it runs while the bar is built.
+Bar.glassPending = false
+function Bar.ApplyGlass(material, tint)
+    local g = Bar.glass
+    if not g then return true end
+    local ok, known = pcall(paintGlass, g, material, tint)
+    if not ok then
+        API.Fail("bar:glass", known)
+        return true
+    end
+    Bar.glassPending = not known
+    return known
+end
+
 function Bar.Build()
     if Bar.frame then return end
     local f = CreateFrame("Frame", "GlassPanelBar", UIParent)
@@ -392,6 +458,8 @@ function Bar.Build()
     Bar.dragFrame = dragFrame
 
     for _, block in ipairs(Engine.blocks) do Bar.Attach(block) end
+    local d = GlassPanelDB or {}
+    Bar.ApplyGlass(d.glass, d.glassTint)   -- last: the bar is whole whatever it does
 end
 
 -- Pull the bar's ends in (UIParent units) to make room for Blizzard's top

@@ -89,7 +89,14 @@ core's `ADDON_LOADED`.
   visual order. Ids of blocks that aren't loaded are kept. Blocks never placed follow
   `side`/`order`. `Layout.Current()` is the cached read; mutators use `Lanes()` then `Save`.
 - **`Bar.lua`**: the strip (`GlassPanelBar`, full width at the top of `UIParent`, strata
-  `MEDIUM`, `Glass.Apply(..., "small")`, mouse-less so empty space clicks through), one plain
+  `MEDIUM`, `Glass.Apply(..., "small")` painted by `Bar.ApplyGlass` (#65: `Bar.GLASS` and
+  `Bar.GLASS_TINTS` are the one allowlist. Clear is the surface **as built** (`SetSurfaceTint(g)`,
+  the instance's grain and wash), so it follows the library; smoked is AltStable's body, its grain
+  and wash as region-alpha scales of the built ones; the class colour from `C_ClassColor` × the
+  preset's `classShade` through `Glass.SetSurfaceTint` (**LibGlass r3+**, embedded r5). Painted last
+  in `Bar.Build`, under pcall (`API.Fail("bar:glass")`); a class colour not readable yet sets
+  `Bar.glassPending`, is said once by the setter, and is retried at `PLAYER_ENTERING_WORLD`), mouse-less so
+  empty space clicks through), one plain
   `Button` per block (icon, a gold **caption** `b.caption` "Label: " (#23; `Bar.ShowsCaption`: never
   on graphical blocks, then `labelsFor[id]`, then `labels`, then the spec's `showLabel`), the
   value `b.label`, `HIGHLIGHT` hover), placing them from
@@ -249,11 +256,11 @@ core's `ADDON_LOADED`.
   unknown is shown as unknown). Secret numbers keep type `"number"` on the client, so
   `type(x) == "number"` is no secrecy check: `API.Plain` first.
 - **`Settings.lua`**: `GlassPanelDB`'s defaults (`EnsureDefaults`) and **the one place a setting
-  is changed and applied** (`SetFont`, `SetShown`, `SetRoom`, `SetLabels`, `SetLabelFor`,
+  is changed and applied** (`SetFont`, `SetShown`, `SetRoom`, `SetGlass`, `SetGlassTint`, `SetLabels`, `SetLabelFor`,
   `SetIconFor`, `SetHidden`, `ResetLayout`, and `ApplyAll` for a whole imported setup, with one
   layout pass). `/gpanel`, the options panel and an import all call these, so they can't drift
   apart. Each calls `Settings.listener` after a change: an open options panel re-reads its controls.
-- **`Share.lua`** (#34): the setup (`font`, `shown`, `room`, `labels`, `hidden`, `labelsFor`,
+- **`Share.lua`** (#34): the setup (`font`, `shown`, `room`, `glass`, `glassTint`, `labels`, `hidden`, `labelsFor`,
   `iconsFor`, and the **effective** layout from `Layout.Lanes`) as `GP1:` + base64 of our own
   serialisation (sorted keys: same setup, same string). The input is **never run as code**: hard
   limits (16k chars, depth 6, 2000 values, 128-char strings), then `Share.Clean` checks every key
@@ -287,17 +294,18 @@ core's `ADDON_LOADED`.
 - **`Options.lua`** (#24): Options > AddOns > Glass Panel, a canvas panel on Retail's Settings
   framework (as GlassUnitFrames #39), registered at `PLAYER_LOGIN`. **Our `Settings` local shadows
   Blizzard's global `Settings`**: the framework is read with `rawget(_G, "Settings")`. Bar (shown,
-  captions, font, width), Layout (reset), Share setup (Export / Import), and a row per loaded plugin
+  captions, font, width, glass, tint), Layout (reset), Share setup (Export / Import), and a row per loaded plugin
   (Shown, Caption, Icon; Caption greyed for graphical blocks, Icon for blocks without one), all in
   name order (a plugin registered later gets its row on the next open, where its name sorts).
   Every open, and every setting change while it's open, re-reads the state.
-- **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`, `layout`, `room`, `labels`,
+- **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`, `layout`, `room`, `glass`
+  (`clear`|`smoked`), `glassTint` (`neutral`|`class`), `labels`,
   `labelsFor[id]`, `iconsFor[id]` (only `false` is stored), `keep[id]` and `replaced["new>old"]` (#50: the player showed a
   replaced block again; the one-time "replaces" line was said) and `notedBuild` (the last client build
   the dev notice was said for), none of them part of a shared setup). The bar is built at
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles
   `list | move <id> <lane> [n] | layout reset | labels | label <id> | icon <id> | show <id> |
-  hide <id> | toggle | font | room | options | export | import | covered | failures`.
+  hide <id> | toggle | font | glass | tint | room | options | export | import | covered | failures`.
 - **`Plugins\<Name>\`**: deploy puts each at the AddOns top level under its TOC name, and
   `.pkgmeta` `move-folders` does the same when packaging (the AltStable pattern).
 
@@ -322,7 +330,8 @@ texture names only grow; instances; upgrade rules).
   a dev copy comes from the LibGlass checkout (`$env:LIBGLASS`, default `..\LibGlass`) through its
   own `Tools\deploy.ps1`, which `Tools\deploy.ps1` here calls first (a refusal leaves the deployed
   addon untouched). The tests load the same checkout and fail loudly without one.
-- **The pin:** `.pkgmeta` pins a commit or tag, **never `tag: latest`**, and **no comment on a
+- **The pin:** `.pkgmeta` pins a commit or tag (`r5` since #65: the bar's tint needs r3's
+  `SetSurfaceTint`), **never `tag: latest`**, and **no comment on a
   value line** (the packager keeps it in the value). Bump it only in a release made anyway: players
   get library fixes earlier through whichever glass addon ships the newest copy (LibStub runs that
   one). `tests\run.ps1` and deploy warn when the checkout isn't at the pin (one check,

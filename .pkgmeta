@@ -40,7 +40,7 @@ manual-changelog:
 externals:
   Libs/LibGlass-1.0:
     url: https://github.com/Spotnick2/LibGlass
-    tag: r1
+    tag: r5
 
 # YAML list, not markdown bullets. Every pattern matches the WHOLE path from
 # the package root, so the top-level names below never reach inside Libs/.

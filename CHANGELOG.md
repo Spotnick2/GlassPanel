@@ -59,3 +59,6 @@
 - Other addons can add blocks with `GlassPanel.RegisterBlock`.
 - The glass look now comes from LibGlass, a small library shared by the Glass addons, included in
   the download. Nothing changes on screen.
+- The bar's glass can be clear (as before) or smoked, and neutral or tinted in your class colour:
+  Options > AddOns > Glass Panel > Bar, or `/gpanel glass clear|smoked` and
+  `/gpanel tint neutral|class`. Applied at once, and part of a shared setup.

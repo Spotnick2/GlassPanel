@@ -2,7 +2,8 @@
 -- account to another, like Edit Mode's layout sharing.
 --
 -- What travels: the settings that describe the setup (layout, hidden,
--- labels, labelsFor, iconsFor, room, font, shown). Not plugins' own data
+-- labels, labelsFor, iconsFor, room, font, shown, glass, glassTint). Not
+-- plugins' own data
 -- (Layer's known layers, XP's session).
 --
 -- Format: "GP1:" + base64 of a tiny serialisation (strings, numbers,
@@ -189,6 +190,7 @@ function Share.Current()
     local d = GlassPanelDB
     return {
         font = d.font, shown = d.shown, room = d.room, labels = d.labels,
+        glass = d.glass, glassTint = d.glassTint,
         hidden = copyMap(d.hidden), labelsFor = copyMap(d.labelsFor), iconsFor = copyMap(d.iconsFor),
         layout = Layout.Lanes(),
     }
@@ -271,6 +273,12 @@ function Share.Clean(raw)
     local room = raw.room == nil and D.room or raw.room
     if room ~= "auto" and room ~= "full" then return nil, "bad room setting" end
     out.room = room
+    local glass = raw.glass == nil and D.glass or raw.glass
+    if not (type(glass) == "string" and GlassPanel.Bar.GLASS[glass]) then return nil, "unknown glass" end
+    out.glass = glass
+    local tint = raw.glassTint == nil and D.glassTint or raw.glassTint
+    if not (type(tint) == "string" and GlassPanel.Bar.GLASS_TINTS[tint]) then return nil, "unknown glass tint" end
+    out.glassTint = tint
     for _, k in ipairs({ "shown", "labels" }) do
         local v = raw[k]
         if v == nil then v = D[k] end
@@ -312,8 +320,8 @@ function Share.Describe(setup)
     for _, lane in ipairs(setup.layout) do blocks = blocks + #lane.ids end
     local hidden = 0
     for _ in pairs(setup.hidden) do hidden = hidden + 1 end
-    return string.format("%d block(s) in %d lane(s), %d hidden; font %s, room %s%s", blocks, #setup.layout, hidden,
-        setup.font, setup.room, setup.shown and "" or ", bar hidden")
+    return string.format("%d block(s) in %d lane(s), %d hidden; font %s, room %s, %s glass, %s tint%s", blocks,
+        #setup.layout, hidden, setup.font, setup.room, setup.glass, setup.glassTint, setup.shown and "" or ", bar hidden")
 end
 
 -- Replace the setup with `setup` (from Share.Clean): through Settings, like
