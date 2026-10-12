@@ -266,8 +266,8 @@ core's `ADDON_LOADED`.
   scan runs under pcall (Durability's pattern: `ammo:scan` recorded, still stale). Yellow under low, red under critical (strictly below), per class in
   `GlassPanelAmmoDB.thresholds[CLASS]` (defaults hunter 600/200, warrior and rogue 100/40; a
   corrupt pair falls back), set in a small window (left-click or the plugin option button).
-  **Unmeasured:** whether the ammo slot's count totals the bags (Vanilla) or the slot alone;
-  `UnitUsesAmmo` for warriors and rogues; the thrown count, and whether it includes the same weapon
+  **Measured (70338, hunter):** the ammo slot's count totals that ammo across the bags (1,100 =
+  six quiver stacks), as in Vanilla. **Unmeasured:** `UnitUsesAmmo` for warriors and rogues; the thrown count, and whether it includes the same weapon
   in the bags (the tooltip would count those twice). stubs/ammo.lua wraps `C_Item.GetItemInfoInstant`
   and `IsItemDataCachedByID` once at the first reset: `WoW.items` first (`pending = true`: not
   seen yet), else the other stubs'.
