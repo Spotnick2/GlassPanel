@@ -48,6 +48,7 @@ New:
 - **Warlock** (#67): soul shards, Healthstone and Soulstone carried, their cooldowns.
 - **Reagents** (#68): the class reagents you pick, Currencies-style. Ammo (#66) and Warlock (#67)
   are their own plugins.
+- **Ammo** (#66): arrows, bullets or thrown left, by the ranged weapon; low/critical colours per class.
 
 Also: an opt-in Edit Mode layout for a full-width bar (#10); hiding Blizzard's XP bar safely (#9).
 

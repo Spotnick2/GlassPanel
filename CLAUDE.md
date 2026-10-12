@@ -249,6 +249,28 @@ core's `ADDON_LOADED`.
   is the GCD (ready). No `interval`: a 1 s `C_Timer` ticker runs only while the tooltip is open on the
   block with a cooldown counting down ("waiting" alone doesn't tick). Names from `C_Item.GetItemNameByID` (localised), English fallback. No click
   (using a stone is secure).
+- **`Plugins\Ammo`** (#66): hunters, warriors and rogues only. The ranged slot (18) decides the
+  kind from `C_Item.GetItemInfoInstant` (Weapon: Bows/Crossbow → arrows, Guns → bullets, Thrown →
+  the slot's own stack; anything else: no block). Projectile subclasses Arrow 2 / Bullet 3 have no
+  enum (item data). `UnitUsesAmmo` (**new in 70338**; Blizzard shows `CharacterAmmoSlot` on it) is
+  the client's gate: a plain `false` hides arrows/bullets (thrown ignores it); absent or unreadable,
+  the weapon decides. Count: `GetInventoryItemCount("player", 0)`, or that ammo in the bags when
+  the count can't be read (an unreadable thrown stack: its bags, with a grey `?`); none equipped or
+  the wrong kind: the matching projectiles in the bags with a red `!`. `GetItemInfoInstant` may
+  return nothing for an item the client hasn't seen: that item is **pending**, never definite (#73).
+  Its data is requested (Reagents'/GearScore's loader: `IsItemDataCachedByID` guard, load events on
+  the plugin's own frame only while one is pending, an `answered` id never asked again) and the
+  block rescans on arrival. Meanwhile an unresolved weapon shows no block, an unresolved bag item
+  makes the count unsure (grey `?`), and equipped ammo of unknown kind is counted (the slot) with a
+  grey `?`, never "wrong". Item classes are cached per id once resolved (never a nil). The
+  scan runs under pcall (Durability's pattern: `ammo:scan` recorded, still stale). Yellow under low, red under critical (strictly below), per class in
+  `GlassPanelAmmoDB.thresholds[CLASS]` (defaults hunter 600/200, warrior and rogue 100/40; a
+  corrupt pair falls back), set in a small window (left-click or the plugin option button).
+  **Unmeasured:** whether the ammo slot's count totals the bags (Vanilla) or the slot alone;
+  `UnitUsesAmmo` for warriors and rogues; the thrown count, and whether it includes the same weapon
+  in the bags (the tooltip would count those twice). stubs/ammo.lua wraps `C_Item.GetItemInfoInstant`
+  and `IsItemDataCachedByID` once at the first reset: `WoW.items` first (`pending = true`: not
+  seen yet), else the other stubs'.
 - **`Plugins\Durability`** (#12): lowest durability and repair cost. Events only mark the
   cache stale; it's rebuilt at most once per repaint (tooltip data is heavy, and only for damaged
   items). An unreadable item marks the figure with a grey `?` and makes the cost unknown; the cost comes from

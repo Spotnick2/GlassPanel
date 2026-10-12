@@ -23,6 +23,7 @@ move-folders:
   GlassPanel/Plugins/AltStable: GlassPanelAltStable
   GlassPanel/Plugins/Warlock: GlassPanelWarlock
   GlassPanel/Plugins/Reagents: GlassPanelReagents
+  GlassPanel/Plugins/Ammo: GlassPanelAmmo
 
 manual-changelog:
   filename: CHANGELOG.md

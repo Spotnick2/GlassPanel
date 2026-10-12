@@ -58,6 +58,17 @@ do
     local cb = GlassPanel.Engine.byId.currencies
     if cb and cb.options then cb.options[1].run() end
 end
+do
+    -- The ammo thresholds window (a hunter, so it opens), saved and reset.
+    local ab = GlassPanel.Engine.byId.ammo
+    if ab then
+        WoW.playerClass = { "Hunter", "HUNTER", 3 }
+        ab.options[1].run()
+        local win = ab._test.window()
+        win.save._scripts.OnClick(win.save)
+        win.reset._scripts.OnClick(win.reset)
+    end
+end
 GlassPanel._test.slash("setup")
 GlassPanel._test.slash("setup back")
 WoW.tick(1.1); WoW.tick()
