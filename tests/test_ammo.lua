@@ -38,7 +38,9 @@ end
 local function has(pattern)
     for _, l in ipairs(tooltip()) do if l:find(pattern, 1, true) then return l end end
 end
-local ICON = function(id) return "|T" .. id .. ":14:14:0:0:64:64:5:59:5:59|t " end
+-- The bar shows the count after the block's own icon and "Ammo: " caption;
+-- which ammo (the id below) is the tooltip's.
+local ICON = function(id) return "" end
 
 -- A hunter with a bow and arrows: the count, white above "low".
 setup("HUNTER", BOW, ARROWS, 1200)
@@ -293,4 +295,7 @@ eq(textOf("ammo"), ICON(2001) .. "|cffffffff900|r", "last good state kept")
 C_Container.GetContainerNumSlots = realSlots
 WoW.invCount[0] = 300
 eq(block("ammo")._test.state().count, 300, "still stale: the next read scans again")
+-- Like Bags: its own icon and the gold caption "Ammo: ".
+check(block("ammo").icon ~= nil, "ammo: a block icon")
+eq(GlassPanel.Bar.ShowsCaption(block("ammo")), true, "ammo: the caption shows by default")
 done("test_ammo")

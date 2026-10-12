@@ -196,8 +196,8 @@ core's `ADDON_LOADED`.
   Up/Down on the shown ones; unresolved saved ids kept at the end) from a left-click or the plugin's
   option **button**; refreshed at most once per frame. Secret amount: grey `?`; measured plain for
   Honor Points (36 / 15,000).
-- **`Plugins\Reagents`** (#68): the class reagents the player picks, in their order (icon + count,
-  a red `0` when none are left), Currencies' chooser on a **hardcoded per-class table** of item ids
+- **`Plugins\Reagents`** (#68): the class reagents the player picks, in their order (after the block's
+  own icon and caption "Reagents: ", as Bags; then icon + count each, a red `0` when none are left), Currencies' chooser on a **hardcoded per-class table** of item ids
   (`CLASS`, keyed by `UnitClass`'s file name; nothing in the client says which items a class uses).
   Poisons are in the client's consumables list; the other ids are Vanilla's (Informant: class
   Reagent), unmeasured. Icons from `C_Item.GetItemInfoInstant` (no item data needed), else
@@ -249,7 +249,8 @@ core's `ADDON_LOADED`.
   is the GCD (ready). No `interval`: a 1 s `C_Timer` ticker runs only while the tooltip is open on the
   block with a cooldown counting down ("waiting" alone doesn't tick). Names from `C_Item.GetItemNameByID` (localised), English fallback. No click
   (using a stone is secure).
-- **`Plugins\Ammo`** (#66): hunters, warriors and rogues only. The ranged slot (18) decides the
+- **`Plugins\Ammo`** (#66): hunters, warriors and rogues only. On the bar, as Bags: its own
+  icon, the caption "Ammo: " and the count (which ammo it is: the tooltip). The ranged slot (18) decides the
   kind from `C_Item.GetItemInfoInstant` (Weapon: Bows/Crossbow → arrows, Guns → bullets, Thrown →
   the slot's own stack; anything else: no block). Projectile subclasses Arrow 2 / Bullet 3 have no
   enum (item data). `UnitUsesAmmo` (**new in 70338**; Blizzard shows `CharacterAmmoSlot` on it) is
