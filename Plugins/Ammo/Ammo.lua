@@ -15,9 +15,10 @@
 -- 18; Projectile 6). The projectile subclasses have no enum: Arrow 2 and
 -- Bullet 3 are the item data's values (Vanilla), unmeasured here.
 --
--- UNMEASURED on the client: whether GetInventoryItemCount on the ammo slot
--- totals that ammo across the bags (Vanilla) or counts the slot alone; what
--- UnitUsesAmmo says for warriors and rogues; the thrown stack's count, and
+-- MEASURED on 70338 (a hunter, 2026-10-12): GetInventoryItemCount on the
+-- ammo slot totals that ammo across the bags (Vanilla): 1,100 for six quiver
+-- stacks, the figure Blizzard's bag window shows on its ammo slot.
+-- UNMEASURED on the client: what UnitUsesAmmo says for warriors and rogues; the thrown stack's count, and
 -- whether it already includes the same weapon in the bags (then "Equipped"
 -- and "In your bags" in the tooltip count those stacks twice). When a slot's
 -- count can't be read, the same item is counted in the bags instead (the
