@@ -58,7 +58,6 @@ local KIND_OF_WEAPON = {
 }
 local KIND_OF_PROJECTILE = { [ARROW] = "arrow", [BULLET] = "bullet" }
 local KIND_NAME = { arrow = "Arrows", bullet = "Bullets", thrown = "Thrown" }
-local KIND_ICON = { arrow = "Interface\\Icons\\INV_Ammo_Arrow_02", bullet = "Interface\\Icons\\INV_Ammo_Bullet_02" }
 
 -- Who carries ammo, and when the figure turns yellow (low) and red (critical).
 local DEFAULTS = {
@@ -257,15 +256,14 @@ local function build()
     s.weapon = equippedID(RANGED_SLOT)
     if not s.weapon then return s end
     -- An unresolved weapon (requested) is pending: no block until it loads.
-    local classID, subClassID, icon = itemClass(s.weapon)
+    local classID, subClassID = itemClass(s.weapon)
     if classID ~= WEAPON then return s end
     local kind = KIND_OF_WEAPON[subClassID]
     if not kind then return s end
     if kind ~= "thrown" and clientSaysNoAmmo() then return s end
-    s.kind, s.weaponIcon = kind, icon
+    s.kind = kind
 
     if kind == "thrown" then
-        s.icon = icon
         s.count = slotCount(RANGED_SLOT)
         s.spare, s.spareUnsure = bagCount(function(id) return id == s.weapon end)
         if s.count == nil then
@@ -277,9 +275,8 @@ local function build()
 
     s.ammo = equippedID(AMMO_SLOT)
     if s.ammo then
-        local _, _, aIcon = itemClass(s.ammo)
         local ak = projectileKind(s.ammo)
-        s.ammoKind, s.icon = ak or nil, aIcon
+        s.ammoKind = ak or nil
         -- The right kind, or a kind not known yet (the slot is the client's
         -- own: counted, marked unsure): the slot.
         if ak == kind or ak == nil then
@@ -295,7 +292,6 @@ local function build()
     end
     -- Nothing usable equipped: what the bags hold of the right kind.
     s.missing = true
-    s.icon = KIND_ICON[kind]
     s.count, s.unsure = bagCount(function(id)
         local k = projectileKind(id)
         if k == nil then return nil end
@@ -323,11 +319,6 @@ local function colour(count, class)
     if count < crit then return "ff4040" end
     if count < low then return "ffd200" end
     return "ffffff"
-end
-
-local function iconText(icon, size)
-    if type(icon) ~= "number" and type(icon) ~= "string" then return "" end
-    return string.format("|T%s:%d:%d:0:0:64:64:5:59:5:59|t ", tostring(icon), size, size)
 end
 
 local UNSURE = "|cff888888?|r"
@@ -411,7 +402,7 @@ end
 local block = GlassPanel.RegisterBlock({
     id = "ammo",
     label = "Ammo",
-    showLabel = false,   -- the ammo's own icon says what it is
+    icon = "Interface\\Icons\\INV_Ammo_Arrow_02",   -- "Ammo: " like Bags' caption; which ammo: the tooltip
     side = "right",
     order = 118,
     events = { "PLAYER_ENTERING_WORLD", "PLAYER_EQUIPMENT_CHANGED", "BAG_UPDATE_DELAYED", "UNIT_INVENTORY_CHANGED" },
@@ -426,7 +417,7 @@ local block = GlassPanel.RegisterBlock({
         else t = "|cff" .. colour(s.count, s.class) .. BreakUpLargeNumbers(s.count) .. "|r" end
         if s.count ~= nil and s.unsure then t = t .. UNSURE end
         if s.missing then t = t .. WARN end
-        return iconText(s.icon, 14) .. t
+        return t
     end,
     tooltip = function(_, tt)
         local s = current()

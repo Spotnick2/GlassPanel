@@ -376,7 +376,7 @@ end
 local block = GlassPanel.RegisterBlock({
     id = "reagents",
     label = "Reagents",
-    showLabel = false,   -- each reagent carries its own icon
+    icon = "Interface\\Icons\\INV_Misc_Dust_02",   -- "Reagents: " like Bags' caption; each reagent has its own
     side = "right",
     order = 125,
     events = { "PLAYER_ENTERING_WORLD", "BAG_UPDATE_DELAYED" },

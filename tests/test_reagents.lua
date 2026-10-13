@@ -286,4 +286,7 @@ for _, c in ipairs(T().available()) do sh[#sh + 1] = c.name end
 eq(table.concat(sh, ","), "Ankh,Fish Oil,Shiny Fish Scales", "shaman: Ankh, Fish Oil, Shiny Fish Scales")
 
 check(next(GlassPanel.failures) == nil, "no failures")
+-- Like Bags: its own icon and the gold caption "Reagents: ".
+check(block("reagents").icon ~= nil, "reagents: a block icon")
+eq(GlassPanel.Bar.ShowsCaption(block("reagents")), true, "reagents: the caption shows by default")
 done("test_reagents")
