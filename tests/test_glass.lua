@@ -11,7 +11,9 @@ local function tintIs(r, gg, b, a, msg)
     check(near(c[1], r) and near(c[2], gg) and near(c[3], b) and near(c[4], a),
           msg .. " (got " .. table.concat({ tostring(c[1]), tostring(c[2]), tostring(c[3]), tostring(c[4]) }, ", ") .. ")")
 end
-local function washAlpha() return g().wash._alpha or 1 end
+-- The wash is a gradient: what's drawn is its peak (the top colour's alpha),
+-- since SetAlpha does nothing on it (#83). The stub models that.
+local function washPeak() return g().wash._gradient[3].a end
 
 -- Defaults: clear and neutral, which is the library's own look.
 WoW.playerClass = { "Hunter", "HUNTER", 3 }
@@ -21,15 +23,20 @@ eq(GlassPanelDB.glassTint, "neutral", "default tint: neutral")
 local st = GlassPanel.Glass.STYLE
 tintIs(st.tint[1], st.tint[2], st.tint[3], st.tint[4], "clear neutral = the built tint")
 eq(g().grain._alpha, st.grain, "clear: the library's grain")
-eq(washAlpha(), 1, "clear: the wash as built")
-eq(g().wash._gradient[3].a, st.wash, "the wash's gradient is the library's own")
+check(near(washPeak(), st.wash), "clear: the wash as built")
+eq(g().wash._shown, true, "(shown)")
 
 -- Smoked: AltStable's darker preset, painted at once.
 GlassPanel._test.slash("glass smoked")
 eq(GlassPanelDB.glass, "smoked", "/gpanel glass smoked")
 tintIs(0.05, 0.06, 0.08, 0.62, "smoked body")
 check(near(g().grain._alpha, 0.35), "smoked grain")
-check(near(washAlpha() * st.wash, 0.14), "smoked wash")
+check(near(washPeak(), 0.14), "smoked wash, through its gradient (r7's SetWash)")
+g().wash:SetAlpha(0.5)
+eq(g().wash._alpha, nil, "(the stub, like the client: SetAlpha on a gradient does nothing)")
+GlassPanel._test.slash("glass clear")
+check(near(washPeak(), st.wash), "clear again: the built wash")
+GlassPanel._test.slash("glass smoked")
 
 -- The class colour, shaded by the preset, at the preset's own alpha.
 GlassPanel._test.slash("tint class")
