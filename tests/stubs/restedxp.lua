@@ -6,7 +6,8 @@
 -- RXP table and registers the libraries RestedXP embeds in LibStub.
 --   WoW.rxp.player = { x, y, instance } (x "secret": a secret position)
 --   WoW.facing (radians; "secret": a secret)
---   WoW.rxpToggles: the launcher's left-clicks; WoW.rxpSend(msg, ...) sends a message.
+--   WoW.rxpToggles: the launcher's left-clicks; WoW.rxpMapUpdates: UpdateMap
+--   calls; WoW.rxpSend(msg, ...) sends a message.
 
 table.insert(WoW.resetHooks, function()
     WoW.facing = 0
@@ -35,6 +36,7 @@ function WoW.installRXP(opts)
     opts = opts or {}
     WoW.installed.RXPGuides = true
     WoW.rxpToggles = 0
+    WoW.rxpMapUpdates = 0
     WoW.rxp = { player = { x = 0, y = 0, instance = 1 } }
     local hbd = LibStub:NewLibrary("HereBeDragons-2.0", 1)
     hbd.GetPlayerWorldPosition = function()
@@ -61,10 +63,27 @@ function WoW.installRXP(opts)
     arrow.element = { wx = 30, wy = 40, instance = 1, step = { index = 14, active = true } }
     local steps = {}
     for i = 1, 196 do steps[i] = {} end
+    -- The guide window's active steps (RXPFrame.activeSteps), their lines in
+    -- element.text with RestedXP's colour tokens.
+    local guideFrame = CreateFrame("Frame", "RXPFrame", UIParent)
+    guideFrame.activeSteps = {
+        { index = 14, elements = { { text = "Talk to RXP_FRIENDLY_Thork" }, { text = " " },
+                                   { text = "Kill 8 Plainstriders" } } },
+        { index = 15, elements = { { text = "Loot a Fresh Zhevra Carcass" } } },
+    }
     rawset(_G, "RXP", {
         game = "FOREVER",
         currentGuide = { name = "12-17 The Barrens", steps = steps },
         arrowFrame = arrow,
+        RXPFrame = guideFrame,
+        guideTextColors = { RXP_FRIENDLY_ = "|cff00ff25" },
+        ReplaceNpcIds = function(text) return text end,
+        -- updateArrowData's visibility (map.lua:1047-1051), for a live target.
+        UpdateMap = function(resetPins)
+            WoW.rxpMapUpdates = WoW.rxpMapUpdates + 1
+            local p = RXP.settings.profile
+            arrow:SetShown(not p.disableArrow and p.showEnabled ~= false)
+        end,
         settings = {
             profile = { showEnabled = true },
             ToggleActive = function()

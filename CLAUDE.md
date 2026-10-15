@@ -385,9 +385,14 @@ core's `ADDON_LOADED`.
   switched off (`disableArrow`: RestedXP then hides the frame on every retarget, and the guide
   toggle leaves it alone, while the target stays live). Codex on #84. No target: its logo alone. The arrow turns every 0.03 s on a frame that's a child of the
   block (stops off screen); the words every 0.25 s, and a width change (in 12 px steps)
-  repaints; `width` is a function measuring them. Double-click (left): show or hide the guide
-  through its LibDataBroker launcher's left-click (safe in combat, measured), else
-  `RXP.settings.ToggleActive`. Repaints on `RXP_STEP_ACTIVATED` / `RXP_GUIDE_LOADED` (AceEvent).
+  repaints; `width` is a function measuring them. **The bar's arrow is THE arrow.** Double-click
+  (left) shows or hides **RestedXP's own on-screen arrow** by flipping its own "Hide waypoint arrow"
+  option (`profile.disableArrow`, saved by RestedXP; its target stays live), then its
+  `UpdateMap(true)` (else the frame hidden directly). **Never the guide** (`showEnabled` /
+  `hideGuideWindow`): either off at login sets its `isHidden`, its step handlers stop
+  (`GuideWindow.lua:250`), and the guide stops advancing. The tooltip lists its active steps
+  (`RXPFrame.activeSteps`, each step's `element.text` through `ReplaceNpcIds` with its
+  `guideTextColors`). Repaints on `RXP_STEP_ACTIVATED` / `RXP_GUIDE_LOADED` (AceEvent).
   Every read guarded: a throw shows the logo and is recorded once (`restedxp:read`).
 - **`Plugins\<Name>\`**: deploy puts each at the AddOns top level under its TOC name, and
   `.pkgmeta` `move-folders` does the same when packaging (the AltStable pattern).

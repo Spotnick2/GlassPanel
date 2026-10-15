@@ -1,5 +1,6 @@
 -- Plugins/RestedXP/RestedXP.lua: the RestedXP guide's waypoint arrow on the
--- bar (#80). Double-click it to show or hide the guide.
+-- bar (#80): the bar's arrow is THE arrow. Double-click it to show or hide
+-- RestedXP's own arrow on the screen as well; the tooltip lists its active steps.
 --
 -- A bridge, like [AltStable]: "## Dependencies: GlassPanel, RXPGuides", so the
 -- client never loads it without RestedXP Guides. RXP is RestedXP's whole addon
@@ -14,13 +15,11 @@
 --   orientation and distance go stale, while its target,
 --   RXP.arrowFrame.element, keeps updating (see target() for when it counts).
 -- - Step titles were nil: the label falls back to "Step N", as its arrow does.
--- - The guide toggle is its LibDataBroker launcher's left-click (its minimap
---   button), safe in combat (ToggleActive skips its secure frames there).
 -- - GetGuideProgress's second value isn't a total: "step N of #steps" instead.
 --
 -- On the bar: RestedXP's arrow, turning toward the waypoint, then the step and
--- the distance. With no live target (the guide hidden, no waypoint) its logo
--- alone: the handle that shows the guide again. The arrow turns every frame,
+-- the distance. With no live target (no waypoint, or the guide switched off)
+-- its logo alone. The arrow turns every frame,
 -- but only while the block is on screen (its frame is a child of the block).
 
 GlassPanel = GlassPanel or {}
@@ -221,35 +220,45 @@ local function build(block)
 end
 
 --------------------------------------------------------------------------------
--- The guide: shown or hidden, by its own launcher
+-- RestedXP's own arrow on the screen: shown or hidden (the double-click)
 --------------------------------------------------------------------------------
 
+-- The bar's arrow is THE arrow; RestedXP's own on-screen one is shown only
+-- when asked. The switch is RestedXP's own option "Hide waypoint arrow"
+-- (profile.disableArrow, saved by RestedXP): its target keeps updating while
+-- the drawing is off (measured, 70374). Never the guide window or the whole
+-- guide (showEnabled / hideGuideWindow): with either off at login RestedXP sets
+-- isHidden and its step handlers stop (GuideWindow.lua:250), so the guide
+-- would stop advancing and our arrow would go stale.
 local function guideShown()
     local p = profile()
     return p == nil or p.showEnabled ~= false
 end
 
+local function theirArrowShown()
+    local p = profile()
+    return p ~= nil and not p.disableArrow
+end
+
 local saidToggle = false
-local function toggleGuide()
-    local ldb = lib("LibDataBroker-1.1")
-    local obj
-    if ldb then
-        local ok, o = pcall(ldb.GetDataObjectByName, ldb, "RXPGuides")
-        obj = ok and type(o) == "table" and o or nil
-    end
-    local ok, err
-    if obj and type(obj.OnClick) == "function" then
-        ok, err = pcall(obj.OnClick, ui and ui.frame, "LeftButton")
-    else
-        local R = rxp()
-        local fn = R and type(R.settings) == "table" and R.settings.ToggleActive
-        if type(fn) == "function" then ok, err = pcall(fn) else ok, err = false, "no launcher and no ToggleActive" end
+local function toggleTheirArrow()
+    local R, p = rxp(), profile()
+    local ok, err = p ~= nil, "no RestedXP settings"
+    if p then
+        p.disableArrow = not p.disableArrow
+        -- What its own options and ResetArrowPosition do next: UpdateMap(true)
+        -- reruns its target pick, which shows or hides the arrow frame
+        -- (map.lua:1047-1051). Without a guide it returns early: the frame
+        -- is set directly then.
+        if R and type(R.UpdateMap) == "function" then ok, err = pcall(R.UpdateMap, true) end
+        local af = R and R.arrowFrame
+        if ok and type(af) == "table" and p.disableArrow then pcall(af.Hide, af) end
     end
     if not ok then
         API.Fail(ID .. ":toggle", err)
         if not saidToggle then
             saidToggle = true
-            API.Print("RestedXP: the guide couldn't be shown or hidden (see /gpanel failures).")
+            API.Print("RestedXP: its arrow couldn't be shown or hidden (see /gpanel failures).")
         end
     end
     GlassPanel.Refresh(ID)
@@ -258,6 +267,56 @@ end
 --------------------------------------------------------------------------------
 -- Tooltip
 --------------------------------------------------------------------------------
+
+local MAX_STEPS, MAX_LINES, MAX_CHARS = 4, 4, 140
+
+-- A step line as its guide window shows it: NPC ids replaced, RestedXP's
+-- colour tokens (RXP_FRIENDLY_ and the like) turned into its colours.
+local function stepLine(R, text)
+    if type(text) ~= "string" or API.IsSecret(text) or text == "" or text == " " then return nil end
+    if type(R.ReplaceNpcIds) == "function" then
+        local ok, t = pcall(R.ReplaceNpcIds, text)
+        if ok and type(t) == "string" then text = t end
+    end
+    local colours = type(R.guideTextColors) == "table" and R.guideTextColors or {}
+    text = text:gsub("RXP_[A-Z]+_", function(token)
+        local c = colours[token]
+        return type(c) == "string" and c or ""
+    end)
+    text = text:gsub("\n", " ")
+    if #text > MAX_CHARS then text = text:sub(1, MAX_CHARS - 3) .. "..." end
+    return text
+end
+
+-- RestedXP's active steps (RXPFrame.activeSteps), each with the lines its
+-- guide window shows.
+local function activeSteps(tt)
+    local R = rxp()
+    local frame = R and R.RXPFrame
+    local steps = type(frame) == "table" and frame.activeSteps
+    if type(steps) ~= "table" or #steps == 0 then return end
+    tt:AddLine(" ")
+    tt:AddLine("Active steps", 1, 0.82, 0)
+    for n, step in ipairs(steps) do
+        if n > MAX_STEPS then
+            tt:AddLine("  ...and " .. (#steps - MAX_STEPS) .. " more", 0.7, 0.7, 0.7)
+            break
+        end
+        if type(step) == "table" then
+            local i = num(step.index)
+            tt:AddLine((i and ("Step " .. i) or "Step"), 1, 1, 1)
+            local lines = 0
+            for _, el in ipairs(type(step.elements) == "table" and step.elements or {}) do
+                local t = type(el) == "table" and stepLine(R, el.text)
+                if t then
+                    lines = lines + 1
+                    if lines > MAX_LINES then break end
+                    tt:AddLine("  " .. t, 0.85, 0.85, 0.85, true)
+                end
+            end
+        end
+    end
+end
 
 local function tooltip(_, tt)
     local R = rxp()
@@ -278,8 +337,11 @@ local function tooltip(_, tt)
     else
         tt:AddLine(guideShown() and "No waypoint right now." or "The guide is hidden.", 0.7, 0.7, 0.7, true)
     end
+    local ok, err = pcall(activeSteps, tt)
+    if not ok then API.Fail(ID .. ":steps", err) end
     tt:AddLine(" ")
-    tt:AddLine(guideShown() and "Double-click: hide the guide" or "Double-click: show the guide", 0.3, 1, 0.3)
+    tt:AddLine(theirArrowShown() and "Double-click: hide RestedXP's own arrow"
+        or "Double-click: show RestedXP's own arrow on the screen", 0.3, 1, 0.3)
 end
 
 --------------------------------------------------------------------------------
@@ -304,7 +366,7 @@ local block = GlassPanel.RegisterBlock({
     build = build,
     tooltip = tooltip,
     onDoubleClick = function(_, button)
-        if button == "LeftButton" then toggleGuide() end
+        if button == "LeftButton" then toggleTheirArrow() end
     end,
 })
 
@@ -320,5 +382,5 @@ if block then
             if not ok then API.Fail(ID .. ":messages", err) end
         end
     end
-    block._test = { read = read, target = target, toggleGuide = toggleGuide, ui = function() return ui end }
+    block._test = { read = read, target = target, toggleTheirArrow = toggleTheirArrow, ui = function() return ui end }
 end

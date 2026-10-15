@@ -115,13 +115,13 @@ eq(ui().art._file, LOGO, "drawing off, its parent completed: no target")
 e.parent = nil
 frame()
 eq(ui().art._file, ARROW, "(live again)")
--- ...and never while the guide is hidden, which with drawing off leaves the frame alone.
-local w0 = rx().widget
-w0._scripts.OnDoubleClick(w0, "LeftButton"); frame()
-eq(RXP.settings.profile.showEnabled, false, "(guide hidden, drawing off)")
-eq(ui().art._file, LOGO, "the guide hidden with drawing off: the logo, not the old target")
-w0._scripts.OnDoubleClick(w0, "LeftButton"); frame()
-eq(ui().art._file, ARROW, "shown again: the arrow")
+-- ...and never while the guide is switched off (its own minimap toggle),
+-- which with drawing off leaves the frame alone.
+RXP.settings.ToggleActive(); frame()
+eq(RXP.settings.profile.showEnabled, false, "(guide switched off, drawing off)")
+eq(ui().art._file, LOGO, "the guide switched off with drawing off: the logo, not the old target")
+RXP.settings.ToggleActive(); frame()
+eq(ui().art._file, ARROW, "switched on again: the arrow")
 RXP.settings.profile.disableArrow = nil
 e.skip = true
 RXP.arrowFrame:Show()
@@ -135,30 +135,40 @@ local t = tooltip()
 check(t:find("RestedXP  |cffffffff12-17 The Barrens|r", 1, true), "the guide's name")
 check(t:find("Step\t14 of 196", 1, true), "step N of the guide's steps")
 check(t:find("Distance\t50 yd", 1, true), "the distance")
-check(t:find("Double-click: hide the guide", 1, true), "how to hide it")
+-- The active steps, as the guide window shows them (tokens coloured, blanks skipped).
+check(t:find("Active steps", 1, true), "the active steps")
+check(t:find("Step 14\n  Talk to |cff00ff25Thork\n  Kill 8 Plainstriders\nStep 15\n  Loot a Fresh Zhevra Carcass", 1, true),
+      "each with its lines")
+check(t:find("Double-click: hide RestedXP's own arrow", 1, true), "its own arrow is on: how to hide it")
 
--- Double-click: the guide, through its own launcher.
+-- Double-click: RestedXP's own arrow on the screen, never the guide; ours stays.
+local updates = WoW.rxpMapUpdates
 w._scripts.OnDoubleClick(w, "LeftButton"); frame(); WoW.tick()
-eq(WoW.rxpToggles, 3, "double-click: the launcher's left-click")
-eq(RXP.settings.profile.showEnabled, false, "the guide hidden")
-eq(ui().art._file, LOGO, "the block shows the logo (the guide's arrow is hidden)")
-check(tooltip():find("Double-click: show the guide", 1, true), "and how to show it again")
+eq(RXP.settings.profile.disableArrow, true, "double-click: its own 'Hide waypoint arrow'")
+eq(RXP.arrowFrame._shown, false, "its arrow on the screen hidden")
+eq(WoW.rxpMapUpdates, updates + 1, "through its own UpdateMap")
+eq(RXP.settings.profile.showEnabled, true, "the guide itself untouched")
+eq(ui().art._file, ARROW, "the bar's arrow stays: it's THE arrow")
+check(tooltip():find("Double-click: show RestedXP's own arrow on the screen", 1, true), "and how to show theirs")
 w._scripts.OnDoubleClick(w, "RightButton")
-eq(WoW.rxpToggles, 3, "a right double-click does nothing")
+eq(RXP.settings.profile.disableArrow, true, "a right double-click does nothing")
 w._scripts.OnDoubleClick(w, "LeftButton"); frame()
-eq(RXP.settings.profile.showEnabled, true, "shown again")
-eq(ui().art._file, ARROW, "and the arrow is back")
+eq(RXP.settings.profile.disableArrow, false, "double-click again: theirs back")
+eq(RXP.arrowFrame._shown, true, "(shown)")
+eq(ui().art._file, ARROW, "ours still there")
+eq(WoW.rxpToggles, 2, "the guide's own toggle never called by us (only the two calls above)")
 
--- A toggle that throws: recorded, said once.
-local realToggle = RXP.settings.ToggleActive
-RXP.settings.ToggleActive = function() error("toggle broke") end
+-- An UpdateMap that throws: recorded, said once.
+local realUpdate = RXP.UpdateMap
+RXP.UpdateMap = function() error("map broke") end
 WoW.chat = {}
 w._scripts.OnDoubleClick(w, "LeftButton")
 w._scripts.OnDoubleClick(w, "LeftButton")
 check(GlassPanel.failures["restedxp:toggle"] ~= nil, "a throwing toggle is recorded")
 eq(#WoW.chat, 1, "and said once")
 GlassPanel.failures["restedxp:toggle"] = nil
-RXP.settings.ToggleActive = realToggle
+RXP.UpdateMap = realUpdate
+RXP.settings.profile.disableArrow = false
 
 -- Messages repaint.
 local dirty = GlassPanel.Engine._test.dirty
@@ -180,12 +190,15 @@ eq(ui().art._file, ARROW, "back when it reads again")
 
 check(next(GlassPanel.failures) == nil, "no failures")
 
--- Without a launcher (no LibDataBroker): RestedXP's ToggleActive directly.
+-- A RestedXP without UpdateMap: its option flipped, its arrow hidden directly.
 WoW.removeRXP()
-loadAddon({ before = function() WoW.installRXP({ noLauncher = true }) end })
+loadAddon({ before = function() WoW.installRXP() end })
+RXP.UpdateMap = nil
 local w2 = rx().widget
 w2._scripts.OnDoubleClick(w2, "LeftButton")
-eq(WoW.rxpToggles, 1, "no launcher: ToggleActive")
+eq(RXP.settings.profile.disableArrow, true, "no UpdateMap: the option still flips")
+eq(RXP.arrowFrame._shown, false, "and its arrow hides")
+check(next(GlassPanel.failures) == nil, "(nothing recorded)")
 WoW.removeRXP()
 
 done("test_restedxp")
