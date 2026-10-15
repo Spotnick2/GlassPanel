@@ -220,6 +220,7 @@ end
 -- where the frame was let go.
 function Methods.SetMovable(w, v) w._movable = v end
 function Methods.SetClampedToScreen(w, v) w._clamped = v end
+function Methods.SetClampRectInsets(w, l, r, t, b) w._clampInsets = { l, r, t, b } end
 function Methods.StartMoving(w) w._moving = true end
 function Methods.StopMovingOrSizing(w) w._moving = false end
 function Methods.GetDebugName(w) return w._name or ("<" .. w._type .. ">") end

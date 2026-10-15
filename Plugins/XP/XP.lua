@@ -233,11 +233,11 @@ end
 
 local ui, panel   -- the panel's bar, and the block's widget it sits on
 
-local function layer(host, color, level)
+local function layer(host, color, level, glass)
     local sb = CreateFrame("StatusBar", nil, host)
     sb:SetAllPoints(host)
-    sb:SetStatusBarTexture(Glass.MEDIA .. "bar_fill")
-    sb:GetStatusBarTexture():AddMaskTexture(Glass.Mask(sb, "bar_mask", 8))
+    sb:SetStatusBarTexture(glass.MEDIA .. "bar_fill")
+    sb:GetStatusBarTexture():AddMaskTexture(glass.Mask(sb, "bar_mask", 8))
     sb:SetStatusBarColor(color[1], color[2], color[3], color[4])
     sb:SetMinMaxValues(0, 1)
     sb:SetValue(0)
@@ -247,16 +247,19 @@ end
 
 -- The four-layer glass bar with its three texts, on `parent`; the caller
 -- anchors ui.host. The host glass bar is the background, gloss and edge; its
--- own fill is rested.
-local function makeBar(parent, height, fontSize)
-    local host = Glass.Bar(parent, height)
+-- own fill is rested. `glass` builds the surfaces (the zoomed bar's clean
+-- instance, else GlassPanel.Glass); the texts are always GlassPanel.Glass's,
+-- whose font the player sets.
+local function makeBar(parent, height, fontSize, glass)
+    glass = glass or Glass
+    local host = glass.Bar(parent, height)
     host:SetFrameLevel(parent:GetFrameLevel() + 1)
     local c = COLORS.rested
     host:SetStatusBarColor(c[1], c[2], c[3], c[4])
 
-    local incomplete = layer(host, COLORS.incomplete, 1)
-    local complete = layer(host, COLORS.complete, 2)
-    local xp = layer(host, COLORS.xp, 3)
+    local incomplete = layer(host, COLORS.incomplete, 1, glass)
+    local complete = layer(host, COLORS.complete, 2, glass)
+    local xp = layer(host, COLORS.xp, 3, glass)
     host.overlay:SetFrameLevel(host:GetFrameLevel() + 4)   -- gloss over every layer
 
     local tf = CreateFrame("Frame", nil, host)
@@ -387,6 +390,12 @@ local SCALE_MIN, SCALE_MAX, SCALE_STEP = 0.5, 2, 0.05
 local GOLD = "|cffffd100"
 
 local float, floatUI, rows, ticker
+local back, backGlass       -- the glass backing (an option), built when first wanted
+local BACK_PAD_X, BACK_PAD_Y = 8, 4
+
+-- The zoomed bar's surfaces: LibGlass r6's clean preset when the loaded copy
+-- has it (#77), else the panel's own glass.
+local function surfaceGlass() return GlassPanel.CleanGlass() or Glass end
 local moving, lastMoveStop = false, -1
 
 -- fn under pcall, a throw recorded: these run from the client (scripts, the
@@ -480,6 +489,7 @@ local function showFloatTooltip(f)
 end
 
 local setDetached   -- below: the menu docks through it
+local applyBacking  -- below: the float builds its backing through it
 
 -- Role's pattern (#20): a menu that throws changes nothing, it's reported; a
 -- client with no MenuUtil docks on the right-click instead.
@@ -500,6 +510,37 @@ local function openMenu(owner)
     end
 end
 
+-- The optional glass behind the whole zoomed bar, rows included: painted like
+-- the panel (Clear or Smoked, Neutral or Class colour) through
+-- API.MatchPanelGlass, which repaints it whenever those change. On its own
+-- frame at the float's level, so its body sits under the bar (float + 1) and
+-- its rims (+ 10) around it, as the panel's blocks sit in the panel's glass.
+-- Clamping grows with it.
+function applyBacking()
+    if not float then return end
+    local on = db().backing == true
+    if on and not back then
+        local glass = surfaceGlass()
+        back = CreateFrame("Frame", nil, float)
+        back:SetPoint("TOPLEFT", float, "TOPLEFT", -BACK_PAD_X, BACK_PAD_Y)
+        back:SetPoint("BOTTOMRIGHT", float, "BOTTOMRIGHT", BACK_PAD_X, -BACK_PAD_Y)
+        back:SetFrameLevel(float:GetFrameLevel())
+        backGlass = glass.Apply(back, "small")
+        API.MatchPanelGlass(backGlass, glass ~= Glass and glass or nil)
+    end
+    if back then back:SetShown(on) end
+    if on then
+        float:SetClampRectInsets(-BACK_PAD_X, BACK_PAD_X, BACK_PAD_Y, -BACK_PAD_Y)
+    else
+        float:SetClampRectInsets(0, 0, 0, 0)
+    end
+end
+
+local function setBacking(on)
+    db().backing = on and true or nil
+    applyBacking()
+end
+
 local function buildFloat()
     local f = CreateFrame("Button", nil, UIParent)
     f:SetFrameStrata("MEDIUM")
@@ -511,7 +552,7 @@ local function buildFloat()
     f:Hide()
     float = f
 
-    floatUI = makeBar(f, FLOAT_BAR_H, FLOAT_FONT)
+    floatUI = makeBar(f, FLOAT_BAR_H, FLOAT_FONT, surfaceGlass())
     floatUI.host:SetPoint("LEFT", f, "LEFT", 0, 0)
     floatUI.host:SetPoint("RIGHT", f, "RIGHT", 0, 0)
     -- The rows, on a layer over the bar's (its texts are at host + 5).
@@ -569,6 +610,7 @@ local function buildFloat()
         if GameTooltip:GetOwner() == self then GameTooltip:Hide() end
     end))
     placeFloat()
+    applyBacking()
 end
 
 -- Shown while zoomed and XP+ is on screen. The times on it tick: a 1 s
@@ -716,6 +758,10 @@ local block = GlassPanel.RegisterBlock({
         { label = "Zoomed bar's scale", min = SCALE_MIN, max = SCALE_MAX, step = SCALE_STEP,
           get = floatScale, set = setScale },
         { label = "Reset the zoomed bar's position", run = resetSpot },
+        { label = "Glass behind the zoomed bar",
+          note = "Painted like the panel: Clear or Smoked, Neutral or Class colour.",
+          get = function() return db().backing == true end,
+          set = setBacking },
     },
     onClick = function(_, button)
         if button == "RightButton" then
@@ -735,6 +781,7 @@ if block then
                     ui = function() return ui end, stats = stats, setDetached = setDetached,
                     float = function() return float end, rows = function() return rows end,
                     floatUI = function() return floatUI end, moving = function() return moving end,
-                    setScale = setScale, floatScale = floatScale,
+                    setScale = setScale, floatScale = floatScale, surfaceGlass = surfaceGlass,
+                    back = function() return back end, backGlass = function() return backGlass end,
                     ticker = function() return ticker end }
 end

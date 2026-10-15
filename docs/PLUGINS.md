@@ -144,3 +144,10 @@ text, such as the XP bar. It's GlassPanel's instance of the embedded library Lib
 (github.com/Spotnick2/LibGlass; its `CLAUDE.md` is the contract and `docs/GLASS-MATERIAL.md` the
 write-up). `Glass.MEDIA` names only the library's own textures: ship your own art under your own
 path.
+
+`GlassPanel.CleanGlass()` returns a second instance with LibGlass r6's clean preset (thin rims, no
+grain, softer bars), made once, or `nil` when the loaded library is older: fall back to
+`GlassPanel.Glass`. Presets are construction settings, so build surfaces with it but keep text on
+`GlassPanel.Glass` (the player's font setting). `GlassPanel.API.MatchPanelGlass(g, glass)` paints
+your own surface (`glass.Apply(...)`) like the bar, Clear or Smoked, Neutral or Class colour, now and
+whenever the player changes them; pass the instance that built it (nil: `GlassPanel.Glass`).

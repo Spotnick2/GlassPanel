@@ -443,7 +443,10 @@ local function classColor()
 end
 
 -- false while the class colour is wanted but unreadable.
-local function paintGlass(g, material, tint)
+-- `glass`: the instance that built g (its own style: a clean surface has no
+-- grain to bring back), GlassPanel.Glass when nil.
+local function paintGlass(g, material, tint, glass)
+    glass = glass or Glass
     local p = Bar.GLASS[material] or Bar.GLASS.clear
     local known, cr, cg, cb = true, nil, nil, nil
     if tint == "class" then
@@ -452,13 +455,13 @@ local function paintGlass(g, material, tint)
     end
     if cr then
         -- nil alpha: the surface's own (clear); smoked brings its own.
-        Glass.SetSurfaceTint(g, cr * p.classShade, cg * p.classShade, cb * p.classShade, p.tint and p.tint[4])
+        glass.SetSurfaceTint(g, cr * p.classShade, cg * p.classShade, cb * p.classShade, p.tint and p.tint[4])
     elseif p.tint then
-        Glass.SetSurfaceTint(g, p.tint[1], p.tint[2], p.tint[3], p.tint[4])
+        glass.SetSurfaceTint(g, p.tint[1], p.tint[2], p.tint[3], p.tint[4])
     else
-        Glass.SetSurfaceTint(g)   -- the colour it was built with
+        glass.SetSurfaceTint(g)   -- the colour it was built with
     end
-    g.grain:SetAlpha(Glass.STYLE.grain * (p.grain or 1))
+    g.grain:SetAlpha(glass.STYLE.grain * (p.grain or 1))
     g.wash:SetAlpha(p.wash or 1)
     return known
 end
@@ -469,16 +472,36 @@ end
 -- (Bar.glassPending: PLAYER_ENTERING_WORLD tries again). A throw is recorded,
 -- never raised: painting is optional, and it runs while the bar is built.
 Bar.glassPending = false
-function Bar.ApplyGlass(material, tint)
-    local g = Bar.glass
-    if not g then return true end
-    local ok, known = pcall(paintGlass, g, material, tint)
+Bar.surfaces = {}   -- { g, glass }: plugins' surfaces painted like the bar (API.MatchPanelGlass)
+
+local function paintOne(g, material, tint, glass)
+    local ok, known = pcall(paintGlass, g, material, tint, glass)
     if not ok then
         API.Fail("bar:glass", known)
         return true
     end
+    return known
+end
+
+function Bar.ApplyGlass(material, tint)
+    local g = Bar.glass
+    if not g then return true end
+    local known = paintOne(g, material, tint)
+    for _, s in ipairs(Bar.surfaces) do paintOne(s.g, material, tint, s.glass) end
     Bar.glassPending = not known
     return known
+end
+
+-- Public (#78): a plugin's own LibGlass surface painted like the bar, now and
+-- whenever the player changes the bar's glass or tint (XP+'s zoomed bar
+-- backing). `glass` is the instance that built it (GlassPanel.CleanGlass()'s,
+-- or GlassPanel.Glass when nil). A surface handed over twice is kept once.
+function API.MatchPanelGlass(g, glass)
+    if type(g) ~= "table" then return end
+    for _, s in ipairs(Bar.surfaces) do if s.g == g then return end end
+    Bar.surfaces[#Bar.surfaces + 1] = { g = g, glass = glass }
+    local d = GlassPanelDB or {}
+    paintOne(g, d.glass, d.glassTint, glass)
 end
 
 function Bar.Build()

@@ -35,6 +35,7 @@ do
     WoW.now = WoW.now + 1   -- past the drags above: a click right after one is ignored
     w._scripts.OnDoubleClick(w, "LeftButton"); WoW.tick()
     local f = xp._test.float()
+    xp.options[3].set(1.5); xp.options[5].set(true); xp.options[5].set(false)   -- scale, glass backing
     f._scripts.OnEnter(f); f._scripts.OnLeave(f)
     WoW.shift = true; f._scripts.OnDragStart(f); WoW.shift = false
     f._center = { 600, 600 }; f._scripts.OnDragStop(f)

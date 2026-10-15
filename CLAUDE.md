@@ -65,7 +65,10 @@ core's `ADDON_LOADED`.
   TOC's Interface, not this notice), and **once per new build** (`GlassPanelDB.notedBuild`), not at
   every login.
 - **`Glass.lua`**: `GlassPanel.Glass = LibStub("LibGlass-1.0"):New()`, this addon's instance of
-  the material (#57; see "The glass material" below).
+  the material (#57; see "The glass material" below). `GlassPanel.CleanGlass()` (public, #78): a
+  second instance with r6's clean preset, made once on demand, `nil` when the loaded copy's MINOR is
+  under 6 (the newest copy among glass addons runs). Surfaces only: text stays on `GlassPanel.Glass`
+  (the font setting). The panel itself stays classic.
 - **`Engine.lua`**: the block registry (`GlassPanel.RegisterBlock`, `GlassPanel.Refresh`) and
   repaint scheduling:
   - one event frame for all blocks; `onEvent` runs immediately and marks the block dirty;
@@ -101,7 +104,7 @@ core's `ADDON_LOADED`.
   `Bar.GLASS_TINTS` are the one allowlist. Clear is the surface **as built** (`SetSurfaceTint(g)`,
   the instance's grain and wash), so it follows the library; smoked is AltStable's body, its grain
   and wash as region-alpha scales of the built ones; the class colour from `C_ClassColor` × the
-  preset's `classShade` through `Glass.SetSurfaceTint` (**LibGlass r3+**, embedded r5). Painted last
+  preset's `classShade` through `Glass.SetSurfaceTint` (**LibGlass r3+**, embedded r6). Painted last
   in `Bar.Build`, under pcall (`API.Fail("bar:glass")`); a class colour not readable yet sets
   `Bar.glassPending`, is said once by the setter, and is retried at `PLAYER_ENTERING_WORLD`), mouse-less so
   empty space clicks through), one plain
@@ -158,7 +161,12 @@ core's `ADDON_LOADED`.
   `GlassPanelXPDB.spot`, checked whole (a bad field: the default, TOP 0,-40) and from live
   `GetCenter()` values checked plain and finite before subtracting. Right-click: a `MenuUtil` menu
   (`CreateButton`: back to the panel, reset session, reset position; no `MenuUtil`: right-click
-  docks). **Scale** 0.5-2 (0.05 steps; the plugin's slider option, `GlassPanelXPDB.scale`, 1 stored
+  docks). Its bar and its optional **glass backing** (`GlassPanelXPDB.backing`, off by default: a
+  `Glass.Apply(back, "small")` on its own frame at the float's level, so the body is under the bar
+  and the rims around it; clamp insets grow with it) are built on `GlassPanel.CleanGlass()` when
+  there is one; the backing is painted like the panel through the public `API.MatchPanelGlass(g,
+  glass)` (`Bar.surfaces`, repainted by `Bar.ApplyGlass` with **its own instance's** style, so a
+  clean surface gets no grain). **Scale** 0.5-2 (0.05 steps; the plugin's slider option, `GlassPanelXPDB.scale`, 1 stored
   as nothing, a corrupt one reads 1): the spot stays in screen units, so SetPoint offsets are divided
   by it and `GetCenter()` multiplied by it (GUF's `PlaceAt`). A 1 s `C_Timer` ticker repaints it only while shown. Its scripts, ticker and menu items
   run under `guarded` (`xp:float`). Figures from one `stats()` snapshot (the tooltip's too).
@@ -377,7 +385,7 @@ texture names only grow; instances; upgrade rules).
   a dev copy comes from the LibGlass checkout (`$env:LIBGLASS`, default `..\LibGlass`) through its
   own `Tools\deploy.ps1`, which `Tools\deploy.ps1` here calls first (a refusal leaves the deployed
   addon untouched). The tests load the same checkout and fail loudly without one.
-- **The pin:** `.pkgmeta` pins a commit or tag (`r5` since #65: the bar's tint needs r3's
+- **The pin:** `.pkgmeta` pins a commit or tag (`r6` since #77/#78: the zoomed XP+ bar's clean preset; the bar's tint needs r3's
   `SetSurfaceTint`), **never `tag: latest`**, and **no comment on a
   value line** (the packager keeps it in the value). Bump it only in a release made anyway: players
   get library fixes earlier through whichever glass addon ships the newest copy (LibStub runs that

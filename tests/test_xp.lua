@@ -492,6 +492,51 @@ do
     sc.set(1)
     eq(GlassPanelXPDB.scale, nil, "1 is the default: nothing stored")
     eq(f._scale, 1, "back to 1")
+    -- Its surfaces: LibGlass r6's clean preset when the loaded copy has it (#77).
+    local _, minor = LibStub("LibGlass-1.0")
+    local clean = GlassPanel.CleanGlass()
+    if minor >= 6 then
+        check(clean ~= nil and clean ~= GlassPanel.Glass, "r6: a clean instance of its own")
+        eq(clean.STYLE.grain, 0, "(clean: no grain)")
+        eq(GlassPanel.CleanGlass(), clean, "made once")
+        eq(T().surfaceGlass(), clean, "the zoomed bar is built on it")
+        -- (inst._bars: LibGlass's own list of the bars an instance built.)
+        local function built(inst, bar)
+            for _, b in ipairs(inst._bars or {}) do if b == bar then return true end end
+            return false
+        end
+        check(built(clean, T().floatUI().host), "the zoomed bar is a clean bar")
+        check(built(GlassPanel.Glass, T().ui().host) and not built(clean, T().ui().host), "the panel's stays classic")
+    else
+        io.write("  (LibGlass checkout older than r6: the clean path isn't tested here)\n")
+    end
+    -- The glass backing: off by default; on, painted like the panel.
+    eq(T().back(), nil, "no backing by default")
+    eq(x.options[5].label, "Glass behind the zoomed bar", "the backing option")
+    x.options[5].set(true)
+    local bk, bg = T().back(), T().backGlass()
+    check(bk ~= nil and bk._shown, "on: a glass backing")
+    eq(GlassPanelXPDB.backing, true, "saved")
+    eq(bk._level, f._level, "its body under the bar")
+    check(bk._level < T().floatUI().host._level, "(the bar above it)")
+    check(f._clampInsets and f._clampInsets[1] == -8 and f._clampInsets[3] == 4, "clamping holds the backing too")
+    if clean then eq(bg.size, "thin_small", "clean: thin rims") end
+    GlassPanel._test.slash("glass smoked")
+    eq(bg.tint._color[4], 0.62, "follows the panel's glass: smoked")
+    local grain = (clean or GlassPanel.Glass).STYLE.grain * 0.35 / 0.45
+    check(math.abs(bg.grain._alpha - grain) < 1e-9, "with its own instance's grain (none on clean)")
+    GlassPanel._test.slash("glass clear")
+    x.options[5].set(false)
+    eq(bk._shown, false, "off: hidden")
+    eq(GlassPanelXPDB.backing, nil, "off: nothing stored")
+    eq(f._clampInsets[1], 0, "clamping back to the bar")
+    x.options[5].set(true)
+    eq(T().back(), bk, "on again: the same backing")
+    eq(#GlassPanel.Bar.surfaces, 1, "handed to the panel once")
+    GlassPanel.API.MatchPanelGlass(bg)
+    GlassPanel.API.MatchPanelGlass("not a surface")
+    eq(#GlassPanel.Bar.surfaces, 1, "a surface handed over again, or junk: still one")
+    x.options[5].set(false)
     WoW.player.level, WoW.player.maxXP = 60, 0
     WoW.player.maxLevel = 60
     WoW.fire("PLAYER_LEVEL_UP", 60); WoW.fire("PLAYER_XP_UPDATE", "player"); WoW.tick()
@@ -517,6 +562,15 @@ do
         shown, p = spotAfterLoad(bad[1])
         check(shown and p[1] == "TOP" and p[5] == -40, bad[2] .. ": the default spot, as a whole")
     end
+    -- An older LibGlass loaded (r5): no clean instance, the panel's glass instead.
+    GlassPanelXPDB = { detached = true, backing = true }
+    loadAddon({ before = function() LibStub.minors["LibGlass-1.0"] = 5 end })
+    eq(GlassPanel.CleanGlass(), nil, "r5: no clean instance")
+    eq(T().surfaceGlass(), GlassPanel.Glass, "the zoomed bar on the panel's glass")
+    local bg = T().backGlass()
+    check(bg ~= nil and T().back()._shown, "a saved backing is built with the bar")
+    eq(bg.size, "small", "the panel's rims")
+    check(next(GlassPanel.failures) == nil, "r5: nothing tried, nothing recorded")
     -- Hiding Blizzard's bar still follows XP+ on screen while zoomed.
     local c
     GlassPanelXPDB = { detached = true, hideBlizzard = true }
