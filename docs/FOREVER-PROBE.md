@@ -69,3 +69,28 @@ fold**. The toggle is the minimize.
 so it's not usable as "x of y". Use the step index and `#RXP.currentGuide.steps` (196).
 
 **Not measured:** a dungeon (skipped), and whether the bearing reads plainly there.
+
+## Rested XP (RestProbe, #81): 1.60.1.70374, 2026-10-15, run 1
+
+The owner ran `/fp steps rest rested`. The raw log is in `RestProbe.lua` (SavedVariables).
+
+**Well Rested is a Legacy talent, readable exactly:**
+- Adventure tree **1188**, node **110301**, spell **1225478**.
+- `C_Traits.GetNodeInfo(C_Traits.GetConfigIDByTreeID(1188), 110301)` gives `activeRank = currentRank = ranksPurchased = 5`, `maxRanks = 5`. The owner confirmed 5/5 in the Legacy window.
+- Its spell description is "Your rested experience accumulates 20% faster and your rested experience cap is increased by 20%."
+- `Constants.LegacyConsts` exists: trees 1187/1188/1189, currency 4225, faction 2802.
+- All three Legacy trees share one configID (15132781) and have 9 nodes each, every one named.
+
+**The pool reads plainly:**
+- `GetXPExhaustion`, `UnitXP`, `UnitXPMax`, `GetRestState` (`1, "Rested", 2`) and `IsResting` all read normally.
+- The cap wasn't reached: the most seen was 6,760 / 16,000, about 0.42 of a level.
+
+**Well Fed is spell 1248406** (20 min). Its aura tooltip reads "Experience gained from kills increased by 5%" (owner's screenshot), but `C_Spell.GetSpellDescription` didn't contain "experience". **Read an XP buff's effect from the aura's tooltip** (`C_TooltipInfo.GetUnitBuffByAuraInstanceID`), not the spell description. The probe now does; run 2 checks it.
+
+**Camping, 13 minutes with "Campfire Nearby" and "Welcoming Campfire":**
+- It added **0** rested, and `IsResting()` was false, apart from one brief true.
+- "Welcoming Campfire" grants its benefits only "after 1 min spent sitting near the campfire", depending on the camp objects placed. Run 2 measures sitting.
+
+**Not measured:**
+- **The inn build-up rate:** a `/reload` restarted the in-memory sampler; the start is now saved.
+- **The cap.**

@@ -70,8 +70,25 @@ local function mentionsXP(text)
     return false
 end
 
--- Every helpful aura: spell ID, name, time left, and its description when it
--- speaks of experience. Returns how many speak of it.
+-- The aura's own tooltip lines (what the player reads: Well Fed's "Experience
+-- gained from kills increased by 5%"), joined; nil when unreadable. The
+-- spell's description is a different text (run 1 found no "experience" in it).
+local function auraText(a)
+    local TI = rawget(_G, "C_TooltipInfo")
+    local id = num(a.auraInstanceID)
+    if not (TI and TI.GetUnitBuffByAuraInstanceID and id) then return nil end
+    local ok, data = pcall(TI.GetUnitBuffByAuraInstanceID, "player", id, "HELPFUL")
+    if not ok or secret(data) or type(data) ~= "table" or type(data.lines) ~= "table" then return nil end
+    local parts = {}
+    for _, line in ipairs(data.lines) do
+        local t = type(line) == "table" and line.leftText
+        if type(t) == "string" and not secret(t) and t ~= "" then parts[#parts + 1] = t end
+    end
+    return #parts > 0 and table.concat(parts, " / ") or nil
+end
+
+-- Every helpful aura: spell ID, name, time left, its tooltip and its spell
+-- description; marked XP when either speaks of experience. Returns how many do.
 local function buffs()
     say("-- buffs (combat " .. inCombat() .. ")")
     local A = rawget(_G, "C_UnitAuras")
@@ -90,11 +107,12 @@ local function buffs()
             local okD, d = pcall(S.GetSpellDescription, id)
             desc = okD and d or nil
         end
-        local xp = mentionsXP(name) or mentionsXP(desc)
+        local tip = auraText(a)
+        local xp = mentionsXP(name) or mentionsXP(tip) or mentionsXP(desc)
         if xp then found = found + 1 end
-        say(string.format("aura %d: id=%s name=%s left=%s source=%s%s", i, show(id), show(name),
-            left and string.format("%.0fs", left) or "none", show(a.sourceUnit),
-            xp and ("  XP: " .. show(desc)) or ""))
+        say(string.format("aura %d%s: id=%s name=%s left=%s source=%s", i, xp and " XP" or "", show(id), show(name),
+            left and string.format("%.0fs", left) or "none", show(a.sourceUnit)))
+        say("    tooltip: " .. show(tip) .. " | description: " .. show(desc))
     end
     say(found .. " aura(s) speak of experience")
     return found
@@ -195,30 +213,41 @@ end
 --------------------------------------------------------------------------------
 
 local watch          -- the ticker
-local first          -- { t, rested, max } at the start
+-- The start, { t (GetServerTime), rested, max }, kept in RestProbeDB.watch so
+-- a /reload or a logout at the inn (rest builds offline too) doesn't lose it.
+local function db() return rawget(_G, "RestProbeDB") end
+local function first() local d = db(); return d and d.watch end
 
 local function sample()
     local rested, max = num(GetXPExhaustion()), num(UnitXPMax("player"))
     local resting = IsResting()
-    local t = GetTime()
-    if not first then
-        first = { t = t, rested = rested, max = max }
+    local t = GetServerTime()
+    local f = first()
+    if not f then
+        if db() then db().watch = { t = t, rested = rested, max = max } end
         say("watch start: rested " .. show(rested) .. " max " .. show(max) .. " resting " .. show(resting))
         return
     end
-    local dt = t - first.t
-    if rested and first.rested and max and max > 0 and dt > 0 then
-        local perHour = (rested - first.rested) / dt * 3600
+    local dt = t - f.t
+    if rested and f.rested and max and max > 0 and dt > 0 then
+        local perHour = (rested - f.rested) / dt * 3600
         say(string.format("watch +%.0fs: rested %s (+%s), %.1f XP/h = %.3f%% of a level per 8 h, resting %s",
-            dt, show(rested), show(rested - first.rested), perHour, perHour * 8 / max * 100, show(resting)))
+            dt, show(rested), show(rested - f.rested), perHour, perHour * 8 / max * 100, show(resting)))
     else
         say("watch +" .. string.format("%.0f", dt) .. "s: rested " .. show(rested) .. " (unreadable or no change)")
     end
 end
 
+-- on: a new start (the old one forgotten). "read": one sample against the saved
+-- start. off: stop the ticker and forget the start.
 local function setWatch(on)
     if watch then watch:Cancel(); watch = nil end
-    first = nil
+    if on == "read" then
+        sample()
+        if first() then watch = C_Timer.NewTicker(60, sample) end
+        return true
+    end
+    if db() then db().watch = nil end
     if on then
         sample()
         watch = C_Timer.NewTicker(60, sample)
@@ -236,35 +265,36 @@ end
 Probe:Command("pool", pool, "the rested pool against the cap")
 Probe:Command("buffs", buffs, "your auras, and the ones about experience")
 Probe:Command("talent", talent, "Well Rested: found, and its rank")
-Probe:Command("watch", function(args) setWatch(args ~= "off") end, "sample rested every minute [off]")
+Probe:Command("watch", function(args)
+    if args == "off" then setWatch(false) elseif args == "read" then setWatch("read") else setWatch(true) end
+end, "sample rested every minute [read: against the saved start | off]")
 Probe:Command("clear", function() Probe:ClearLog(); say("log cleared") end, "empty the saved log")
 
 Probe:Steps("rested", {
     title = "XP+: the rested cap, Well Rested and XP buffs",
-    { text = "Log in a character below the level cap, out of combat. Then press Next." },
+    { text = "Out of combat, below the level cap. Type /fp to open the console beside this panel: "
+          .. "the readings show there. Then press Next." },
     { text = "Reading the rested pool.", auto = true, run = pool,
       check = function() local r, m = pool(); return r ~= nil and m ~= nil, "rested and max readable" end },
     { text = "Looking for Well Rested in the Legacy talents.", auto = true, run = talent,
       check = function() return found ~= nil, found and ("rank " .. tostring(found.rank)) or "not found" end },
-    { text = "Open your Legacy talents (Adventure). Does the rank shown for Well Rested match what the "
-          .. "console says? (Note the rank you see.)", ask = true },
-    { text = "Eat XP food, or get a camping buff (or both), then press Read.", button = "Read", run = buffs,
+    { text = "In the console: does Well Rested's rank match your Legacy talents (Adventure)?", ask = true },
+    { text = "Have XP food on (Well Fed), then press Read.", button = "Read", run = buffs,
       check = function() return buffs() > 0, "an aura speaks of experience" end },
-    { text = "Was every XP buff you have listed in the console (with its spell ID)? Note any missing.", ask = true },
-    { text = "Go to an inn or a city so you're resting, then press Start: a sample every minute.",
-      button = "Start", run = function() return setWatch(true) end },
-    { text = "Stay resting for at least 10 minutes (you can stand or log out at the inn; logging out stops "
-          .. "the samples). Then press Next.", },
-    { text = "Stopping the samples.", auto = true, run = function()
-          sample()
-          return setWatch(false)
-      end },
-    { text = "If you can, leave the inn and camp (use your camping buff) for a few minutes with Start "
-          .. "again, else Skip.", button = "Start", run = function() return setWatch(true) end },
-    { text = "After a few minutes camping, press Run to stop.", button = "Stop", run = function()
-          sample()
-          return setWatch(false)
-      end },
+    { text = "In the console: is Well Fed marked XP, with its tooltip text?", ask = true },
+    { text = "At an inn or a city (resting), press Start.", button = "Start",
+      run = function() return setWatch(true) end },
+    { text = "Stay resting, or log out at the inn, for at least 15 minutes (rest builds offline too; "
+          .. "the start is saved). Back here, press Read.", button = "Read",
+      run = function() return setWatch("read") end },
+    { text = "Light your campfire and SIT next to it for 2 minutes (its benefits start after 1 minute "
+          .. "sitting), then press Read: your buffs.", button = "Read", run = buffs },
+    { text = "Still sitting: press Start to sample rested while camping.", button = "Start",
+      run = function() return setWatch(true) end },
+    { text = "After 5 minutes sitting by the fire, press Read.", button = "Read",
+      run = function() return setWatch("read") end },
+    { text = "Press Stop to end the samples, then type /reload to save the results.", button = "Stop",
+      run = function() return setWatch(false) end },
     { text = "Type /reload to save the results.", reload = true },
 })
 

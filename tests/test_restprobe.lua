@@ -17,7 +17,7 @@ end })
 local spells = { [9001] = { "Well Rested", "Your rested experience accumulates 20% faster and your rested experience "
                             .. "cap is increased by 20%." },
                  [9002] = { "Swift Feet", "Run faster." },
-                 [7001] = { "Well Fed", "Experience gained increased by 5%." },
+                 [7001] = { "Well Fed", "Restores health over time." },   -- the spell's text, not the aura's
                  [7002] = { "Arcane Intellect", "Increases Intellect." } }
 rawset(_G, "C_Spell", {
     GetSpellName = function(id) return spells[id] and spells[id][1] end,
@@ -37,6 +37,19 @@ rawset(_G, "C_Traits", {
     GetDefinitionInfo = function(id) return defs[id] end,
 })
 rawset(_G, "Constants", { LegacyConsts = { LEGACY_TREE_ADVENTURE_ID = 1188 } })
+-- The aura's tooltip (70338 dump: C_TooltipInfo.GetUnitBuffByAuraInstanceID ->
+-- TooltipData, its lines' leftText): what the player reads, unlike the spell's
+-- description. Measured on 70374: Well Fed 1248406's description had no
+-- "experience"; its tooltip says "Experience gained from kills increased by 5%".
+local tips = {}
+C_TooltipInfo.GetUnitBuffByAuraInstanceID = function(unit, id)
+    local t = tips[id]
+    if t == "secret" then return WoW.Secret("tooltip") end
+    if not t then return nil end
+    local lines = {}
+    for i, text in ipairs(t) do lines[i] = { leftText = text } end
+    return { lines = lines }
+end
 
 loadForeverProbe()
 local ns = {}
@@ -84,28 +97,43 @@ fp("rest talent")
 check(logHas("C_Traits: MISSING pieces"), "no C_Traits: said")
 rawset(_G, "C_Traits", realTraits)
 
--- XP buffs: the ones that speak of experience, with their IDs.
-auras = { { spellId = 7001, name = "Well Fed", expirationTime = WoW.now + 600, sourceUnit = "player" },
-          { spellId = 7002, name = "Arcane Intellect", expirationTime = 0 } }
+-- XP buffs: found by the aura's tooltip (the spell's description doesn't say).
+auras = { { spellId = 7001, name = "Well Fed", expirationTime = WoW.now + 600, sourceUnit = "player",
+            auraInstanceID = 51 },
+          { spellId = 7002, name = "Arcane Intellect", expirationTime = 0, auraInstanceID = 52 } }
+tips[51] = { "Well Fed", "Your Stamina is increased by 1. Experience gained from kills increased by 5%." }
+tips[52] = { "Arcane Intellect", "Increases Intellect by 2." }
 fp("rest buffs")
-check(logHas("aura 1: id=7001 name=\"Well Fed\" left=600s"), "an aura with its time left")
-check(logHas("XP: \"Experience gained increased by 5%.\""), "its description, when it's about experience")
+check(logHas("aura 1 XP: id=7001 name=\"Well Fed\" left=600s"), "Well Fed marked XP, by its tooltip")
+check(logHas("tooltip: \"Well Fed / Your Stamina is increased by 1. Experience gained from kills increased by 5%.\""
+    .. " | description: \"Restores health over time.\""), "both texts logged")
 check(logHas("1 aura(s) speak of experience"), "counted")
-check(logHas("aura 2: id=7002 name=\"Arcane Intellect\" left=none"), "a permanent one too")
+check(logHas("aura 2: id=7002 name=\"Arcane Intellect\" left=none"), "a permanent one, not XP")
+tips[51] = "secret"
+fp("rest buffs")
+check(logHas("tooltip: nil | description: \"Restores health over time.\""), "a secret tooltip: nil, not touched")
 auras = { WoW.Secret("aura") }
 fp("rest buffs")
 check(logHas("aura 1: <secret table>"), "a secret aura: said, not touched")
 auras = {}
 
--- Build-up: a sample a minute.
+-- Build-up: a sample a minute, timed by the server's clock.
 fp("rest watch")
 check(logHas("watch start: rested 3000"), "watch starts with a sample")
+eq(RestProbeDB.watch and RestProbeDB.watch.rested, 3000, "the start is saved (survives a /reload or a logout)")
 WoW.player.rested = 3000 + 45
-WoW.now = WoW.now + 60
+WoW.serverTime = WoW.serverTime + 60
 WoW.fireTickers()
 check(logHas("watch +60s: rested 3045 (+45), 2700.0 XP/h = 48.000% of a level per 8 h"), "rate per hour and per 8 h")
+-- A logout at the inn: the ticker is gone, the saved start isn't.
+for _, t in ipairs(WoW.tickers) do t:Cancel() end
+WoW.player.rested = 3000 + 900
+WoW.serverTime = WoW.serverTime + 1140   -- 20 min after the start
+fp("rest watch read")
+check(logHas("watch +1200s: rested 3900 (+900), 2700.0 XP/h"), "read later, against the saved start")
 fp("rest watch off")
 check(logHas("watch off"), "stopped")
+eq(RestProbeDB.watch, nil, "and the start forgotten")
 
 -- The procedure is defined; nothing went to chat.
 fp("steps")
