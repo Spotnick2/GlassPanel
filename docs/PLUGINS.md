@@ -62,6 +62,8 @@ GlassPanel.RegisterBlock({
     text     = function(block) return "GS: 2057" end,  -- plain string, or nil/"" for no space
     tooltip  = function(block, tt) tt:AddLine("GearScore") end,  -- tt is GameTooltip
     onClick  = function(block, mouseButton) end,
+    onDoubleClick = function(block, mouseButton) end,  -- optional: the second click of a double-click comes here
+                                       -- instead of onClick (any button; the first still goes to onClick)
     onShown  = function(block, visible) end,     -- appeared on / left the screen (hide, empty text, bar toggle)
     options  = {                                 -- on/off settings of your own, shown as checkboxes under
         { label = "Hide Blizzard's XP bar",      -- "Plugin options" in Options > AddOns > Glass Panel
@@ -78,6 +80,9 @@ A block that draws more than text (the XP bar, `Plugins\XP\XP.lua`) adds:
 
 ```lua
     width = 360,                            -- fixed width in px; "" text then still shows the block, nil hides it
+                                            -- or function(block) -> px or nil, asked on every repaint: nil sizes
+                                            -- the block to its content (XP+ zoomed: its icon alone; with the icon
+                                            -- turned off, empty text shows the label instead, so it never vanishes)
     build = function(block) end,            -- once, when block.widget exists: create your own frames on it
     paint = function(block) end,            -- after every repaint while its text is valid and non-nil and it's on screen
 ```

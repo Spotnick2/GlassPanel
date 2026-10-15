@@ -78,7 +78,15 @@ core's `ADDON_LOADED`.
     blocks only);
   - every block callback runs under `pcall` via `Engine.Call`;
   - `text` must return a plain string. Secrets and non-strings are refused and recorded.
-  - A relayout runs only when some text changed.
+  - A relayout runs only when some text changed, or a width or what a block displays (#78).
+  - `width` may be a function (#78), asked once per repaint in `Bar.SetText` (before its
+    unchanged-text return) and cached as `b.fixedWidth`: a number >= 16 is a fixed width, a plain
+    nil sizes the block to its content; anything else (secret, NaN, inf, < 16, a throw) is recorded
+    as `<id>:width` and sized to content. A content-sized graphical block with empty text and its
+    icon off displays its label (else its id) so it never shrinks to padding (`syncDisplay`, also
+    run by `UpdateIcon`; `b.text` stays the block's own answer).
+  - `onDoubleClick(block, button)` (#78): `OnDoubleClick` is wired only for a block that has it
+    (the others keep two `onClick`s), behind the same after-a-drag guard as `onClick`.
 - **`Layout.lua`**: where blocks go (#6), a pure model. **Free lanes**: `{ x = 0..1, ids }`,
   where `0` packs left, `1` packs right and anything else is centred on the anchor. **Lanes never
   overlap**: `Place` pushes them `LANE_GAP` apart (they only overlap when nothing fits). A drop
@@ -140,6 +148,18 @@ core's `ADDON_LOADED`.
   `MainStatusTrackingBarContainer`** (measured: its `UpdateShownState` calls
   `GetParent():CheckForLayoutChange()`, so under our frame Edit Mode threw a nil call); the manager
   doesn't use its parent. A watched rep bar (the secondary container) hides with it, as in Titan.
+  **Zoomed (#78):** a left double-click on the block (its icon) toggles `GlassPanelXPDB.detached`.
+  Zoomed, `width` returns nil (the panel keeps the icon alone, the handle that docks it back) and
+  `paint` hides the panel's host and draws the **float**: a plain `Button` on UIParent built on the
+  first zoom (`makeBar` + rows above/below, after the owner's WeakAura; the outer frame holds the rows
+  so clamping covers them), shown while zoomed **and** XP+ is on screen (`onShown`: hiding XP+, the
+  panel or the level cap hides it). Shift-drag moves it (`moving` tracked; a plain drag saves nothing;
+  hidden mid-move stops unsaved); the spot is CENTER offsets from UIParent's centre in
+  `GlassPanelXPDB.spot`, checked whole (a bad field: the default, TOP 0,-40) and from live
+  `GetCenter()` values checked plain and finite before subtracting. Right-click: a `MenuUtil` menu
+  (`CreateButton`: back to the panel, reset session, reset position; no `MenuUtil`: right-click
+  docks). A 1 s `C_Timer` ticker repaints it only while shown. Its scripts, ticker and menu items
+  run under `guarded` (`xp:float`). Figures from one `stats()` snapshot (the tooltip's too).
   `/played` is requested with `TIME_PLAYED_MSG` muted on the chat frames, one request at a time
   (a token ties the unmute, the next frame after the answer or after 10 s, to its own request),
   **never** by replacing `ChatFrame_DisplayTimePlayed`. Graphical blocks aren't painted while off

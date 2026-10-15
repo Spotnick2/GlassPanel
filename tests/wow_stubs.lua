@@ -208,6 +208,18 @@ function Methods.SetAlpha(w, a) w._alpha = a end
 -- one from the harness.
 function Methods.GetRect(w) if w._rect then return unpack(w._rect) end end
 function Methods.GetTop(w) if w._rect then return w._rect[2] + w._rect[4] end end
+-- The centre: w._center = { x, y } (a test moving a frame sets it), else the
+-- rect's middle; nil without either.
+function Methods.GetCenter(w)
+    if w._center then return w._center[1], w._center[2] end
+    if w._rect then return w._rect[1] + w._rect[3] / 2, w._rect[2] + w._rect[4] / 2 end
+end
+-- Moving with the mouse: recorded (w._moving); a test sets w._center to
+-- where the frame was let go.
+function Methods.SetMovable(w, v) w._movable = v end
+function Methods.SetClampedToScreen(w, v) w._clamped = v end
+function Methods.StartMoving(w) w._moving = true end
+function Methods.StopMovingOrSizing(w) w._moving = false end
 function Methods.GetDebugName(w) return w._name or ("<" .. w._type .. ">") end
 function Methods.IsForbidden(w) return false end
 function Methods.GetParent(w) return w._parent end

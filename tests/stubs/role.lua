@@ -35,13 +35,19 @@ end
 -- functions)"); EllesmereUI, which ships on Forever, calls
 -- MenuUtil.CreateContextMenu(owner, function(_, rootDescription) ...).
 -- CreateRadio is Retail's, unconfirmed here (to check in game).
+-- CreateButton(text, callback, data): wow-ui-source (forever)
+-- Blizzard_Menu/11_0_0_MenuImplementationGuide.lua; XP+'s zoomed bar (#78).
 -- Just enough of Blizzard's menu: the generator runs against a root that
--- records its radio items, so a test can click one (setSelected(data)).
+-- records its radio items and buttons, so a test can click one
+-- (setSelected(data), or callback(data)).
 MenuUtil = { CreateContextMenu = function(owner, generator)
-    local root = { radios = {} }
+    local root = { radios = {}, buttons = {} }
     function root:CreateRadio(text, isSelected, setSelected, data)
         table.insert(self.radios, { text = text, isSelected = isSelected, setSelected = setSelected, data = data })
     end
+    function root:CreateButton(text, callback, data)
+        table.insert(self.buttons, { text = text, callback = callback, data = data })
+    end
     generator(owner, root)
-    WoW.menu = { owner = owner, radios = root.radios }
+    WoW.menu = { owner = owner, radios = root.radios, buttons = root.buttons }
 end }

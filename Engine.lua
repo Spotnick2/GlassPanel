@@ -175,12 +175,15 @@ end
 --   events = { "EVENT", ... }, onEvent(block, event, ...),
 --   unitEvents = { EVENT = "player" } (only that unit's firing of the event),
 --   interval (seconds, or function(block) -> seconds until the next repaint),
---   tooltip(block, GameTooltip), onClick(block, mouseButton), onInit(block),
+--   tooltip(block, GameTooltip), onClick(block, mouseButton),
+--   onDoubleClick(block, mouseButton) (the second click of a double-click
+--   comes here instead of onClick), onInit(block),
 --   onShown(block, visible) when it appears on or leaves the screen.
 -- For a block that draws more than text (the XP bar):
---   width (fixed, px), build(block) once its widget exists (block.widget),
---   paint(block) after every repaint while its text is non-nil. With a width,
---   text "" still shows the block; nil hides it.
+--   width (px; or function(block) -> px, or nil for "sized to its content",
+--   asked on every repaint), build(block) once its widget exists
+--   (block.widget), paint(block) after every repaint while its text is
+--   non-nil. With a width, text "" still shows the block; nil hides it.
 function GlassPanel.RegisterBlock(spec)
     if type(spec) ~= "table" then return invalid(spec, "not a table") end
     if type(spec.id) ~= "string" or spec.id == "" then return invalid(spec, "id must be a non-empty string") end
@@ -216,8 +219,9 @@ function GlassPanel.RegisterBlock(spec)
             if type(e) ~= "string" then return invalid(spec, "events must be a list of event names") end
         end
     end
-    if spec.width ~= nil and (type(spec.width) ~= "number" or spec.width ~= spec.width or spec.width < 16) then
-        return invalid(spec, "width must be a number of pixels, at least 16")
+    if spec.width ~= nil and type(spec.width) ~= "function"
+        and (type(spec.width) ~= "number" or spec.width ~= spec.width or spec.width < 16) then
+        return invalid(spec, "width must be a number of pixels (at least 16), or a function returning one or nil")
     end
     -- Malformed options drop the options (recorded), never the block: an
     -- optional setting mustn't take a plugin's readout off the bar.
@@ -237,7 +241,8 @@ function GlassPanel.RegisterBlock(spec)
             spec.options = nil
         end
     end
-    for _, key in ipairs({ "onEvent", "tooltip", "onClick", "onInit", "onShown", "build", "paint", "caption" }) do
+    for _, key in ipairs({ "onEvent", "tooltip", "onClick", "onDoubleClick", "onInit", "onShown", "build", "paint",
+                           "caption" }) do
         if spec[key] ~= nil and type(spec[key]) ~= "function" then return invalid(spec, key .. " must be a function") end
     end
 

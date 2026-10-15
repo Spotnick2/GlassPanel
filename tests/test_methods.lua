@@ -28,6 +28,20 @@ for _, blk in ipairs(GlassPanel.Engine.blocks) do
     w._scripts.OnEnter(w); w._scripts.OnLeave(w); w._scripts.OnClick(w, "LeftButton")
     w._scripts.OnDragStart(w); WoW.tick(); w._scripts.OnDragStop(w)
 end
+do
+    -- XP+ zoomed (#78): its own frame, built on the first zoom, so driven here.
+    local xp = GlassPanel.Engine.byId.xp
+    local w = xp.widget
+    WoW.now = WoW.now + 1   -- past the drags above: a click right after one is ignored
+    w._scripts.OnDoubleClick(w, "LeftButton"); WoW.tick()
+    local f = xp._test.float()
+    f._scripts.OnEnter(f); f._scripts.OnLeave(f)
+    WoW.shift = true; f._scripts.OnDragStart(f); WoW.shift = false
+    f._center = { 600, 600 }; f._scripts.OnDragStop(f)
+    WoW.now = WoW.now + 1
+    f._scripts.OnClick(f, "RightButton")
+    w._scripts.OnDoubleClick(w, "LeftButton"); WoW.tick()
+end
 GlassPanel._test.slash("font friz")
 GlassPanel._test.slash("hide gold")
 GlassPanel._test.slash("toggle")
