@@ -192,6 +192,20 @@ local function duration(sec)
     return string.format("%ds", sec)
 end
 
+-- One snapshot of every figure the bar and the tooltip show, or nil when
+-- XP isn't readable. One place, so the views can't disagree.
+local function stats()
+    local cur, max, rested = readXP()
+    if not cur then return nil end
+    local s = { cur = cur, max = max, rested = rested, toLevel = max - cur }
+    s.qc, s.qi = questXP()
+    s.total, s.levelTime = playedNow()
+    s.sessionTime = S.sessionStart and (GetTime() - S.sessionStart) or nil
+    s.rateSession = (s.sessionTime and s.sessionTime > 0 and S.sessionXP > 0) and S.sessionXP / s.sessionTime or nil
+    s.rateLevel = (s.levelTime and s.levelTime > 0 and cur > 0) and cur / s.levelTime or nil
+    return s
+end
+
 --------------------------------------------------------------------------------
 -- Drawing
 --------------------------------------------------------------------------------
@@ -210,16 +224,12 @@ local function layer(host, color, level)
     return sb
 end
 
-local function build(block)
-    local w = block.widget
-    -- The host glass bar: background, gloss and edge; its own fill is rested.
-    local host = Glass.Bar(w, BAR_H)
-    -- After the icon (TitanPanelXPP's XP_Icon): the bar starts where the
-    -- block's text would (its empty caption, which Bar moves when the icon
-    -- is turned off), so it takes the icon's space back then.
-    host:SetPoint("LEFT", w.caption, "LEFT", -2, 0)
-    host:SetPoint("RIGHT", w, "RIGHT", -2, 0)
-    host:SetFrameLevel(w:GetFrameLevel() + 1)
+-- The four-layer glass bar with its three texts, on `parent`; the caller
+-- anchors ui.host. The host glass bar is the background, gloss and edge; its
+-- own fill is rested.
+local function makeBar(parent, height, fontSize)
+    local host = Glass.Bar(parent, height)
+    host:SetFrameLevel(parent:GetFrameLevel() + 1)
     local c = COLORS.rested
     host:SetStatusBarColor(c[1], c[2], c[3], c[4])
 
@@ -231,31 +241,45 @@ local function build(block)
     local tf = CreateFrame("Frame", nil, host)
     tf:SetAllPoints(host)
     tf:SetFrameLevel(host:GetFrameLevel() + 5)
-    local left = Glass.Font(tf, FONT, "LEFT")
+    local left = Glass.Font(tf, fontSize, "LEFT")
     left:SetPoint("LEFT", host, "LEFT", 6, 0)
-    local center = Glass.Font(tf, FONT, "CENTER")
+    local center = Glass.Font(tf, fontSize, "CENTER")
     center:SetPoint("CENTER", host, "CENTER", 0, 0)
-    local right = Glass.Font(tf, FONT, "RIGHT")
+    local right = Glass.Font(tf, fontSize, "RIGHT")
     right:SetPoint("RIGHT", host, "RIGHT", -6, 0)
 
-    ui = { host = host, incomplete = incomplete, complete = complete, xp = xp,
-           left = left, center = center, right = right }
+    return { host = host, incomplete = incomplete, complete = complete, xp = xp,
+             left = left, center = center, right = right }
+end
+
+local function paintBar(bar, s)
+    local cur, max = s.cur, s.max
+    Glass.SetBar(bar.host, max, math.min(cur + s.rested, max))
+    Glass.SetBar(bar.incomplete, max, math.min(cur + s.qc + s.qi, max))
+    Glass.SetBar(bar.complete, max, math.min(cur + s.qc, max))
+    Glass.SetBar(bar.xp, max, cur)
+
+    bar.left:SetText("|cffffffccLv " .. level() .. "|r")
+    bar.center:SetText(num(cur) .. " / " .. num(max) .. " (" .. num(s.toLevel) .. ")")
+    local right = pct(cur, max)
+    if s.qc > 0 then right = right .. " |cffff9700(" .. pct(math.min(cur + s.qc, max), max) .. ")|r" end
+    bar.right:SetText(right)
+end
+
+local function build(block)
+    local w = block.widget
+    ui = makeBar(w, BAR_H, FONT)
+    -- After the icon (TitanPanelXPP's XP_Icon): the bar starts where the
+    -- block's text would (its empty caption, which Bar moves when the icon
+    -- is turned off), so it takes the icon's space back then.
+    ui.host:SetPoint("LEFT", w.caption, "LEFT", -2, 0)
+    ui.host:SetPoint("RIGHT", w, "RIGHT", -2, 0)
 end
 
 local function paint()
-    local cur, max, rested = readXP()
-    if not (ui and cur) then return end
-    local qc, qi = questXP()
-    Glass.SetBar(ui.host, max, math.min(cur + rested, max))
-    Glass.SetBar(ui.incomplete, max, math.min(cur + qc + qi, max))
-    Glass.SetBar(ui.complete, max, math.min(cur + qc, max))
-    Glass.SetBar(ui.xp, max, cur)
-
-    ui.left:SetText("|cffffffccLv " .. level() .. "|r")
-    ui.center:SetText(num(cur) .. " / " .. num(max) .. " (" .. num(max - cur) .. ")")
-    local right = pct(cur, max)
-    if qc > 0 then right = right .. " |cffff9700(" .. pct(math.min(cur + qc, max), max) .. ")|r" end
-    ui.right:SetText(right)
+    local s = stats()
+    if not (ui and s) then return end
+    paintBar(ui, s)
 end
 
 --------------------------------------------------------------------------------
@@ -270,17 +294,15 @@ local function line(tt, label, value, color)
 end
 
 local function tooltip(_, tt)
-    local cur, max, rested = readXP()
-    if not cur then
+    local s = stats()
+    if not s then
         tt:AddLine("XP+")
         tt:AddLine("Experience is not available right now.", 0.7, 0.7, 0.7, true)
         return
     end
-    local now = GetTime()
-    local toLevel = max - cur
-    local qc, qi = questXP()
-    local total, levelTime = playedNow()
-    local sessionTime = S.sessionStart and (now - S.sessionStart) or nil
+    local cur, max, rested, toLevel, qc, qi = s.cur, s.max, s.rested, s.toLevel, s.qc, s.qi
+    local total, levelTime, sessionTime = s.total, s.levelTime, s.sessionTime
+    local rateSession, rateLevel = s.rateSession, s.rateLevel
 
     tt:AddLine("XP+  |cffffffffLevel " .. level() .. "|r")
     line(tt, "Time played", duration(total))
@@ -300,8 +322,6 @@ local function tooltip(_, tt)
     if S.lastGain > 0 then
         line(tt, "Last gain", num(S.lastGain) .. " (" .. math.ceil(toLevel / S.lastGain) .. " to level)")
     end
-    local rateSession = (sessionTime and sessionTime > 0 and S.sessionXP > 0) and S.sessionXP / sessionTime or nil
-    local rateLevel = (levelTime and levelTime > 0 and cur > 0) and cur / levelTime or nil
     line(tt, "XP/hr (this level)", rateLevel and num(rateLevel * 3600) or "--")
     line(tt, "XP/hr (this session)", rateSession and num(rateSession * 3600) or "--")
     line(tt, "Level in (this level)", duration(rateLevel and toLevel / rateLevel))
