@@ -35,6 +35,15 @@ end
 
 local function inCombat() return show(InCombatLockdown()) end
 
+-- The rested pool: a plain nil is an EMPTY pool (0), as XP+ reads it; a
+-- secret or a malformed value is unreadable (nil). (Codex on #88.)
+local function restedNow()
+    local v = GetXPExhaustion()
+    if secret(v) then return nil end
+    if v == nil then return 0 end
+    return num(v)
+end
+
 --------------------------------------------------------------------------------
 -- The pool against the cap
 --------------------------------------------------------------------------------
@@ -47,7 +56,7 @@ local function pool()
     Probe:Call("GetXPExhaustion()", GetXPExhaustion)
     Probe:Call("GetRestState()", GetRestState)
     Probe:Call("IsResting()", IsResting)
-    local rested, max = num(GetXPExhaustion()), num(UnitXPMax("player"))
+    local rested, max = restedNow(), num(UnitXPMax("player"))
     if rested and max and max > 0 then
         say(string.format("rested = %.4f levels of this level's XP (Vanilla cap 1.5; 1.8 with Well Rested 5/5)",
             rested / max))
@@ -101,8 +110,10 @@ local function buffs()
         for i = 1, 40 do
             local ok, a = pcall(A.GetAuraDataByIndex, "player", i, filter)
             if not ok then say(kind .. " " .. i .. ": ERROR " .. tostring(a)) break end
-            if a == nil then break end
+            -- Secrecy first: comparing a secret, even with nil, throws on the client
+            -- (GetAuraDataByIndex is SecretWhenUnitAuraRestricted). Codex on #88.
             if secret(a) then say(kind .. " " .. i .. ": <secret table>") break end
+            if a == nil then break end
             local id, name = a.spellId, a.name
             local left = num(a.expirationTime) and a.expirationTime > 0 and (a.expirationTime - now) or nil
             local desc
@@ -127,7 +138,7 @@ end
 -- the pool read before using one (saved: a /reload in between is fine) and
 -- after, the difference logged as XP and as a share of the level.
 local function tent(phase)
-    local rested, max = num(GetXPExhaustion()), num(UnitXPMax("player"))
+    local rested, max = restedNow(), num(UnitXPMax("player"))
     local d = rawget(_G, "RestProbeDB")
     if phase == "before" then
         if d then d.tent = { rested = rested, max = max } end
@@ -246,7 +257,7 @@ local function db() return rawget(_G, "RestProbeDB") end
 local function first() local d = db(); return d and d.watch end
 
 local function sample()
-    local rested, max = num(GetXPExhaustion()), num(UnitXPMax("player"))
+    local rested, max = restedNow(), num(UnitXPMax("player"))
     local resting = IsResting()
     local t = GetServerTime()
     local f = first()

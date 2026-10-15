@@ -140,6 +140,27 @@ fp("rest tent after")
 check(logHas("tent gain: unreadable"), "no 'before': said")
 WoW.player.rested = 3000
 
+-- An empty pool (a plain nil from GetXPExhaustion) is 0, not unreadable: a
+-- run started right after spending rested still measures (Codex on #88).
+WoW.player.rested = nil
+fp("rest tent before")
+eq(RestProbeDB.tent and RestProbeDB.tent.rested, 0, "tent before, empty pool: 0")
+WoW.player.rested = 1600
+fp("rest tent after")
+check(logHas("tent gain: +1600 rested = 0.0356 of this level"), "a tent's grant from an empty pool")
+WoW.player.rested = nil
+fp("rest watch")
+eq(RestProbeDB.watch and RestProbeDB.watch.rested, 0, "watch from an empty pool: 0")
+WoW.player.rested = 120
+WoW.serverTime = WoW.serverTime + 3600
+fp("rest watch read")
+check(logHas("watch +3600s: rested 120 (+120), 120.0 XP/h"), "then gaining rested: measured")
+fp("rest watch off")
+WoW.player.rested = "secret"
+fp("rest tent before")
+eq(RestProbeDB.tent.rested, nil, "a secret pool stays unreadable, not 0")
+WoW.player.rested = 3000
+
 -- Build-up: a sample a minute, timed by the server's clock.
 fp("rest watch")
 check(logHas("watch start: rested 3000"), "watch starts with a sample")
