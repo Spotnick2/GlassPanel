@@ -97,6 +97,18 @@ function libGlassScripts()
     return files
 end
 
+-- Like the client: a plugin loads only when every addon its ## Dependencies
+-- names is installed (the core, and WoW.installed for the others).
+function dependenciesMet(p)
+    local f = assert(io.open(p.dir .. p.toc, "rb"))
+    local deps = f:read("*a"):match("## Dependencies:([^\r\n]*)") or ""
+    f:close()
+    for d in deps:gmatch("[^,%s]+") do
+        if d ~= "GlassPanel" and not WoW.installed[d] then return false end
+    end
+    return true
+end
+
 -- Load the addon the way the client does: every TOC file with (name, ns),
 -- the library's XML expanded in place, then ADDON_LOADED, PLAYER_LOGIN,
 -- PLAYER_ENTERING_WORLD, and one frame.
@@ -148,7 +160,7 @@ function loadAddon(opts)
     end
     if allow ~= false then
         for _, p in ipairs(plugins()) do
-            if p.toc and (not only or only[p.name]) then
+            if p.toc and (not only or only[p.name]) and dependenciesMet(p) then
                 local pns = {}
                 for _, file in ipairs(tocFiles(p.toc, p.dir)) do
                     local chunk = assert(loadfile(file))

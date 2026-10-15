@@ -35,6 +35,8 @@
   the tooltip lists damaged items.
 - Bags: used and total bag slots, coloured as they fill; quivers and soul bags listed apart.
   Left-click opens or closes your bags.
+- RestedXP (only when RestedXP Guides is installed): its waypoint arrow on the bar, pointing the
+  way as you turn, with the step and the distance. Double-click it to show or hide the guide.
 - Ammo (hunters, warriors and rogues): the arrows, bullets or thrown weapons you have left, chosen
   from your ranged weapon. Yellow when low and red when critical; left-click to set when, for your
   class. A red `!` means you have no ammo equipped, or the wrong kind for the weapon.
