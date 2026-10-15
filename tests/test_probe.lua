@@ -124,6 +124,16 @@ player.x = "secret"
 fp("rxp bearing")
 eq(T.last().why, "position secret", "secret position: no bearing")
 player.x = 0
+-- A target on another map (a dungeon, another continent): no bearing, though
+-- HereBeDragons' vector would still answer (it ignores the instance).
+arrowFrame.element.instance = 1
+fp("rxp bearing")
+eq(T.last().ok, false, "target on another map: no bearing")
+check(T.last().why:find("other map (player 0, target 1)", 1, true), "and why: " .. tostring(T.last().why))
+arrowFrame.element.instance = nil
+fp("rxp bearing")
+eq(T.last().ok, false, "a target with no instance: no bearing")
+arrowFrame.element.instance = 0
 
 -- the test arrow follows RestedXP's target
 fp("rxp testarrow")
@@ -134,7 +144,7 @@ WoW.tick(0.05)
 eq(test.text._text, "probe 50 yd", "drawn from our bearing")
 check(logHas("target changed: step #3"), "the first target logged")
 local stepB = { index = 4, title = "Back to town", active = true }
-arrowFrame.element = { wx = 0, wy = 10, instance = 0, step = stepB }
+arrowFrame.element = { wx = 0, wy = 10, instance = 0, step = stepB }   -- same map as the player
 WoW.tick(0.05)
 check(logHas("target changed: step #4"), "a new target logged")
 eq(test.text._text, "probe 10 yd", "and followed")

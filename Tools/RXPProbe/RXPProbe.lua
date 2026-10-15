@@ -171,6 +171,13 @@ local function computeBearing()
     if not (num(x) and num(y)) then return nil, nil, "no position" end
     local tx, ty = num(e.wx), num(e.wy)
     if not (tx and ty) then return nil, nil, "target has no world position" end
+    -- The embedded HereBeDragons' GetWorldVector ignores the instance and
+    -- subtracts the coordinates: across two maps (a dungeon, another
+    -- continent) it returns a plausible, meaningless vector. RestedXP guards
+    -- that with wrongContinent; we compare the instances ourselves.
+    if num(inst) == nil or num(inst) ~= num(e.instance) then
+        return nil, nil, "other map (player " .. show(inst) .. ", target " .. show(e.instance) .. ")"
+    end
     local okV, angle, dist = pcall(HBD.GetWorldVector, HBD, inst, x, y, tx, ty)
     if not okV then return nil, nil, "vector threw" end
     if secret(angle) or secret(dist) then return nil, nil, "vector secret" end
