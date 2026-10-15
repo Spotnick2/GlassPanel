@@ -16,13 +16,22 @@
     The repo keeps "## Version: @project-version@" for the packager; the deployed
     copy gets "dev". The repo copy is never modified.
 
+    The probes under Tools\<X>Probe are ForeverProbe modules: -Probe deploys
+    them too, -ProbeOnly only them. Either deploys the ForeverProbe checkout
+    first ($env:FOREVERPROBE, else ..\ForeverProbe), since a probe without its
+    host doesn't load. Players never get a probe: it isn't packaged.
+
     Usage:
         pwsh Tools/deploy.ps1
+        pwsh Tools/deploy.ps1 -Probe        # ...and the probes (RXPProbe)
+        pwsh Tools/deploy.ps1 -ProbeOnly    # just the probes
         pwsh Tools/deploy.ps1 -AddOnsPath "D:\...\_classic_beta_\Interface\AddOns"
 #>
 
 param(
-    [string]$AddOnsPath = "C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns"
+    [string]$AddOnsPath = "C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns",
+    [switch]$Probe,
+    [switch]$ProbeOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,6 +41,35 @@ if (-not (Test-Path $AddOnsPath)) { Write-Error "AddOns path not found: $AddOnsP
 # paths as strings, and a relative or forward-slash path would match nothing
 # and delete every file just copied.
 $AddOnsPath = (Resolve-Path -LiteralPath $AddOnsPath).ProviderPath
+
+# The probes: the ForeverProbe host first (a probe has ## Dependencies:
+# ForeverProbe, so without it the client loads none), then each Tools\<X>Probe
+# as AddOns\<X>Probe, its TOC and Lua only (forever-probe.pin is CI's).
+$ForeverProbe = if ($env:FOREVERPROBE) { $env:FOREVERPROBE } else { Join-Path (Split-Path -Parent $RepoRoot) "ForeverProbe" }
+function Deploy-Probes {
+    if (-not (Test-Path -LiteralPath (Join-Path $ForeverProbe "Tools\deploy.ps1"))) {
+        Write-Error "ForeverProbe checkout not found at $ForeverProbe (clone github.com/Spotnick2/ForeverProbe there, or set `$env:FOREVERPROBE)"
+        exit 1
+    }
+    & pwsh -NoProfile -File (Join-Path $ForeverProbe "Tools\deploy.ps1") -AddOnsPath $AddOnsPath
+    if ($LASTEXITCODE -ne 0) { Write-Error "ForeverProbe deploy refused; the probes were not touched"; exit 1 }
+    foreach ($dir in Get-ChildItem -LiteralPath (Join-Path $RepoRoot "Tools") -Directory -Filter "*Probe") {
+        $dest = Join-Path $AddOnsPath $dir.Name
+        Write-Host "Deploying $($dir.Name) -> $dest" -ForegroundColor Cyan
+        New-Item -ItemType Directory -Force -Path $dest | Out-Null
+        Get-ChildItem -LiteralPath $dir.FullName -File | Where-Object { $_.Extension -in ".toc", ".lua" } |
+            ForEach-Object {
+                Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $dest $_.Name) -Force
+                Write-Host "  $($_.Name)"
+            }
+    }
+}
+if ($ProbeOnly) {
+    Deploy-Probes
+    Write-Host ""
+    Write-Host "In game: /reload, then /fp steps rxp arrow (or /fp rxp)" -ForegroundColor Green
+    exit 0
+}
 
 $LibGlass = if ($env:LIBGLASS) { $env:LIBGLASS } else { Join-Path (Split-Path -Parent $RepoRoot) "LibGlass" }
 if (-not (Test-Path -LiteralPath (Join-Path $LibGlass "Tools\deploy.ps1"))) {
@@ -95,6 +133,8 @@ if (Test-Path $pluginRoot) {
     }
 }
 
+if ($Probe) { Deploy-Probes }
+
 Write-Host ""
-Write-Host "Changed files: /reload is enough. A brand-new addon folder needs a client restart." -ForegroundColor Yellow
+Write-Host "Changed files, or a brand-new addon folder: /reload is enough." -ForegroundColor Yellow
 Write-Host "In game:  /console scriptErrors 1   then   /gpanel" -ForegroundColor Green

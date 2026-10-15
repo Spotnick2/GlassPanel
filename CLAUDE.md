@@ -450,6 +450,7 @@ There's no build system. The Lua 5.1 toolchain is at `C:\Program Files (x86)\Lua
 pwsh tests\run.ps1                                                 # luac -p on every TOC's .lua files (core + plugins) + every tests\test_*.lua
 & 'C:\Program Files (x86)\Lua\5.1\lua.exe' tests\test_engine.lua  # one test, run from the repo root
 pwsh Tools\deploy.ps1                                              # LibGlass -> AddOns\GlassPanel\Libs, core -> AddOns\GlassPanel, each Plugins\X -> AddOns\<toc name>
+pwsh Tools\deploy.ps1 -Probe                                       # ...and ForeverProbe + each Tools\<X>Probe (-ProbeOnly: just those)
 ```
 
 Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`).
@@ -459,7 +460,17 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`).
 - Deploy rewrites `## Version: @project-version@` to `dev` in the deployed copy only. Never
   commit a literal version over that token.
 - In game: `/console scriptErrors 1`, then `/reload`. Check the AddOns list shows the addon
-  enabled and **not flagged out of date**. A brand-new addon folder needs a client restart.
+  enabled and **not flagged out of date**. `/reload` loads a brand-new addon folder too; exit the
+  client fully only to test persistence.
+- **Probes** (`Tools\<X>Probe`) are ForeverProbe modules (`References\PROBES.md`, the host's
+  `docs/GUIDE.md`): `/fp` console and their own saved log, never chat; guided procedures with
+  `Probe:Steps`; results read from `WTF\...\SavedVariables\<X>Probe.lua` and `ForeverProbe.lua`
+  after the owner's `/reload`, and written to `docs/FOREVER-PROBE.md`. `.pkgmeta` ignores `Tools`, so
+  they never ship. `tests\test_probe.lua` loads the host from `..\ForeverProbe` (or
+  `$env:FOREVERPROBE`) and **skips when there's no checkout**: the repo is private and CI has no
+  token. **RXPProbe** (#80) measures RestedXP's arrow target, our own bearing to it (HereBeDragons +
+  `GetPlayerFacing`, plain or secret) beside a test arrow, its launcher toggle and step-list
+  collapse in and out of combat, and its messages: `/fp steps rxp arrow`.
 
 ## Addon basics
 

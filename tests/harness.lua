@@ -164,6 +164,31 @@ function loadAddon(opts)
     return GlassPanel
 end
 
+-- The ForeverProbe host (the probes' own; never shipped), from its checkout:
+-- $FOREVERPROBE, else ../ForeverProbe (GlassChat's loader). nil when there's
+-- no checkout: it's a private repo, so CI has none, and the probe test skips.
+function foreverProbeRoot()
+    local root = (os.getenv("FOREVERPROBE") or "../ForeverProbe"):gsub("\\", "/"):gsub("/$", "")
+    local f = io.open(root .. "/ForeverProbe.toc", "rb")
+    if not f then return nil end
+    f:close()
+    return root
+end
+
+function loadForeverProbe()
+    local root = foreverProbeRoot()
+    if not root then error("ForeverProbe checkout not found: clone it to ../ForeverProbe or set FOREVERPROBE", 0) end
+    local toc = assert(io.open(root .. "/ForeverProbe.toc", "rb"))
+    local files = {}
+    for line in toc:read("*a"):gmatch("[^\r\n]+") do
+        if line:match("%.lua$") and not line:match("^#") then files[#files + 1] = root .. "/" .. line end
+    end
+    toc:close()
+    for _, file in ipairs(files) do assert(loadfile(file))("ForeverProbe", {}) end
+    WoW.fire("ADDON_LOADED", "ForeverProbe")
+    return ForeverProbe
+end
+
 function block(id) return GlassPanel.Engine.byId[id] end
 function textOf(id) return block(id).widget.label._text end
 -- A block's left edge on the bar, as last laid out.

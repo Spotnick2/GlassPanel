@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: RXPProbe
+## Notes: Throwaway probe for Glass Panel [RestedXP] (#80): RestedXP's arrow target, our own bearing, its guide toggle. A ForeverProbe module: /fp rxp
+## Author: Spotnick
+## Version: dev
+## Dependencies: ForeverProbe
+## OptionalDeps: RXPGuides
+## SavedVariables: RXPProbeDB
+
+RXPProbe.lua
