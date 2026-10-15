@@ -20,6 +20,9 @@ try {
     $luac = Join-Path (Split-Path -Parent $Lua) "luac.exe"
     $tocs = @("GlassPanel.toc") + (Get-ChildItem "Plugins" -Recurse -Filter "*.toc" -ErrorAction SilentlyContinue |
         ForEach-Object { Resolve-Path -Relative $_.FullName })
+    # The probes (Tools\<X>Probe, ForeverProbe modules: never packaged) are checked too.
+    $tocs += Get-ChildItem "Tools" -Recurse -Filter "*.toc" -ErrorAction SilentlyContinue |
+        ForEach-Object { Resolve-Path -Relative $_.FullName }
     $luaFiles = foreach ($toc in $tocs) {
         $dir = Split-Path -Parent $toc
         Get-Content $toc | ForEach-Object { $_.Trim() } |
