@@ -91,6 +91,11 @@ The owner ran `/fp steps rest rested`. The raw log is in `RestProbe.lua` (SavedV
 - It added **0** rested, and `IsResting()` was false, apart from one brief true.
 - "Welcoming Campfire" grants its benefits only "after 1 min spent sitting near the campfire", depending on the camp objects placed. Run 2 measures sitting.
 
+**Camp Tent (owner's screenshot):** using one leaves a debuff, "Boosted Rest": "You cannot gain more
+rested experience from a Camp Tent for 1 hour". So a tent grants rested **at once**, then locks itself
+for an hour. Run 1's minute sampler couldn't see that. The probe now reads debuffs too, and measures a
+tent's grant from the pool before and after.
+
 **Not measured:**
 - **The inn build-up rate:** a `/reload` restarted the in-memory sampler; the start is now saved.
 - **The cap.**
