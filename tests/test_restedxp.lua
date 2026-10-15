@@ -137,8 +137,24 @@ check(t:find("Step\t14 of 196", 1, true), "step N of the guide's steps")
 check(t:find("Distance\t50 yd", 1, true), "the distance")
 -- The active steps, as the guide window shows them (tokens coloured, blanks skipped).
 check(t:find("Active steps", 1, true), "the active steps")
-check(t:find("Step 14\n  Talk to |cff00ff25Thork\n  Kill 8 Plainstriders\nStep 15\n  Loot a Fresh Zhevra Carcass", 1, true),
-      "each with its lines")
+check(t:find("Active steps\nStep 14\n  Talk to |cff00ff25Thork\n  Kill 8 Plainstriders\nStep 15\n"
+    .. "  Loot a Fresh Zhevra Carcass\n  Talk to Innkeeper Boorand\n  Ask |cFF00FF25Thork|r again", 1, true),
+      "the shown steps with their lines, NPCs by the guide's names")
+check(not t:find("internal", 1, true), "hidden steps (hidewindow, hidetip) left out (Codex on #90)")
+check(t:find("RestedXP  |cffffffff12-17 The Barrens|r", 1, true) and t:find("Distance\t50 yd", 1, true),
+      "the header survives: its ReplaceNpcIds (which borrows GameTooltip) never called")
+eq(GameTooltip._owner, w, "the tooltip still owned by the block")
+-- The limit counts shown steps only.
+local all = RXP.RXPFrame.activeSteps
+local saved = {}
+for k, v in ipairs(all) do saved[k] = v end
+for i = 1, 6 do all[#all + 1] = { index = 20 + i, active = true, elements = { { text = "more " .. i } } } end
+table.insert(all, 1, { index = 2, active = true, hidewindow = true, elements = { { text = "hidden first" } } })
+local t2 = tooltip()
+check(t2:find("Step 22", 1, true) and not t2:find("Step 23", 1, true), "four shown steps (hidden ones don't take a slot)")
+check(t2:find("...and 4 more", 1, true), "and the rest counted among shown steps only")
+for k in pairs(all) do all[k] = nil end
+for k, v in ipairs(saved) do all[k] = v end
 check(t:find("Double-click: hide RestedXP's own arrow", 1, true), "its own arrow is on: how to hide it")
 
 -- Double-click: RestedXP's own arrow on the screen, never the guide; ours stays.

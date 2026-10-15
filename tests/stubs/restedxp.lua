@@ -66,10 +66,16 @@ function WoW.installRXP(opts)
     -- The guide window's active steps (RXPFrame.activeSteps), their lines in
     -- element.text with RestedXP's colour tokens.
     local guideFrame = CreateFrame("Frame", "RXPFrame", UIParent)
+    -- Hidden internal steps (hidewindow / hidetip, like Zephras Isle's looping
+    -- #completewith ones) come first, as they can.
     guideFrame.activeSteps = {
-        { index = 14, elements = { { text = "Talk to RXP_FRIENDLY_Thork" }, { text = " " },
-                                   { text = "Kill 8 Plainstriders" } } },
-        { index = 15, elements = { { text = "Loot a Fresh Zhevra Carcass" } } },
+        { index = 3, active = true, hidewindow = true, elements = { { text = "+1 internal" } } },
+        { index = 4, active = true, hidetip = true, elements = { { text = "+1 internal too" } } },
+        { index = 14, active = true, elements = { { text = "Talk to RXP_FRIENDLY_Thork" }, { text = " " },
+                                                  { text = "Kill 8 Plainstriders" } } },
+        { index = 15, active = true, elements = { { text = "Loot a Fresh Zhevra Carcass" },
+                                                  { text = "Talk to npc:Innkeeper Boorand:3934" },
+                                                  { text = "Ask |cFF00FF25Thork::3429|r again" } } },
     }
     rawset(_G, "RXP", {
         game = "FOREVER",
@@ -77,7 +83,14 @@ function WoW.installRXP(opts)
         arrowFrame = arrow,
         RXPFrame = guideFrame,
         guideTextColors = { RXP_FRIENDLY_ = "|cff00ff25" },
-        ReplaceNpcIds = function(text) return text end,
+        -- Like v4.11.23's: a cache miss borrows the global GameTooltip
+        -- (GetNpcName, functions.lua:891-939). The plugin must not call it.
+        ReplaceNpcIds = function(text)
+            GameTooltip:SetOwner(UIParent, "ANCHOR_BOTTOMRIGHT")   -- WorldFrame in the client
+            GameTooltip:ClearLines()
+            GameTooltip:Hide()
+            return text
+        end,
         -- updateArrowData's visibility (map.lua:1047-1051), for a live target.
         UpdateMap = function(resetPins)
             WoW.rxpMapUpdates = WoW.rxpMapUpdates + 1

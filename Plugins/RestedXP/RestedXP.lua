@@ -270,14 +270,16 @@ end
 
 local MAX_STEPS, MAX_LINES, MAX_CHARS = 4, 4, 140
 
--- A step line as its guide window shows it: NPC ids replaced, RestedXP's
--- colour tokens (RXP_FRIENDLY_ and the like) turned into its colours.
+-- A step line as its guide window shows it, RestedXP's colour tokens
+-- (RXP_FRIENDLY_ and the like) turned into its colours. NPCs keep the names
+-- the guide wrote ("npc:Name:123" -> "Name", "Name::123" -> "Name"), which is
+-- RestedXP's own fallback. Never its ReplaceNpcIds: on a cache miss its
+-- GetNpcName borrows the global GameTooltip (SetOwner WorldFrame,
+-- ClearLines, Hide; functions.lua:891-939), the very tooltip this builds
+-- (Codex on #90).
 local function stepLine(R, text)
     if type(text) ~= "string" or API.IsSecret(text) or text == "" or text == " " then return nil end
-    if type(R.ReplaceNpcIds) == "function" then
-        local ok, t = pcall(R.ReplaceNpcIds, text)
-        if ok and type(t) == "string" then text = t end
-    end
+    text = text:gsub("npc:(.-):%d+", "%1"):gsub("::%d+", "")
     local colours = type(R.guideTextColors) == "table" and R.guideTextColors or {}
     text = text:gsub("RXP_[A-Z]+_", function(token)
         local c = colours[token]
@@ -288,13 +290,27 @@ local function stepLine(R, text)
     return text
 end
 
--- RestedXP's active steps (RXPFrame.activeSteps), each with the lines its
--- guide window shows.
+-- RestedXP's active steps (RXPFrame.activeSteps) as its window shows them:
+-- only the shown ones (its v2:IsActiveStepShown, GuideWindow.lua:3099: active,
+-- not hidewindow, not hidetip; internal looping steps are hidden), each with
+-- its lines. The limit counts shown steps only (Codex on #90).
+local function shownSteps(steps)
+    local out = {}
+    for _, step in ipairs(steps) do
+        if type(step) == "table" and step.active and not step.hidewindow and not step.hidetip then
+            out[#out + 1] = step
+        end
+    end
+    return out
+end
+
 local function activeSteps(tt)
     local R = rxp()
     local frame = R and R.RXPFrame
-    local steps = type(frame) == "table" and frame.activeSteps
-    if type(steps) ~= "table" or #steps == 0 then return end
+    local all = type(frame) == "table" and frame.activeSteps
+    if type(all) ~= "table" then return end
+    local steps = shownSteps(all)
+    if #steps == 0 then return end
     tt:AddLine(" ")
     tt:AddLine("Active steps", 1, 0.82, 0)
     for n, step in ipairs(steps) do
@@ -302,7 +318,7 @@ local function activeSteps(tt)
             tt:AddLine("  ...and " .. (#steps - MAX_STEPS) .. " more", 0.7, 0.7, 0.7)
             break
         end
-        if type(step) == "table" then
+        do
             local i = num(step.index)
             tt:AddLine((i and ("Step " .. i) or "Step"), 1, 1, 1)
             local lines = 0

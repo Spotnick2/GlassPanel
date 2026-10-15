@@ -391,8 +391,10 @@ core's `ADDON_LOADED`.
   `UpdateMap(true)` (else the frame hidden directly). **Never the guide** (`showEnabled` /
   `hideGuideWindow`): either off at login sets its `isHidden`, its step handlers stop
   (`GuideWindow.lua:250`), and the guide stops advancing. The tooltip lists its active steps
-  (`RXPFrame.activeSteps`, each step's `element.text` through `ReplaceNpcIds` with its
-  `guideTextColors`). Repaints on `RXP_STEP_ACTIVATED` / `RXP_GUIDE_LOADED` (AceEvent).
+  (`RXPFrame.activeSteps`, only the shown ones by its own `v2:IsActiveStepShown`: active, not
+  `hidewindow`/`hidetip`, the 4-step limit counting those; each `element.text` with its
+  `guideTextColors`, NPCs by the guide's own names. **Never its `ReplaceNpcIds`**: on a cache miss
+  `GetNpcName` borrows the global `GameTooltip`, the one being built; Codex on #90). Repaints on `RXP_STEP_ACTIVATED` / `RXP_GUIDE_LOADED` (AceEvent).
   Every read guarded: a throw shows the logo and is recorded once (`restedxp:read`).
 - **`Plugins\<Name>\`**: deploy puts each at the AddOns top level under its TOC name, and
   `.pkgmeta` `move-folders` does the same when packaging (the AltStable pattern).
