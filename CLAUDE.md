@@ -466,9 +466,10 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`).
   `docs/GUIDE.md`): `/fp` console and their own saved log, never chat; guided procedures with
   `Probe:Steps`; results read from `WTF\...\SavedVariables\<X>Probe.lua` and `ForeverProbe.lua`
   after the owner's `/reload`, and written to `docs/FOREVER-PROBE.md`. `.pkgmeta` ignores `Tools`, so
-  they never ship. `tests\test_probe.lua` loads the host from `..\ForeverProbe` (or
-  `$env:FOREVERPROBE`) and **skips when there's no checkout**: the repo is private and CI has no
-  token. **RXPProbe** (#80) measures RestedXP's arrow target, our own bearing to it (HereBeDragons +
+  they never ship. **Probe tests run locally only** (ForeverProbe is private: no token, no pin, no
+  secret): `tests\test_probe.lua` loads the host from `..\ForeverProbe` (or `$env:FOREVERPROBE`),
+  where a missing checkout is an **error**; CI sets `FOREVERPROBE_OPTIONAL=1` and skips it. So run
+  `tests\run.ps1` before every PR that touches a probe. **RXPProbe** (#80) measures RestedXP's arrow target, our own bearing to it (HereBeDragons +
   `GetPlayerFacing`, plain or secret) beside a test arrow, its launcher toggle and step-list
   collapse in and out of combat, and its messages: `/fp steps rxp arrow`.
 

@@ -165,20 +165,20 @@ function loadAddon(opts)
 end
 
 -- The ForeverProbe host (the probes' own; never shipped), from its checkout:
--- $FOREVERPROBE, else ../ForeverProbe (GlassChat's loader). nil when there's
--- no checkout: it's a private repo, so CI has none, and the probe test skips.
-function foreverProbeRoot()
-    local root = (os.getenv("FOREVERPROBE") or "../ForeverProbe"):gsub("\\", "/"):gsub("/$", "")
-    local f = io.open(root .. "/ForeverProbe.toc", "rb")
-    if not f then return nil end
-    f:close()
-    return root
-end
-
+-- $FOREVERPROBE, else ../ForeverProbe (GlassChat's loader). It's private and
+-- only on the owner's disk, so CI doesn't have it: with FOREVERPROBE_OPTIONAL=1
+-- (CI) a missing checkout skips the calling test file; without it (locally)
+-- it's an error, never a silent skip (ForeverProbe's GUIDE, section 8).
 function loadForeverProbe()
-    local root = foreverProbeRoot()
-    if not root then error("ForeverProbe checkout not found: clone it to ../ForeverProbe or set FOREVERPROBE", 0) end
-    local toc = assert(io.open(root .. "/ForeverProbe.toc", "rb"))
+    local root = (os.getenv("FOREVERPROBE") or "../ForeverProbe"):gsub("\\", "/"):gsub("/$", "")
+    local toc = io.open(root .. "/ForeverProbe.toc", "rb")
+    if not toc then
+        if os.getenv("FOREVERPROBE_OPTIONAL") == "1" then
+            io.write("SKIPPED: ForeverProbe isn't here (private, local only); the probe tests run locally\n")
+            os.exit(0)
+        end
+        error("ForeverProbe checkout not found at " .. root .. ": clone it there or set FOREVERPROBE", 0)
+    end
     local files = {}
     for line in toc:read("*a"):gmatch("[^\r\n]+") do
         if line:match("%.lua$") and not line:match("^#") then files[#files + 1] = root .. "/" .. line end
