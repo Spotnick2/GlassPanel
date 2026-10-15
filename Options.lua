@@ -100,6 +100,49 @@ local function checkbox(col, text, get, set)
     return cb
 end
 
+-- Hand-built slider (GlassUnitFrames' Options.lua): the text and the value on
+-- one line, the track under it. get() -> number; set(number), rounded to the
+-- step. Refreshing it (SetValue fires OnValueChanged) never writes back.
+local SLIDER_W = 200
+local function slider(col, text, min, max, step, fmt, get, set)
+    local fs = label(text)
+    local value = label("")
+    value:SetPoint("LEFT", fs, "LEFT", SLIDER_W + 12, 0)
+    place(col, fs, 18, 4)
+    local s = CreateFrame("Slider", nil, content)
+    s:SetSize(SLIDER_W, 16)
+    s:SetOrientation("HORIZONTAL")
+    s:SetMinMaxValues(min, max)
+    s:SetValueStep(step)
+    s:SetObeyStepOnDrag(true)
+    local track = s:CreateTexture(nil, "BACKGROUND")
+    track:SetPoint("LEFT", s, "LEFT", 0, 0)
+    track:SetPoint("RIGHT", s, "RIGHT", 0, 0)
+    track:SetHeight(6)
+    track:SetColorTexture(0.25, 0.25, 0.3, 0.9)
+    s:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+    place(col, s, 26, 8)
+    local refreshing = false
+    local function show(v) value:SetText(string.format(fmt, v)) end
+    s:SetScript("OnValueChanged", function(_, v)
+        v = math.max(min, math.min(max, math.floor((v - min) / step + 0.5) * step + min))
+        show(v)
+        if refreshing then return end
+        set(v)
+        refreshAll()
+    end)
+    refreshers[#refreshers + 1] = function()
+        local v = get()
+        if type(v) ~= "number" or v ~= v then v = min end
+        v = math.max(min, math.min(max, v))
+        refreshing = true
+        s:SetValue(v)
+        refreshing = false
+        show(v)
+    end
+    return s
+end
+
 -- Mutually exclusive choices: { { value, text }, ... }.
 local function radios(col, title, options, get, set)
     if title then place(col, label(title), 22, 4) end
@@ -207,6 +250,17 @@ local function addPluginOptions()
                         local ok, err = pcall(o.run)
                         if not ok then API.Fail(key, err) end
                     end)
+                elseif o.min ~= nil then
+                    widgets[key] = slider(left, o.label, o.min, o.max, o.step or 0.05, o.fmt or "%.2f",
+                        function()
+                            local ok, v = pcall(o.get)
+                            if not ok then API.Fail(key .. ":get", v) return nil end
+                            return API.Plain(v)
+                        end,
+                        function(v)
+                            local ok, err = pcall(o.set, v)
+                            if not ok then API.Fail(key, err) end
+                        end)
                 else
                     widgets[key] = checkbox(left, o.label,
                         function()

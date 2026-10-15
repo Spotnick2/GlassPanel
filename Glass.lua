@@ -12,3 +12,23 @@
 
 GlassPanel = GlassPanel or {}
 GlassPanel.Glass = LibStub("LibGlass-1.0"):New()
+
+-- LibGlass r6's clean preset (#78): thin rims, no grain, softer bars, neutral
+-- tracks. An instance of its own, made once on demand, for surfaces that opt
+-- in (XP+'s zoomed bar); nil when the copy LibStub loaded is older (the
+-- newest copy among every glass addon runs, so a development checkout or an
+-- older addon could still bring r5): callers fall back to GlassPanel.Glass.
+-- Presets are construction settings: text stays on GlassPanel.Glass, whose
+-- font the player sets.
+local clean
+function GlassPanel.CleanGlass()
+    if clean == nil then
+        clean = false
+        local lib, minor = LibStub("LibGlass-1.0")
+        if type(minor) == "number" and minor >= 6 then
+            local ok, inst = pcall(lib.New, lib, { preset = "clean" })
+            if ok then clean = inst else GlassPanel.API.Fail("glass:clean", inst) end
+        end
+    end
+    return clean or nil
+end

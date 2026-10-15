@@ -289,6 +289,300 @@ check(T().blizzardBar.IsHidden() and c2._parent ~= UIParent, "saved setting appl
 GlassPanelXPDB = nil
 check(next(GlassPanel.failures) == nil, "no failures (Blizzard XP bar)")
 
+-- Zoomed (#78): double-click XP+'s icon to zoom in or out.
+do
+    WoW.player = { level = 30, maxLevel = 60, xp = 12000, maxXP = 45000, rested = 3000, xpDisabled = false }
+    WoW.quests = { { questID = 10, xp = 2000, complete = true } }
+    GlassPanelXPDB = nil
+    loadAddon()
+    local x = xpBlock()
+    local w = x.widget
+    eq(w._width, 360, "docked: the 360 px bar")
+    eq(T().float(), nil, "the zoomed bar isn't built before it's needed")
+    check(w._scripts.OnDoubleClick ~= nil, "the block takes double-clicks")
+    check(tooltipHas("Double-click: maximize (a bar on the screen)"), "the docked bar's tooltip: maximize")
+    w._scripts.OnClick(w, "LeftButton"); w._scripts.OnDoubleClick(w, "LeftButton"); WoW.tick()
+    eq(GlassPanelXPDB.detached, true, "double-click: zoomed, and saved")
+    local f = T().float()
+    check(f ~= nil and f._shown, "the zoomed bar shows")
+    eq(f._parent, UIParent, "on UIParent, not the panel")
+    eq(w._shown, true, "the handle stays on the panel")
+    eq(w._width, 4 + 14 + 4 + 4, "the panel keeps the icon alone")
+    eq(T().ui().host._shown, false, "the panel's bar hidden")
+    eq(f._scripts.OnDoubleClick, nil, "the zoomed bar takes no double-click: the icon is the toggle")
+    local p = f._points[1]
+    check(p[1] == "TOP" and p[2] == UIParent and p[4] == 0 and p[5] == -40, "default: top centre, under the panel")
+    check(f._clamped and f._movable, "clamped to the screen, movable")
+    eq(f._height, 14 + 18 + 14, "the outer frame holds the rows above and below")
+    -- What it shows: the same snapshot as everything else.
+    local s, rows = T().stats(), T().rows()
+    eq(T().floatUI().center._text, "12,000 / 45,000 (33,000)", "the bar's figures")
+    eq(rows.level._text, "|cffffd100Time this level:|r " .. T().duration(s.levelTime), "time this level")
+    eq(rows.session._text, "|cffffd100Time this session:|r " .. T().duration(s.sessionTime), "time this session")
+    eq(rows.rate._text, "-- XP/hr", "no rate yet")
+    eq(rows.next._text, "|cffffd100Next level:|r --", "so no time to level")
+    eq(rows.extra._text, "|cffffd100Turn-ins|r 4.4%   |cffffd100Rested|r 6.7%", "turn-ins and rested")
+    -- The times tick: a 1 s ticker while it shows.
+    check(T().ticker() ~= nil, "a ticker while it shows")
+    WoW.player.xp = 13000
+    WoW.fire("PLAYER_XP_UPDATE", "player"); WoW.now = WoW.now + 3600
+    WoW.fireTickers(); WoW.tick()
+    eq(rows.rate._text, "1,000 XP/hr", "repainted by the ticker: the session rate")
+    eq(rows.next._text, "|cffffd100Next level:|r 1d 8h", "and the time to level from it")
+    -- Tooltips: each says what works there.
+    w._scripts.OnEnter(w)
+    check(tooltipHas("Double-click: minimize (back into the panel)"), "the handle's tooltip: minimize")
+    f._scripts.OnEnter(f)
+    eq(GameTooltip._owner, f, "the zoomed bar's tooltip is its own")
+    local hasShift, hasMenu, hasIcon = false, false, false
+    for _, l in ipairs(GameTooltip._lines) do
+        hasShift = hasShift or l == "Shift-drag: move"
+        hasMenu = hasMenu or l == "Right-click: menu"
+        hasIcon = hasIcon or l == "Double-click XP+'s icon on the panel to minimize"
+    end
+    check(hasShift and hasMenu and hasIcon, "the zoomed bar's tooltip: move, menu, minimize by the icon")
+    local before = #GameTooltip._lines
+    GameTooltip._lines = {}
+    GlassPanel.Refresh("xp"); WoW.tick()
+    eq(#GameTooltip._lines, before, "an open tooltip on it is redrawn on a repaint")
+    GameTooltip:Hide()
+    GlassPanel.Refresh("xp"); WoW.tick()
+    eq(GameTooltip._shown, false, "a dismissed one isn't reopened")
+    f._scripts.OnLeave(f)
+    -- Moving: shift-drag only.
+    f._scripts.OnDragStart(f)
+    eq(f._moving, nil, "a plain drag doesn't move it")
+    f._center = { 100, 100 }
+    f._scripts.OnDragStop(f)
+    eq(GlassPanelXPDB.spot, nil, "and saves nothing")
+    WoW.shift = true
+    f._scripts.OnDragStart(f)
+    WoW.shift = false
+    eq(f._moving, true, "shift-drag moves it")
+    f._center = { 600.3, 700 }
+    f._scripts.OnDragStop(f)
+    eq(f._moving, false, "stopped")
+    check(GlassPanelXPDB.spot and GlassPanelXPDB.spot.x == 100.5 and GlassPanelXPDB.spot.y == 316,
+          "saved from UIParent's centre, rounded to 0.5")
+    p = f._points[1]
+    check(#f._points == 1 and p[1] == "CENTER" and p[4] == 100.5 and p[5] == 316, "anchored on the saved spot")
+    WoW.menu = nil
+    f._scripts.OnClick(f, "RightButton")
+    eq(WoW.menu, nil, "the release that ends a move isn't a click")
+    WoW.now = WoW.now + 1
+    -- A live centre that doesn't read plainly, or out of bounds: nothing saved.
+    for _, bad in ipairs({ { WoW.Secret("cx"), 700 }, { 1 / 0, 700 }, { 500 + 5000, 384 } }) do
+        WoW.shift = true; f._scripts.OnDragStart(f); WoW.shift = false
+        f._center = bad
+        f._scripts.OnDragStop(f)
+        eq(GlassPanelXPDB.spot.x, 100.5, "an unusable centre saves nothing")
+        eq(f._points[1][4], 100.5, "and the bar goes back to the last good spot")
+        eq(GlassPanel.failures["xp:float"], nil, "checked, never touched (a secret would throw)")
+    end
+    WoW.now = WoW.now + 1
+    -- The menu.
+    f._scripts.OnClick(f, "RightButton")
+    eq(WoW.menu.owner, f, "right-click: the menu, on the zoomed bar")
+    eq(#WoW.menu.buttons, 3, "three items")
+    eq(WoW.menu.buttons[3].text, "Reset position", "reset position")
+    WoW.menu.buttons[3].callback()
+    eq(GlassPanelXPDB.spot, nil, "forgotten")
+    eq(f._points[1][1], "TOP", "back at the default")
+    T().S.sessionXP = 5
+    WoW.menu.buttons[2].callback()
+    eq(T().S.sessionXP, 0, "reset session")
+    local realRefresh = GlassPanel.Refresh
+    GlassPanel.Refresh = function() error("refresh broke") end
+    WoW.menu.buttons[2].callback()
+    GlassPanel.Refresh = realRefresh
+    check(GlassPanel.failures["xp:float"] ~= nil, "a menu item that throws when chosen is recorded")
+    GlassPanel.failures["xp:float"] = nil
+    eq(WoW.menu.buttons[1].text, "Back to the panel", "back to the panel")
+    WoW.menu.buttons[1].callback(); WoW.tick()
+    eq(GlassPanelXPDB.detached, nil, "docked: nothing stored")
+    eq(f._shown, false, "the zoomed bar hides")
+    eq(T().ticker(), nil, "its ticker stops")
+    eq(w._width, 360, "the panel's bar is back")
+    eq(T().ui().host._shown, true, "(shown)")
+    -- Double-click on the handle docks; on the bar zooms.
+    w._scripts.OnDoubleClick(w, "LeftButton"); WoW.tick()
+    eq(f._shown, true, "zoomed again")
+    w._scripts.OnDoubleClick(w, "RightButton"); WoW.tick()
+    eq(f._shown, true, "a right double-click doesn't toggle")
+    w._scripts.OnDoubleClick(w, "LeftButton"); WoW.tick()
+    eq(f._shown, false, "double-click on the handle: docked")
+    -- Hidden mid-move: stopped, nothing saved.
+    w._scripts.OnDoubleClick(w, "LeftButton"); WoW.tick()
+    WoW.shift = true; f._scripts.OnDragStart(f); WoW.shift = false
+    f._center = { 700, 700 }
+    w._scripts.OnDoubleClick(w, "LeftButton"); WoW.tick()
+    eq(f._moving, false, "docked mid-move: stopped")
+    eq(T().moving(), false, "(and forgotten)")
+    eq(GlassPanelXPDB.spot, nil, "nothing saved")
+    -- The menu, without MenuUtil or broken.
+    w._scripts.OnDoubleClick(w, "LeftButton"); WoW.tick()
+    local menu = MenuUtil.CreateContextMenu
+    MenuUtil.CreateContextMenu = function() error("menu broke") end
+    WoW.chat = {}
+    f._scripts.OnClick(f, "RightButton")
+    check(GlassPanel.failures["xp:menu"] ~= nil, "a menu that throws is recorded")
+    eq(GlassPanelXPDB.detached, true, "and changes nothing")
+    check(#WoW.chat == 1, "said once")
+    GlassPanel.failures["xp:menu"] = nil
+    MenuUtil.CreateContextMenu = nil
+    f._scripts.OnClick(f, "RightButton"); WoW.tick()
+    eq(GlassPanelXPDB.detached, nil, "no MenuUtil: right-click docks")
+    MenuUtil.CreateContextMenu = menu
+    -- Follows XP+ on screen: hidden, the panel toggled, the level cap.
+    w._scripts.OnDoubleClick(w, "LeftButton"); WoW.tick()
+    GlassPanel._test.slash("hide xp")
+    eq(f._shown, false, "XP+ hidden: the zoomed bar too")
+    eq(T().ticker(), nil, "(no ticker)")
+    GlassPanel._test.slash("show xp"); WoW.tick()
+    eq(f._shown, true, "back")
+    check(T().ticker() ~= nil, "(ticking)")
+    GlassPanel._test.slash("toggle")
+    eq(f._shown, false, "the panel toggled off: hidden")
+    GlassPanel._test.slash("toggle"); WoW.tick()
+    eq(f._shown, true, "toggled on: back")
+    -- Its icon off while zoomed: the handle shows "XP+" instead (core policy).
+    GlassPanel._test.slash("icon xp off")
+    eq(w.label._text, "XP+", "icon off: the handle says XP+")
+    GlassPanel._test.slash("icon xp on")
+    eq(w.label._text, "", "icon on: the icon alone")
+    -- The options: zoomed, and reset position.
+    eq(x.options[2].get(), true, "the Zoomed option reads it")
+    x.options[2].set(false); WoW.tick()
+    eq(f._shown, false, "the Zoomed option docks")
+    x.options[2].set(true); WoW.tick()
+    eq(f._shown, true, "and zooms")
+    GlassPanelXPDB.spot = { x = 5, y = 6 }
+    x.options[4].run()
+    eq(GlassPanelXPDB.spot, nil, "Reset position")
+    -- Scale (the plugin's slider): live, the spot kept in screen units.
+    local function near(a, b) return type(a) == "number" and math.abs(a - b) < 1e-9 end
+    local sc = x.options[3]
+    check(sc.min == 0.5 and sc.max == 2 and sc.step == 0.05, "a slider, 0.5 to 2 in 0.05 steps")
+    eq(sc.get(), 1, "scale 1 by default")
+    GlassPanelXPDB.spot = { x = 100, y = 50 }
+    sc.set(1.5)
+    check(near(GlassPanelXPDB.scale, 1.5), "saved")
+    check(near(f._scale, 1.5), "applied at once")
+    p = f._points[1]
+    check(p[1] == "CENTER" and near(p[4], 100 / 1.5) and near(p[5], 50 / 1.5),
+          "offsets divided by the scale: the spot stays in screen units")
+    WoW.shift = true; f._scripts.OnDragStart(f); WoW.shift = false
+    f._center = { 400, 300 }   -- the float's own (scaled) units: 600, 450 on UIParent
+    f._scripts.OnDragStop(f)
+    check(near(GlassPanelXPDB.spot.x, 100) and near(GlassPanelXPDB.spot.y, 66), "a move at 1.5 saves screen units")
+    WoW.now = WoW.now + 1
+    sc.set(1.23); check(near(GlassPanelXPDB.scale, 1.25), "rounded to the step")
+    sc.set(5); check(near(GlassPanelXPDB.scale, 2), "clamped to 2")
+    sc.set(0.1); check(near(GlassPanelXPDB.scale, 0.5), "clamped to 0.5")
+    sc.set(0 / 0); check(near(GlassPanelXPDB.scale, 0.5), "NaN ignored")
+    sc.set(WoW.Secret("scale")); check(near(GlassPanelXPDB.scale, 0.5), "a secret ignored")
+    for _, bad in ipairs({ "big", 9, 0.1, 0 / 0 }) do
+        GlassPanelXPDB.scale = bad
+        eq(T().floatScale(), 1, "a corrupt saved scale reads as 1: " .. tostring(bad))
+    end
+    GlassPanelXPDB.spot = nil
+    sc.set(2)
+    p = f._points[1]
+    check(p[1] == "TOP" and near(p[5], -20), "the default spot at scale 2: still 40 under the top")
+    sc.set(1)
+    eq(GlassPanelXPDB.scale, nil, "1 is the default: nothing stored")
+    eq(f._scale, 1, "back to 1")
+    -- Its surfaces: LibGlass r6's clean preset when the loaded copy has it (#77).
+    local _, minor = LibStub("LibGlass-1.0")
+    local clean = GlassPanel.CleanGlass()
+    if minor >= 6 then
+        check(clean ~= nil and clean ~= GlassPanel.Glass, "r6: a clean instance of its own")
+        eq(clean.STYLE.grain, 0, "(clean: no grain)")
+        eq(GlassPanel.CleanGlass(), clean, "made once")
+        eq(T().surfaceGlass(), clean, "the zoomed bar is built on it")
+        -- (inst._bars: LibGlass's own list of the bars an instance built.)
+        local function built(inst, bar)
+            for _, b in ipairs(inst._bars or {}) do if b == bar then return true end end
+            return false
+        end
+        check(built(clean, T().floatUI().host), "the zoomed bar is a clean bar")
+        check(built(GlassPanel.Glass, T().ui().host) and not built(clean, T().ui().host), "the panel's stays classic")
+    else
+        io.write("  (LibGlass checkout older than r6: the clean path isn't tested here)\n")
+    end
+    -- The glass backing: off by default; on, painted like the panel.
+    eq(T().back(), nil, "no backing by default")
+    eq(x.options[5].label, "Glass behind the zoomed bar", "the backing option")
+    x.options[5].set(true)
+    local bk, bg = T().back(), T().backGlass()
+    check(bk ~= nil and bk._shown, "on: a glass backing")
+    eq(GlassPanelXPDB.backing, true, "saved")
+    eq(bk._level, f._level, "its body under the bar")
+    check(bk._level < T().floatUI().host._level, "(the bar above it)")
+    check(f._clampInsets and f._clampInsets[1] == -8 and f._clampInsets[3] == 4, "clamping holds the backing too")
+    if clean then eq(bg.size, "thin_small", "clean: thin rims") end
+    GlassPanel._test.slash("glass smoked")
+    eq(bg.tint._color[4], 0.62, "follows the panel's glass: smoked")
+    local grain = (clean or GlassPanel.Glass).STYLE.grain * 0.35 / 0.45
+    check(math.abs(bg.grain._alpha - grain) < 1e-9, "with its own instance's grain (none on clean)")
+    GlassPanel._test.slash("glass clear")
+    x.options[5].set(false)
+    eq(bk._shown, false, "off: hidden")
+    eq(GlassPanelXPDB.backing, nil, "off: nothing stored")
+    eq(f._clampInsets[1], 0, "clamping back to the bar")
+    x.options[5].set(true)
+    eq(T().back(), bk, "on again: the same backing")
+    eq(#GlassPanel.Bar.surfaces, 1, "handed to the panel once")
+    GlassPanel.API.MatchPanelGlass(bg)
+    GlassPanel.API.MatchPanelGlass("not a surface")
+    eq(#GlassPanel.Bar.surfaces, 1, "a surface handed over again, or junk: still one")
+    x.options[5].set(false)
+    WoW.player.level, WoW.player.maxXP = 60, 0
+    WoW.player.maxLevel = 60
+    WoW.fire("PLAYER_LEVEL_UP", 60); WoW.fire("PLAYER_XP_UPDATE", "player"); WoW.tick()
+    eq(f._shown, false, "the level cap hides it")
+    check(next(GlassPanel.failures) == nil, "no failures (zoomed)")
+end
+
+-- Saved: zoomed and its spot come back; a corrupt spot falls back whole.
+do
+    WoW.player = { level = 30, maxLevel = 60, xp = 100, maxXP = 1000, xpDisabled = false }
+    local function spotAfterLoad(spot)
+        GlassPanelXPDB = { detached = true, spot = spot }
+        loadAddon()
+        local f = T().float()
+        return f and f._shown, f and f._points[1]
+    end
+    local shown, p = spotAfterLoad({ x = 50, y = 60 })
+    check(shown and p[1] == "CENTER" and p[4] == 50 and p[5] == 60, "zoomed and its spot kept over a reload")
+    eq(xpBlock().widget._width, 4 + 14 + 4 + 4, "and the panel keeps the icon")
+    for _, bad in ipairs({ { "here", "not a table" }, { { x = 50, y = "a" }, "one bad field" },
+                           { { x = 50, y = 1 / 0 }, "infinite" }, { { x = 9000, y = 0 }, "out of bounds" },
+                           { { x = WoW.Secret("x"), y = 3 }, "secret" } }) do
+        shown, p = spotAfterLoad(bad[1])
+        check(shown and p[1] == "TOP" and p[5] == -40, bad[2] .. ": the default spot, as a whole")
+    end
+    -- An older LibGlass loaded (r5): no clean instance, the panel's glass instead.
+    GlassPanelXPDB = { detached = true, backing = true }
+    loadAddon({ before = function() LibStub.minors["LibGlass-1.0"] = 5 end })
+    eq(GlassPanel.CleanGlass(), nil, "r5: no clean instance")
+    eq(T().surfaceGlass(), GlassPanel.Glass, "the zoomed bar on the panel's glass")
+    local bg = T().backGlass()
+    check(bg ~= nil and T().back()._shown, "a saved backing is built with the bar")
+    eq(bg.size, "small", "the panel's rims")
+    check(next(GlassPanel.failures) == nil, "r5: nothing tried, nothing recorded")
+    -- Hiding Blizzard's bar still follows XP+ on screen while zoomed.
+    local c
+    GlassPanelXPDB = { detached = true, hideBlizzard = true }
+    rawset(_G, "StatusTrackingBarManager", nil)
+    loadAddon({ before = function() c = blizzardXPBar() end })
+    WoW.flushTimers()
+    check(T().blizzardBar.IsHidden(), "Blizzard's XP bar hidden while zoomed")
+    rawset(_G, "StatusTrackingBarManager", nil)
+    GlassPanelXPDB = nil
+    check(next(GlassPanel.failures) == nil, "no failures (saved zoom)")
+end
+
 -- Durations.
 local d = T().duration
 eq(d(nil), "--", "unknown duration")

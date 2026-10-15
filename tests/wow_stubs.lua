@@ -204,10 +204,25 @@ function Methods.GetWidth(w) return w._width end
 function Methods.GetLeft(w) return w._rect and w._rect[1] or 0 end
 function Methods.GetEffectiveScale(w) return WoW.uiScale end
 function Methods.SetAlpha(w, a) w._alpha = a end
+function Methods.SetScale(w, s) w._scale = s end
+function Methods.GetScale(w) return w._scale or 1 end
 -- Rect: set w._rect = { left, bottom, width, height } in a test; the bar gets
 -- one from the harness.
 function Methods.GetRect(w) if w._rect then return unpack(w._rect) end end
 function Methods.GetTop(w) if w._rect then return w._rect[2] + w._rect[4] end end
+-- The centre: w._center = { x, y } (a test moving a frame sets it), else the
+-- rect's middle; nil without either.
+function Methods.GetCenter(w)
+    if w._center then return w._center[1], w._center[2] end
+    if w._rect then return w._rect[1] + w._rect[3] / 2, w._rect[2] + w._rect[4] / 2 end
+end
+-- Moving with the mouse: recorded (w._moving); a test sets w._center to
+-- where the frame was let go.
+function Methods.SetMovable(w, v) w._movable = v end
+function Methods.SetClampedToScreen(w, v) w._clamped = v end
+function Methods.SetClampRectInsets(w, l, r, t, b) w._clampInsets = { l, r, t, b } end
+function Methods.StartMoving(w) w._moving = true end
+function Methods.StopMovingOrSizing(w) w._moving = false end
 function Methods.GetDebugName(w) return w._name or ("<" .. w._type .. ">") end
 function Methods.IsForbidden(w) return false end
 function Methods.GetParent(w) return w._parent end
@@ -288,7 +303,17 @@ function Methods.SetFont(fs, file, size, flags) fs._font = { file, size, flags }
 function Methods.SetMinMaxValues(b, lo, hi, interp) b._min, b._max = lo, hi end
 function Methods.SetStatusBarColor(b, r, g, bl, a) b._color = { r, g, bl, a } end
 function Methods.GetValue(b) return b._value end
-function Methods.SetValue(b, v) b._value = v end
+-- A Slider clamps to its range and fires OnValueChanged (self, value,
+-- userInput) as on the client, a refresh included; a StatusBar just stores.
+function Methods.SetValue(b, v)
+    if b._type == "Slider" then
+        v = math.max(b._min or v, math.min(b._max or v, v))
+        b._value = v
+        if b._scripts.OnValueChanged then b._scripts.OnValueChanged(b, v, false) end
+        return
+    end
+    b._value = v
+end
 function Methods.SetStatusBarTexture(b, file)
     b._fill = b._fill or newWidget("Texture", b)
     b._fill._file = file

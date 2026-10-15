@@ -258,6 +258,17 @@ badOptions("o1", "yes", "options not a list")
 badOptions("o2", { { label = 1, get = print, set = print } }, "label not a string")
 badOptions("o3", { { label = "x", get = print } }, "no set")
 badOptions("o4", { { label = "x", get = print, set = print, note = 5 } }, "note not a string")
+-- Sliders (#78): min < max, both finite numbers; step > 0 and fmt a string when given.
+badOptions("s1", { { label = "x", get = print, set = print, min = 1 } }, "slider without max")
+badOptions("s2", { { label = "x", get = print, set = print, min = 2, max = 1 } }, "slider min over max")
+badOptions("s3", { { label = "x", get = print, set = print, min = 0, max = 1 / 0 } }, "slider max infinite")
+badOptions("s4", { { label = "x", get = print, set = print, min = 0, max = 1, step = 0 } }, "slider step 0")
+badOptions("s5", { { label = "x", get = print, set = print, min = 0, max = 1, fmt = 3 } }, "slider fmt not a string")
+badOptions("s6", { { label = "x", run = print, min = 0, max = 1 } }, "a button with a range")
+badOptions("s7", { { label = "x", get = print, set = print, min = 0 / 0, max = 1 } }, "slider min NaN")
+local s8 = register({ id = "s8", text = function() end,
+                      options = { { label = "x", get = print, set = print, min = 0.5, max = 2, step = 0.1, fmt = "%.1f" } } })
+check(s8 ~= nil and s8.options ~= nil, "a valid slider is kept")
 local o5 = register({ id = "o5", text = function() end, options = { { label = "x", get = print, set = print } } })
 check(o5 ~= nil and o5.options ~= nil, "a valid option list is kept")
 
@@ -289,5 +300,110 @@ local late = register({ id = "late", icon = "x", text = function() return "1" en
 WoW.tick()
 eq(late.widget.icon._shown, false, "saved setting honoured at attach")
 eq(late.widget.textX, 4, "and the text starts at the edge")
+
+-- A width function (#78): asked on every repaint; nil = sized to its content.
+loadAddon()
+check(register({ id = "wf0", text = function() end, width = "wide" }) == nil, "refused: width neither number nor function")
+local fw, fwText, fwShown, fwPaints = 120, "", {}, 0
+local fb = register({ id = "fw", label = "Zoomy", icon = "x", width = function() return fw end,
+                     text = function() return fwText end, paint = function() fwPaints = fwPaints + 1 end,
+                     onShown = function(_, v) fwShown[#fwShown + 1] = v end })
+WoW.tick()
+local fwid = fb.widget
+eq(fwid._width, 120, "a number from the function: that fixed width")
+eq(fwid.caption._text, "", "a width function is graphical: no caption")
+local relayouts = 0
+local realLayout = GlassPanel.Bar.Layout
+GlassPanel.Bar.Layout = function(...) relayouts = relayouts + 1; return realLayout(...) end
+fw = nil
+GlassPanel.Refresh("fw"); WoW.tick()
+eq(relayouts, 1, "the width changed with the text unchanged: relaid out")
+eq(fwid._width, 4 + 14 + 4 + 0 + 0 + 4, "nil: sized to its content (the icon alone)")
+eq(fwid._shown, true, "and still shown with empty text (graphical)")
+eq(fwShown[#fwShown], true, "on screen")
+check(fwPaints >= 2, "and painted")
+GlassPanel.Refresh("fw"); WoW.tick()
+eq(relayouts, 1, "nothing changed: no relayout")
+GlassPanel.Bar.Layout = realLayout
+check(GlassPanel.failures["fw:width"] == nil, "a plain nil records nothing")
+-- Changed while hidden: the new width shows once it's back.
+GlassPanel._test.slash("hide fw")
+fw = 200
+GlassPanel.Refresh("fw"); WoW.tick()
+GlassPanel._test.slash("show fw")
+eq(fwid._width, 200, "a width changed while hidden is used when shown again")
+-- Bad answers: recorded, sized to its content.
+for _, bad in ipairs({ { WoW.Secret("width"), "a secret" }, { "wide", "a string" }, { 8, "under 16" },
+                       { 0 / 0, "NaN" }, { 1 / 0, "infinity" }, { -1 / 0, "minus infinity" } }) do
+    fw = bad[1]
+    GlassPanel.failures["fw:width"] = nil
+    GlassPanel.Refresh("fw"); WoW.tick()
+    check(GlassPanel.failures["fw:width"] ~= nil, bad[2] .. ": recorded")
+    eq(fwid._width, 4 + 14 + 4 + 4, bad[2] .. ": sized to its content")
+end
+GlassPanel.failures["fw:width"] = nil
+local throwing = register({ id = "fwthrow", width = function() error("w") end, text = function() return "" end })
+WoW.tick()
+check(GlassPanel.failures["fwthrow:width"] ~= nil, "a throwing width function: recorded")
+eq(throwing.widget._shown, true, "and the block still shows")
+GlassPanel.failures["fwthrow:width"] = nil
+-- Its icon off while sized to its content with nothing to show: its label
+-- shows, so it never shrinks to padding. Both ways, and b.text untouched.
+fw = nil
+GlassPanel.Refresh("fw"); WoW.tick()
+eq(fwid.label._text, "", "(content-sized, icon on: no label)")
+GlassPanel._test.slash("icon fw off")
+eq(fwid.label._text, "Zoomy", "icon off: its label shows at once, no repaint")
+eq(fwid.text, "", "the block's own text stays empty")
+eq(fwid._width, 4 + #"Zoomy" * 6 + 4, "and the width measures it")
+GlassPanel._test.slash("icon fw on")
+eq(fwid.label._text, "", "icon on again: gone")
+eq(fwid._width, 4 + 14 + 4 + 4, "back to the icon")
+GlassPanel._test.slash("icon fw off")
+fw = 120
+GlassPanel.Refresh("fw"); WoW.tick()
+eq(fwid.label._text, "", "a fixed width again (docked): no label")
+eq(fwid._width, 120, "(fixed)")
+fw = nil
+GlassPanel.Refresh("fw"); WoW.tick()
+eq(fwid.label._text, "Zoomy", "icon already off, then content-sized: the label")
+fwText = nil
+GlassPanel.Refresh("fw"); WoW.tick()
+eq(fwid._shown, false, "nil text still hides it, never a handle")
+local noLabel = register({ id = "nolabel", label = "", width = function() return nil end, text = function() return "" end })
+WoW.tick()
+eq(noLabel.widget.label._text, "nolabel", "an empty label falls back to the id")
+check(next(GlassPanel.failures) == nil, "no failures (width functions)")
+
+-- onDoubleClick (#78): wired only when given; guarded after a drag like onClick.
+loadAddon()
+check(register({ id = "dc0", text = function() end, onDoubleClick = "yes" }) == nil, "refused: onDoubleClick not a function")
+local clicks, doubles = {}, {}
+local dc = register({ id = "dc", text = function() return "dc" end,
+                      onClick = function(_, b) clicks[#clicks + 1] = b end,
+                      onDoubleClick = function(_, b) doubles[#doubles + 1] = b end })
+local single = register({ id = "single", text = function() return "s" end, onClick = function() end })
+WoW.tick()
+eq(single.widget._scripts.OnDoubleClick, nil, "not wired without onDoubleClick")
+local dw = dc.widget
+dw._scripts.OnClick(dw, "LeftButton"); dw._scripts.OnDoubleClick(dw, "LeftButton")
+eq(#clicks, 1, "first click: onClick")
+eq(doubles[1], "LeftButton", "second: onDoubleClick, with the button")
+dragTo("dc", 600)
+dw._scripts.OnClick(dw, "LeftButton"); dw._scripts.OnDoubleClick(dw, "LeftButton")
+eq(#clicks, 1, "no click right after a drag")
+eq(#doubles, 1, "no double-click right after a drag")
+WoW.now = WoW.now + 1
+dragTo("dc", leftOf("dc") + 3)   -- a wobbly drag: moved under 10 px
+dw._scripts.OnClick(dw, "LeftButton"); dw._scripts.OnDoubleClick(dw, "LeftButton")
+eq(#clicks, 1, "nor after a wobbly one")
+eq(#doubles, 1, "(double-click too)")
+WoW.now = WoW.now + 1
+dw._scripts.OnDoubleClick(dw, "RightButton")
+eq(doubles[2], "RightButton", "every button's double-click reaches it")
+register({ id = "dcbad", text = function() return "x" end, onDoubleClick = function() error("dc") end })
+WoW.tick()
+block("dcbad").widget._scripts.OnDoubleClick(block("dcbad").widget, "LeftButton")
+check(GlassPanel.failures["dcbad:onDoubleClick"] ~= nil, "a throwing onDoubleClick is recorded")
 
 done("test_engine")

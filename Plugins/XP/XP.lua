@@ -4,6 +4,9 @@
 -- host Glass.Bar's own fill), incomplete-quest XP, completed-quest XP, XP.
 -- The tooltip has the leveling statistics: time played, XP/hr and time to
 -- level, both for this level and for this session.
+-- Zoomed (#78): a double-click on XP+'s icon (the block) turns it into a wide
+-- bar on the screen, after the owner's old WeakAura, and the panel keeps the
+-- icon alone; another double-click there puts it back.
 --
 -- Forever notes:
 -- - UnitXP, UnitXPMax and GetXPExhaustion were measured plain, but secrecy is
@@ -44,6 +47,24 @@ local S = {
 }
 
 local plain = API.Plain
+
+-- This plugin's SavedVariables. Read lazily: the first read is on the first
+-- repaint or layout, after they load (never while the files run).
+local function db()
+    local d = rawget(_G, "GlassPanelXPDB")
+    if type(d) ~= "table" then
+        d = {}
+        GlassPanelXPDB = d
+    end
+    return d
+end
+
+-- Zoomed (#78): the bar on the screen, only XP+'s icon left on the panel.
+local function detached() return db().detached == true end
+
+-- Whether XP+ is on screen (onShown): the panel's block, and with it the
+-- zoomed bar.
+local onScreen = false
 
 local function capped()
     if IsXPUserDisabled() then return true end
@@ -192,17 +213,31 @@ local function duration(sec)
     return string.format("%ds", sec)
 end
 
+-- One snapshot of every figure the bar and the tooltip show, or nil when
+-- XP isn't readable. One place, so the views can't disagree.
+local function stats()
+    local cur, max, rested = readXP()
+    if not cur then return nil end
+    local s = { cur = cur, max = max, rested = rested, toLevel = max - cur }
+    s.qc, s.qi = questXP()
+    s.total, s.levelTime = playedNow()
+    s.sessionTime = S.sessionStart and (GetTime() - S.sessionStart) or nil
+    s.rateSession = (s.sessionTime and s.sessionTime > 0 and S.sessionXP > 0) and S.sessionXP / s.sessionTime or nil
+    s.rateLevel = (s.levelTime and s.levelTime > 0 and cur > 0) and cur / s.levelTime or nil
+    return s
+end
+
 --------------------------------------------------------------------------------
 -- Drawing
 --------------------------------------------------------------------------------
 
-local ui
+local ui, panel   -- the panel's bar, and the block's widget it sits on
 
-local function layer(host, color, level)
+local function layer(host, color, level, glass)
     local sb = CreateFrame("StatusBar", nil, host)
     sb:SetAllPoints(host)
-    sb:SetStatusBarTexture(Glass.MEDIA .. "bar_fill")
-    sb:GetStatusBarTexture():AddMaskTexture(Glass.Mask(sb, "bar_mask", 8))
+    sb:SetStatusBarTexture(glass.MEDIA .. "bar_fill")
+    sb:GetStatusBarTexture():AddMaskTexture(glass.Mask(sb, "bar_mask", 8))
     sb:SetStatusBarColor(color[1], color[2], color[3], color[4])
     sb:SetMinMaxValues(0, 1)
     sb:SetValue(0)
@@ -210,52 +245,60 @@ local function layer(host, color, level)
     return sb
 end
 
-local function build(block)
-    local w = block.widget
-    -- The host glass bar: background, gloss and edge; its own fill is rested.
-    local host = Glass.Bar(w, BAR_H)
-    -- After the icon (TitanPanelXPP's XP_Icon): the bar starts where the
-    -- block's text would (its empty caption, which Bar moves when the icon
-    -- is turned off), so it takes the icon's space back then.
-    host:SetPoint("LEFT", w.caption, "LEFT", -2, 0)
-    host:SetPoint("RIGHT", w, "RIGHT", -2, 0)
-    host:SetFrameLevel(w:GetFrameLevel() + 1)
+-- The four-layer glass bar with its three texts, on `parent`; the caller
+-- anchors ui.host. The host glass bar is the background, gloss and edge; its
+-- own fill is rested. `glass` builds the surfaces (the zoomed bar's clean
+-- instance, else GlassPanel.Glass); the texts are always GlassPanel.Glass's,
+-- whose font the player sets.
+local function makeBar(parent, height, fontSize, glass)
+    glass = glass or Glass
+    local host = glass.Bar(parent, height)
+    host:SetFrameLevel(parent:GetFrameLevel() + 1)
     local c = COLORS.rested
     host:SetStatusBarColor(c[1], c[2], c[3], c[4])
 
-    local incomplete = layer(host, COLORS.incomplete, 1)
-    local complete = layer(host, COLORS.complete, 2)
-    local xp = layer(host, COLORS.xp, 3)
+    local incomplete = layer(host, COLORS.incomplete, 1, glass)
+    local complete = layer(host, COLORS.complete, 2, glass)
+    local xp = layer(host, COLORS.xp, 3, glass)
     host.overlay:SetFrameLevel(host:GetFrameLevel() + 4)   -- gloss over every layer
 
     local tf = CreateFrame("Frame", nil, host)
     tf:SetAllPoints(host)
     tf:SetFrameLevel(host:GetFrameLevel() + 5)
-    local left = Glass.Font(tf, FONT, "LEFT")
+    local left = Glass.Font(tf, fontSize, "LEFT")
     left:SetPoint("LEFT", host, "LEFT", 6, 0)
-    local center = Glass.Font(tf, FONT, "CENTER")
+    local center = Glass.Font(tf, fontSize, "CENTER")
     center:SetPoint("CENTER", host, "CENTER", 0, 0)
-    local right = Glass.Font(tf, FONT, "RIGHT")
+    local right = Glass.Font(tf, fontSize, "RIGHT")
     right:SetPoint("RIGHT", host, "RIGHT", -6, 0)
 
-    ui = { host = host, incomplete = incomplete, complete = complete, xp = xp,
-           left = left, center = center, right = right }
+    return { host = host, incomplete = incomplete, complete = complete, xp = xp,
+             left = left, center = center, right = right }
 end
 
-local function paint()
-    local cur, max, rested = readXP()
-    if not (ui and cur) then return end
-    local qc, qi = questXP()
-    Glass.SetBar(ui.host, max, math.min(cur + rested, max))
-    Glass.SetBar(ui.incomplete, max, math.min(cur + qc + qi, max))
-    Glass.SetBar(ui.complete, max, math.min(cur + qc, max))
-    Glass.SetBar(ui.xp, max, cur)
+local function paintBar(bar, s)
+    local cur, max = s.cur, s.max
+    Glass.SetBar(bar.host, max, math.min(cur + s.rested, max))
+    Glass.SetBar(bar.incomplete, max, math.min(cur + s.qc + s.qi, max))
+    Glass.SetBar(bar.complete, max, math.min(cur + s.qc, max))
+    Glass.SetBar(bar.xp, max, cur)
 
-    ui.left:SetText("|cffffffccLv " .. level() .. "|r")
-    ui.center:SetText(num(cur) .. " / " .. num(max) .. " (" .. num(max - cur) .. ")")
+    bar.left:SetText("|cffffffccLv " .. level() .. "|r")
+    bar.center:SetText(num(cur) .. " / " .. num(max) .. " (" .. num(s.toLevel) .. ")")
     local right = pct(cur, max)
-    if qc > 0 then right = right .. " |cffff9700(" .. pct(math.min(cur + qc, max), max) .. ")|r" end
-    ui.right:SetText(right)
+    if s.qc > 0 then right = right .. " |cffff9700(" .. pct(math.min(cur + s.qc, max), max) .. ")|r" end
+    bar.right:SetText(right)
+end
+
+local function build(block)
+    local w = block.widget
+    panel = w
+    ui = makeBar(w, BAR_H, FONT)
+    -- After the icon (TitanPanelXPP's XP_Icon): the bar starts where the
+    -- block's text would (its empty caption, which Bar moves when the icon
+    -- is turned off), so it takes the icon's space back then.
+    ui.host:SetPoint("LEFT", w.caption, "LEFT", -2, 0)
+    ui.host:SetPoint("RIGHT", w, "RIGHT", -2, 0)
 end
 
 --------------------------------------------------------------------------------
@@ -269,18 +312,29 @@ local function line(tt, label, value, color)
     tt:AddDoubleLine(label, value, 1, 0.82, 0, color[1], color[2], color[3])
 end
 
-local function tooltip(_, tt)
-    local cur, max, rested = readXP()
-    if not cur then
+-- The clicks that work where the mouse is: the bar on the panel, the icon
+-- left on the panel while zoomed, or the zoomed bar.
+local HINTS = {
+    panel = { "Double-click: maximize (a bar on the screen)", "Left-click: refresh time played",
+              "Right-click: reset session" },
+    handle = { "Double-click: minimize (back into the panel)", "Left-click: refresh time played",
+               "Right-click: reset session" },
+    float = { "Shift-drag: move", "Left-click: refresh time played", "Right-click: menu",
+              "Double-click XP+'s icon on the panel to minimize" },
+}
+
+-- `where`: "float" from the zoomed bar; the panel's block passes nothing.
+local function tooltip(_, tt, where)
+    where = where or (detached() and "handle" or "panel")
+    local s = stats()
+    if not s then
         tt:AddLine("XP+")
         tt:AddLine("Experience is not available right now.", 0.7, 0.7, 0.7, true)
         return
     end
-    local now = GetTime()
-    local toLevel = max - cur
-    local qc, qi = questXP()
-    local total, levelTime = playedNow()
-    local sessionTime = S.sessionStart and (now - S.sessionStart) or nil
+    local cur, max, rested, toLevel, qc, qi = s.cur, s.max, s.rested, s.toLevel, s.qc, s.qi
+    local total, levelTime, sessionTime = s.total, s.levelTime, s.sessionTime
+    local rateSession, rateLevel = s.rateSession, s.rateLevel
 
     tt:AddLine("XP+  |cffffffffLevel " .. level() .. "|r")
     line(tt, "Time played", duration(total))
@@ -300,15 +354,317 @@ local function tooltip(_, tt)
     if S.lastGain > 0 then
         line(tt, "Last gain", num(S.lastGain) .. " (" .. math.ceil(toLevel / S.lastGain) .. " to level)")
     end
-    local rateSession = (sessionTime and sessionTime > 0 and S.sessionXP > 0) and S.sessionXP / sessionTime or nil
-    local rateLevel = (levelTime and levelTime > 0 and cur > 0) and cur / levelTime or nil
     line(tt, "XP/hr (this level)", rateLevel and num(rateLevel * 3600) or "--")
     line(tt, "XP/hr (this session)", rateSession and num(rateSession * 3600) or "--")
     line(tt, "Level in (this level)", duration(rateLevel and toLevel / rateLevel))
     line(tt, "Level in (this session)", duration(rateSession and toLevel / rateSession))
     tt:AddLine(" ")
-    tt:AddLine("Left-click: refresh time played", 0.3, 1, 0.3)
-    tt:AddLine("Right-click: reset session", 0.3, 1, 0.3)
+    for _, hint in ipairs(HINTS[where] or HINTS.panel) do tt:AddLine(hint, 0.3, 1, 0.3) end
+end
+
+local function resetSessionAndSay()
+    resetSession()
+    API.Print("XP+ session reset")
+    GlassPanel.Refresh("xp")
+end
+
+--------------------------------------------------------------------------------
+-- Zoomed (#78): the bar on the screen, after the owner's old WeakAura
+--------------------------------------------------------------------------------
+
+-- A plain Button on UIParent (nothing secure: it zooms, docks and moves in
+-- combat), built on the first zoom. Shown while zoomed and XP+ is on screen:
+-- hiding XP+, the panel, the level cap all hide it, and its handle (XP+'s
+-- icon on the panel) with it. The outer frame holds the rows above and below
+-- the bar, so clamping keeps them on screen. Its spot is CENTER offsets from
+-- UIParent's centre (GlassUnitFrames' cast bars), in GlassPanelXPDB.spot;
+-- never set (or anything wrong with it): under the panel, top centre. Its
+-- scale (GlassPanelXPDB.scale, the plugin's slider) leaves the spot in screen
+-- units: SetPoint offsets are in the float's own scaled units, so they are
+-- divided by it, and its centre multiplied by it (GlassUnitFrames' PlaceAt).
+local FLOAT_W, FLOAT_BAR_H, FLOAT_FONT = 480, 18, 12
+local ROW_H, ROW_FONT = 14, 10
+local DEFAULT_Y = -40       -- from UIParent's top
+local SPOT_LIMIT = 4096
+local SCALE_MIN, SCALE_MAX, SCALE_STEP = 0.5, 2, 0.05
+local GOLD = "|cffffd100"
+
+local float, floatUI, rows, ticker
+local back, backGlass       -- the glass backing (an option), built when first wanted
+local BACK_PAD_X, BACK_PAD_Y = 8, 4
+
+-- The zoomed bar's surfaces: LibGlass r6's clean preset when the loaded copy
+-- has it (#77), else the panel's own glass.
+local function surfaceGlass() return GlassPanel.CleanGlass() or Glass end
+local moving, lastMoveStop = false, -1
+
+-- fn under pcall, a throw recorded: these run from the client (scripts, the
+-- ticker, a menu item chosen later), outside the engine's guard.
+local function guarded(fn)
+    return function(...)
+        local ok, err = pcall(fn, ...)
+        if not ok then API.Fail("xp:float", err) end
+    end
+end
+
+-- A plain, finite number, or nil.
+local function finite(v)
+    v = plain(v)
+    if type(v) ~= "number" or v ~= v or v == math.huge or v == -math.huge then return nil end
+    return v
+end
+
+-- The saved spot, or nil for the default: never half saved, half default.
+local function savedSpot()
+    local s = db().spot
+    if type(s) ~= "table" then return nil end
+    local x, y = finite(s.x), finite(s.y)
+    if not (x and y and math.abs(x) <= SPOT_LIMIT and math.abs(y) <= SPOT_LIMIT) then return nil end
+    return x, y
+end
+
+-- The saved scale, or 1 when unset or out of range.
+local function floatScale()
+    local s = finite(db().scale)
+    if not s or s < SCALE_MIN or s > SCALE_MAX then return 1 end
+    return s
+end
+
+local function placeFloat()
+    local scale = floatScale()
+    float:SetScale(scale)
+    float:ClearAllPoints()
+    local x, y = savedSpot()
+    if x then
+        float:SetPoint("CENTER", UIParent, "CENTER", x / scale, y / scale)
+    else
+        float:SetPoint("TOP", UIParent, "TOP", 0, DEFAULT_Y / scale)
+    end
+end
+
+-- Where the frame was let go, saved when every coordinate reads plainly and
+-- the offsets are in bounds; either way it's anchored on our point again (the
+-- last good spot when this one isn't). The float's centre is in its own
+-- scaled units: times its scale, it's in UIParent's.
+local function saveSpot()
+    local scale = floatScale()
+    local fx, fy = float:GetCenter()
+    local ux, uy = UIParent:GetCenter()
+    fx, fy, ux, uy = finite(fx), finite(fy), finite(ux), finite(uy)
+    if fx and fy and ux and uy then
+        fx, fy = fx * scale, fy * scale
+        local x, y = math.floor((fx - ux) * 2 + 0.5) / 2, math.floor((fy - uy) * 2 + 0.5) / 2
+        if math.abs(x) <= SPOT_LIMIT and math.abs(y) <= SPOT_LIMIT then db().spot = { x = x, y = y } end
+    end
+    placeFloat()
+end
+
+local function resetSpot()
+    db().spot = nil
+    if float then placeFloat() end
+end
+
+-- The slider: clamped, in steps; 1 (the default) is stored as nothing. Live:
+-- the bar grows or shrinks around its spot.
+local function setScale(v)
+    v = finite(v)
+    if not v then return end
+    v = math.max(SCALE_MIN, math.min(SCALE_MAX, math.floor(v / SCALE_STEP + 0.5) * SCALE_STEP))
+    db().scale = (math.abs(v - 1) > 1e-6) and v or nil
+    if float then placeFloat() end
+end
+
+local function stopTicker()
+    if ticker then ticker:Cancel() end
+    ticker = nil
+end
+
+local function showFloatTooltip(f)
+    GameTooltip:SetOwner(f, "ANCHOR_NONE")
+    GameTooltip:ClearAllPoints()
+    GameTooltip:SetPoint("TOP", f, "BOTTOM", 0, -4)
+    GameTooltip:ClearLines()
+    tooltip(nil, GameTooltip, "float")
+    GameTooltip:Show()
+end
+
+local setDetached   -- below: the menu docks through it
+local applyBacking  -- below: the float builds its backing through it
+
+-- Role's pattern (#20): a menu that throws changes nothing, it's reported; a
+-- client with no MenuUtil docks on the right-click instead.
+local function openMenu(owner)
+    local menu = rawget(_G, "MenuUtil")
+    if not (menu and menu.CreateContextMenu) then
+        setDetached(false)
+        return
+    end
+    local ok, err = pcall(menu.CreateContextMenu, owner, function(_, root)
+        root:CreateButton("Back to the panel", guarded(function() setDetached(false) end))
+        root:CreateButton("Reset session", guarded(resetSessionAndSay))
+        root:CreateButton("Reset position", guarded(resetSpot))
+    end)
+    if not ok then
+        API.Fail("xp:menu", err)
+        API.Print("XP+: the menu couldn't open (see /gpanel failures).")
+    end
+end
+
+-- The optional glass behind the whole zoomed bar, rows included: painted like
+-- the panel (Clear or Smoked, Neutral or Class colour) through
+-- API.MatchPanelGlass, which repaints it whenever those change. On its own
+-- frame at the float's level, so its body sits under the bar (float + 1) and
+-- its rims (+ 10) around it, as the panel's blocks sit in the panel's glass.
+-- Clamping grows with it.
+function applyBacking()
+    if not float then return end
+    local on = db().backing == true
+    if on and not back then
+        local glass = surfaceGlass()
+        back = CreateFrame("Frame", nil, float)
+        back:SetPoint("TOPLEFT", float, "TOPLEFT", -BACK_PAD_X, BACK_PAD_Y)
+        back:SetPoint("BOTTOMRIGHT", float, "BOTTOMRIGHT", BACK_PAD_X, -BACK_PAD_Y)
+        back:SetFrameLevel(float:GetFrameLevel())
+        backGlass = glass.Apply(back, "small")
+        API.MatchPanelGlass(backGlass, glass ~= Glass and glass or nil)
+    end
+    if back then back:SetShown(on) end
+    if on then
+        float:SetClampRectInsets(-BACK_PAD_X, BACK_PAD_X, BACK_PAD_Y, -BACK_PAD_Y)
+    else
+        float:SetClampRectInsets(0, 0, 0, 0)
+    end
+end
+
+local function setBacking(on)
+    db().backing = on and true or nil
+    applyBacking()
+end
+
+local function buildFloat()
+    local f = CreateFrame("Button", nil, UIParent)
+    f:SetFrameStrata("MEDIUM")
+    f:SetSize(FLOAT_W, ROW_H + FLOAT_BAR_H + ROW_H)
+    f:SetClampedToScreen(true)
+    f:SetMovable(true)
+    f:RegisterForClicks("AnyUp")
+    f:RegisterForDrag("LeftButton")
+    f:Hide()
+    float = f
+
+    floatUI = makeBar(f, FLOAT_BAR_H, FLOAT_FONT, surfaceGlass())
+    floatUI.host:SetPoint("LEFT", f, "LEFT", 0, 0)
+    floatUI.host:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+    -- The rows, on a layer over the bar's (its texts are at host + 5).
+    local tf = CreateFrame("Frame", nil, f)
+    tf:SetAllPoints(f)
+    tf:SetFrameLevel(floatUI.host:GetFrameLevel() + 6)
+    local host = floatUI.host
+    local function row(justify, point, relPoint, x, y)
+        local fs = Glass.Font(tf, ROW_FONT, justify)
+        fs:SetPoint(point, host, relPoint, x, y)
+        return fs
+    end
+    rows = {
+        level   = row("LEFT", "BOTTOMLEFT", "TOPLEFT", 2, 2),
+        session = row("RIGHT", "BOTTOMRIGHT", "TOPRIGHT", -2, 2),
+        rate    = row("LEFT", "TOPLEFT", "BOTTOMLEFT", 2, -2),
+        next    = row("CENTER", "TOP", "BOTTOM", 0, -2),
+        extra   = row("RIGHT", "TOPRIGHT", "BOTTOMRIGHT", -2, -2),
+    }
+
+    f:SetScript("OnEnter", guarded(showFloatTooltip))
+    f:SetScript("OnLeave", guarded(function(self)
+        if GameTooltip:GetOwner() == self then GameTooltip:Hide() end
+    end))
+    f:SetScript("OnDragStart", guarded(function(self)
+        if not IsShiftKeyDown() then return end
+        moving = true
+        if GameTooltip:GetOwner() == self then GameTooltip:Hide() end
+        self:StartMoving()
+    end))
+    f:SetScript("OnDragStop", guarded(function(self)
+        if not moving then return end   -- a plain drag moves nothing, saves nothing
+        moving = false
+        lastMoveStop = GetTime()
+        self:StopMovingOrSizing()
+        saveSpot()
+    end))
+    f:SetScript("OnClick", guarded(function(self, button)
+        -- The release that ends a move is not a click.
+        if moving or GetTime() - lastMoveStop < 0.2 then return end
+        if button == "LeftButton" then
+            requestPlayed()
+        elseif button == "RightButton" then
+            openMenu(self)
+        end
+    end))
+    -- Hidden mid-move (docked, XP+ hidden): stopped where it was saved last.
+    f:SetScript("OnHide", guarded(function(self)
+        if moving then
+            moving = false
+            self:StopMovingOrSizing()
+            placeFloat()
+        end
+        stopTicker()
+        if GameTooltip:GetOwner() == self then GameTooltip:Hide() end
+    end))
+    placeFloat()
+    applyBacking()
+end
+
+-- Shown while zoomed and XP+ is on screen. The times on it tick: a 1 s
+-- ticker repaints while it shows (Guild's and Warlock's pattern), the display
+-- only (never /played).
+local function applyFloat()
+    local want = onScreen and detached()
+    if want and not float then buildFloat() end
+    if not float then return end
+    if want and not float:IsShown() then
+        float:Show()
+        if not ticker then ticker = C_Timer.NewTicker(1, guarded(function() GlassPanel.Refresh("xp") end)) end
+    elseif not want then
+        float:Hide()   -- OnHide stops the ticker
+    end
+end
+
+local function paintFloat(s)
+    paintBar(floatUI, s)
+    local rate = s.rateSession or s.rateLevel
+    rows.level:SetText(GOLD .. "Time this level:|r " .. duration(s.levelTime))
+    rows.session:SetText(GOLD .. "Time this session:|r " .. duration(s.sessionTime))
+    rows.rate:SetText((rate and num(rate * 3600) or "--") .. " XP/hr")
+    rows.next:SetText(GOLD .. "Next level:|r " .. duration(rate and s.toLevel / rate))
+    rows.extra:SetText(GOLD .. "Turn-ins|r " .. pct(s.qc, s.max) .. "   " .. GOLD .. "Rested|r " .. pct(s.rested, s.max))
+end
+
+-- Zoom or dock. The panel's width follows on the next repaint (the block's
+-- width function), the lane keeping its place.
+function setDetached(on)
+    db().detached = on and true or nil
+    local owner = GameTooltip:GetOwner()
+    if owner ~= nil and (owner == float or owner == panel) then
+        GameTooltip:Hide()
+    end
+    applyFloat()
+    GlassPanel.Refresh("xp")
+end
+
+-- One snapshot for whichever view shows: the panel's bar, or the zoomed one
+-- (the panel then keeps only the icon). Only while XP+ is on screen.
+local function paint()
+    local s = stats()
+    if not s then return end
+    local zoomed = detached()
+    if ui then
+        ui.host:SetShown(not zoomed)
+        if not zoomed then paintBar(ui, s) end
+    end
+    if zoomed and float and float:IsShown() then
+        paintFloat(s)
+        -- Redrawn only while it's open on the zoomed bar (not reopened).
+        if GameTooltip:GetOwner() == float and GameTooltip:IsShown() then showFloatTooltip(float) end
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -327,16 +683,6 @@ end
 -- in onShown, which runs on the first layout, after they load). While Edit
 -- Mode is open the bars are given back, so they can be seen and moved.
 local blizzardBar = API.SystemHider("StatusTrackingBarManager")
-local onScreen = false
-
-local function db()
-    local d = rawget(_G, "GlassPanelXPDB")
-    if type(d) ~= "table" then
-        d = {}
-        GlassPanelXPDB = d
-    end
-    return d
-end
 
 local function applyBlizzardBar()
     blizzardBar.Set(onScreen and db().hideBlizzard == true)
@@ -351,7 +697,12 @@ local block = GlassPanel.RegisterBlock({
     label = "XP+",
     icon = "Interface\\Icons\\XP_Icon",   -- TitanPanelXPP's purple "XP"
     order = 20,
-    width = WIDTH,
+    -- Zoomed: sized to its content, which is the icon alone (the handle).
+    -- An explicit branch: `detached() and nil or WIDTH` is always WIDTH.
+    width = function()
+        if detached() then return nil end
+        return WIDTH
+    end,
     events = { "PLAYER_ENTERING_WORLD", "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "UPDATE_EXHAUSTION",
                "PLAYER_UPDATE_RESTING", "TIME_PLAYED_MSG", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN",
                "ENABLE_XP_GAIN", "DISABLE_XP_GAIN" },
@@ -390,6 +741,7 @@ local block = GlassPanel.RegisterBlock({
     onShown = function(_, visible)
         onScreen = visible
         applyBlizzardBar()
+        applyFloat()
     end,
     options = {
         { label = "Hide Blizzard's XP bar",
@@ -399,19 +751,37 @@ local block = GlassPanel.RegisterBlock({
               db().hideBlizzard = on or nil
               applyBlizzardBar()
           end },
+        { label = "Zoomed: a bar on the screen, not on the panel",
+          note = "Double-click XP+'s icon to zoom in or out. Shift-drag the zoomed bar to move it.",
+          get = detached,
+          set = function(on) setDetached(on) end },
+        { label = "Zoomed bar's scale", min = SCALE_MIN, max = SCALE_MAX, step = SCALE_STEP,
+          get = floatScale, set = setScale },
+        { label = "Reset the zoomed bar's position", run = resetSpot },
+        { label = "Glass behind the zoomed bar",
+          note = "Painted like the panel: Clear or Smoked, Neutral or Class colour.",
+          get = function() return db().backing == true end,
+          set = setBacking },
     },
     onClick = function(_, button)
         if button == "RightButton" then
-            resetSession()
-            API.Print("XP+ session reset")
-            GlassPanel.Refresh("xp")
+            resetSessionAndSay()
         elseif button == "LeftButton" then
             requestPlayed()
         end
+    end,
+    -- On the bar, or on the icon left while zoomed: zoom in or out.
+    onDoubleClick = function(_, button)
+        if button == "LeftButton" then setDetached(not detached()) end
     end,
 })
 
 if block then
     block._test = { S = S, duration = duration, pending = function() return pending end, blizzardBar = blizzardBar,
-                    ui = function() return ui end }
+                    ui = function() return ui end, stats = stats, setDetached = setDetached,
+                    float = function() return float end, rows = function() return rows end,
+                    floatUI = function() return floatUI end, moving = function() return moving end,
+                    setScale = setScale, floatScale = floatScale, surfaceGlass = surfaceGlass,
+                    back = function() return back end, backGlass = function() return backGlass end,
+                    ticker = function() return ticker end }
 end

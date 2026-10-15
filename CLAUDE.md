@@ -65,7 +65,10 @@ core's `ADDON_LOADED`.
   TOC's Interface, not this notice), and **once per new build** (`GlassPanelDB.notedBuild`), not at
   every login.
 - **`Glass.lua`**: `GlassPanel.Glass = LibStub("LibGlass-1.0"):New()`, this addon's instance of
-  the material (#57; see "The glass material" below).
+  the material (#57; see "The glass material" below). `GlassPanel.CleanGlass()` (public, #78): a
+  second instance with r6's clean preset, made once on demand, `nil` when the loaded copy's MINOR is
+  under 6 (the newest copy among glass addons runs). Surfaces only: text stays on `GlassPanel.Glass`
+  (the font setting). The panel itself stays classic.
 - **`Engine.lua`**: the block registry (`GlassPanel.RegisterBlock`, `GlassPanel.Refresh`) and
   repaint scheduling:
   - one event frame for all blocks; `onEvent` runs immediately and marks the block dirty;
@@ -78,7 +81,15 @@ core's `ADDON_LOADED`.
     blocks only);
   - every block callback runs under `pcall` via `Engine.Call`;
   - `text` must return a plain string. Secrets and non-strings are refused and recorded.
-  - A relayout runs only when some text changed.
+  - A relayout runs only when some text changed, or a width or what a block displays (#78).
+  - `width` may be a function (#78), asked once per repaint in `Bar.SetText` (before its
+    unchanged-text return) and cached as `b.fixedWidth`: a number >= 16 is a fixed width, a plain
+    nil sizes the block to its content; anything else (secret, NaN, inf, < 16, a throw) is recorded
+    as `<id>:width` and sized to content. A content-sized graphical block with empty text and its
+    icon off displays its label (else its id) so it never shrinks to padding (`syncDisplay`, also
+    run by `UpdateIcon`; `b.text` stays the block's own answer).
+  - `onDoubleClick(block, button)` (#78): `OnDoubleClick` is wired only for a block that has it
+    (the others keep two `onClick`s), behind the same after-a-drag guard as `onClick`.
 - **`Layout.lua`**: where blocks go (#6), a pure model. **Free lanes**: `{ x = 0..1, ids }`,
   where `0` packs left, `1` packs right and anything else is centred on the anchor. **Lanes never
   overlap**: `Place` pushes them `LANE_GAP` apart (they only overlap when nothing fits). A drop
@@ -93,7 +104,7 @@ core's `ADDON_LOADED`.
   `Bar.GLASS_TINTS` are the one allowlist. Clear is the surface **as built** (`SetSurfaceTint(g)`,
   the instance's grain and wash), so it follows the library; smoked is AltStable's body, its grain
   and wash as region-alpha scales of the built ones; the class colour from `C_ClassColor` × the
-  preset's `classShade` through `Glass.SetSurfaceTint` (**LibGlass r3+**, embedded r5). Painted last
+  preset's `classShade` through `Glass.SetSurfaceTint` (**LibGlass r3+**, embedded r6). Painted last
   in `Bar.Build`, under pcall (`API.Fail("bar:glass")`); a class colour not readable yet sets
   `Bar.glassPending`, is said once by the setter, and is retried at `PLAYER_ENTERING_WORLD`), mouse-less so
   empty space clicks through), one plain
@@ -140,6 +151,25 @@ core's `ADDON_LOADED`.
   `MainStatusTrackingBarContainer`** (measured: its `UpdateShownState` calls
   `GetParent():CheckForLayoutChange()`, so under our frame Edit Mode threw a nil call); the manager
   doesn't use its parent. A watched rep bar (the secondary container) hides with it, as in Titan.
+  **Zoomed (#78):** a left double-click on the block (its icon) toggles `GlassPanelXPDB.detached`.
+  Zoomed, `width` returns nil (the panel keeps the icon alone, the handle that docks it back) and
+  `paint` hides the panel's host and draws the **float**: a plain `Button` on UIParent built on the
+  first zoom (`makeBar` + rows above/below, after the owner's WeakAura; the outer frame holds the rows
+  so clamping covers them), shown while zoomed **and** XP+ is on screen (`onShown`: hiding XP+, the
+  panel or the level cap hides it). Shift-drag moves it (`moving` tracked; a plain drag saves nothing;
+  hidden mid-move stops unsaved); the spot is CENTER offsets from UIParent's centre in
+  `GlassPanelXPDB.spot`, checked whole (a bad field: the default, TOP 0,-40) and from live
+  `GetCenter()` values checked plain and finite before subtracting. Right-click: a `MenuUtil` menu
+  (`CreateButton`: back to the panel, reset session, reset position; no `MenuUtil`: right-click
+  docks). Its bar and its optional **glass backing** (`GlassPanelXPDB.backing`, off by default: a
+  `Glass.Apply(back, "small")` on its own frame at the float's level, so the body is under the bar
+  and the rims around it; clamp insets grow with it) are built on `GlassPanel.CleanGlass()` when
+  there is one; the backing is painted like the panel through the public `API.MatchPanelGlass(g,
+  glass)` (`Bar.surfaces`, repainted by `Bar.ApplyGlass` with **its own instance's** style, so a
+  clean surface gets no grain). **Scale** 0.5-2 (0.05 steps; the plugin's slider option, `GlassPanelXPDB.scale`, 1 stored
+  as nothing, a corrupt one reads 1): the spot stays in screen units, so SetPoint offsets are divided
+  by it and `GetCenter()` multiplied by it (GUF's `PlaceAt`). A 1 s `C_Timer` ticker repaints it only while shown. Its scripts, ticker and menu items
+  run under `guarded` (`xp:float`). Figures from one `stats()` snapshot (the tooltip's too).
   `/played` is requested with `TIME_PLAYED_MSG` muted on the chat frames, one request at a time
   (a token ties the unmute, the next frame after the answer or after 10 s, to its own request),
   **never** by replacing `ChatFrame_DisplayTimePlayed`. Graphical blocks aren't painted while off
@@ -317,7 +347,9 @@ core's `ADDON_LOADED`.
 - **`Options.lua`** (#24): Options > AddOns > Glass Panel, a canvas panel on Retail's Settings
   framework (as GlassUnitFrames #39), registered at `PLAYER_LOGIN`. **Our `Settings` local shadows
   Blizzard's global `Settings`**: the framework is read with `rawget(_G, "Settings")`. Bar (shown,
-  captions, font, width, glass, tint), Layout (reset), Share setup (Export / Import), and a row per loaded plugin
+  captions, font, width, glass, tint), Layout (reset), Share setup (Export / Import), plugin options
+  (checkbox, button, or slider: hand-built after GUF's, `min`/`max`/`step`/`fmt`, validated in
+  `RegisterBlock`; a refresh never writes back), and a row per loaded plugin
   (Shown, Caption, Icon; Caption greyed for graphical blocks, Icon for blocks without one), all in
   name order (a plugin registered later gets its row on the next open, where its name sorts).
   Every open, and every setting change while it's open, re-reads the state.
@@ -353,7 +385,7 @@ texture names only grow; instances; upgrade rules).
   a dev copy comes from the LibGlass checkout (`$env:LIBGLASS`, default `..\LibGlass`) through its
   own `Tools\deploy.ps1`, which `Tools\deploy.ps1` here calls first (a refusal leaves the deployed
   addon untouched). The tests load the same checkout and fail loudly without one.
-- **The pin:** `.pkgmeta` pins a commit or tag (`r5` since #65: the bar's tint needs r3's
+- **The pin:** `.pkgmeta` pins a commit or tag (`r6` since #77/#78: the zoomed XP+ bar's clean preset; the bar's tint needs r3's
   `SetSurfaceTint`), **never `tag: latest`**, and **no comment on a
   value line** (the packager keeps it in the value). Bump it only in a release made anyway: players
   get library fixes earlier through whichever glass addon ships the newest copy (LibStub runs that

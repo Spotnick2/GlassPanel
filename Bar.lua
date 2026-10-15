@@ -76,6 +76,23 @@ function Bar.ShowsIcon(block)
     return not (d and d.iconsFor and d.iconsFor[block.id] == false)
 end
 
+-- What the value shows: the block's text, except that a graphical block
+-- sized to its content this repaint (its width function said nil), with
+-- empty text and no icon showing, shows its label: it would otherwise shrink
+-- to a few pixels of nothing (XP+'s handle while zoomed with its icon off,
+-- #78). b.text stays the block's own answer. True if the display changed.
+local function syncDisplay(block)
+    local b = block.widget
+    local shown = b.text or ""
+    if block.width ~= nil and b.fixedWidth == nil and b.text == "" and not Bar.ShowsIcon(block) then
+        shown = block.label ~= "" and block.label or block.id
+    end
+    if b.shownText == shown then return false end
+    b.shownText = shown
+    b.label:SetText(shown)
+    return true
+end
+
 -- Show or hide the icon, the caption starting after it or at the edge;
 -- true if it changed (the width moves what follows).
 function Bar.UpdateIcon(block)
@@ -88,6 +105,8 @@ function Bar.UpdateIcon(block)
     b.textX = show and (PAD + ICON + PAD) or PAD
     b.caption:ClearAllPoints()
     b.caption:SetPoint("LEFT", b, "LEFT", b.textX, 0)
+    -- The display may hang on the icon; the caller relays out without a repaint.
+    if b.painted then syncDisplay(block) end
     return true
 end
 
@@ -236,11 +255,21 @@ local function onHide(button)
     if drag and drag.button == button then endDrag(false) end
 end
 
+-- The release that ends a drag is not a click.
+local function afterDrag() return drag ~= nil or GetTime() - lastDragStop < 0.2 end
+
 local function onClick(button, mouseButton)
-    -- The release that ends a drag is not a click.
-    if drag or GetTime() - lastDragStop < 0.2 then return end
+    if afterDrag() then return end
     local block = button.block
     if block.onClick then Engine.Call(block, "onClick", block.onClick, block, mouseButton) end
+end
+
+-- Wired only for a block with onDoubleClick: every other block keeps getting
+-- the second click as an onClick.
+local function onDoubleClick(button, mouseButton)
+    if afterDrag() then return end
+    local block = button.block
+    Engine.Call(block, "onDoubleClick", block.onDoubleClick, block, mouseButton)
 end
 
 -- The widget for one block: a plain Button with an optional icon and a label.
@@ -253,6 +282,7 @@ function Bar.Attach(block)
     b:SetScript("OnEnter", onEnter)
     b:SetScript("OnLeave", onLeave)
     b:SetScript("OnClick", onClick)
+    if block.onDoubleClick then b:SetScript("OnDoubleClick", onDoubleClick) end
     b:RegisterForDrag("LeftButton")
     b:SetScript("OnDragStart", onDragStart)
     b:SetScript("OnDragStop", onDragStop)
@@ -296,21 +326,46 @@ function Bar.Attach(block)
     Engine.MarkDirty(block)
 end
 
--- True if the text changed (the caller relayouts only then).
+-- A graphical block's width this repaint: its number, or what its width
+-- function says (nil: sized to its content, like a text block). A bad answer
+-- is recorded and the block is sized to its content.
+local function fixedWidth(block)
+    local w = block.width
+    if type(w) ~= "function" then return w end
+    local ok, res = Engine.Call(block, "width", w, block)
+    if not ok then return nil end
+    if API.IsSecret(res) then
+        API.Fail(block.id .. ":width", "returned a secret value")
+        return nil
+    end
+    if res == nil then return nil end
+    if type(res) ~= "number" or res ~= res or res == math.huge or res < 16 then
+        API.Fail(block.id .. ":width", "returned " .. tostring(res) .. ", not a number of pixels (at least 16) or nil")
+        return nil
+    end
+    return res
+end
+
+-- True if anything that moves the layout changed (the caller relayouts only
+-- then): the text, the caption, the width or what the value displays.
 function Bar.SetText(block, text)
     local b = block.widget
     if not b then return false end
+    -- A dynamic caption is re-read on every repaint (it can change without
+    -- the value changing), and so is a width function (#78: XP+ zooms with
+    -- its text "" throughout).
+    local captionChanged = block.caption ~= nil and Bar.UpdateCaption(block)
+    local width = fixedWidth(block)
+    local widthChanged = b.fixedWidth ~= width
+    b.fixedWidth = width
     -- The first paint always counts as a change: a new widget's text is nil
     -- too, and a first nil must still reach Bar.Layout to hide it (and to
     -- tell its onShown), e.g. a plugin registering after startup.
-    -- A dynamic caption is re-read on every repaint (it can change without
-    -- the value changing).
-    local captionChanged = block.caption ~= nil and Bar.UpdateCaption(block)
-    if b.painted and b.text == text then return captionChanged end
+    local textChanged = not b.painted or b.text ~= text
     b.painted = true
     b.text = text
-    b.label:SetText(text or "")
-    return true
+    local displayChanged = syncDisplay(block)
+    return textChanged or captionChanged or widthChanged or displayChanged
 end
 
 local function shows(block)
@@ -323,7 +378,7 @@ local function widthOf(id)
     local block = Engine.byId[id]
     if not (block and block.widget and shows(block)) then return nil end
     local b = block.widget
-    return block.width
+    return b.fixedWidth
         or (b.textX + math.ceil(b.caption:GetStringWidth()) + math.ceil(b.label:GetStringWidth()) + PAD)
 end
 
@@ -388,7 +443,10 @@ local function classColor()
 end
 
 -- false while the class colour is wanted but unreadable.
-local function paintGlass(g, material, tint)
+-- `glass`: the instance that built g (its own style: a clean surface has no
+-- grain to bring back), GlassPanel.Glass when nil.
+local function paintGlass(g, material, tint, glass)
+    glass = glass or Glass
     local p = Bar.GLASS[material] or Bar.GLASS.clear
     local known, cr, cg, cb = true, nil, nil, nil
     if tint == "class" then
@@ -397,13 +455,13 @@ local function paintGlass(g, material, tint)
     end
     if cr then
         -- nil alpha: the surface's own (clear); smoked brings its own.
-        Glass.SetSurfaceTint(g, cr * p.classShade, cg * p.classShade, cb * p.classShade, p.tint and p.tint[4])
+        glass.SetSurfaceTint(g, cr * p.classShade, cg * p.classShade, cb * p.classShade, p.tint and p.tint[4])
     elseif p.tint then
-        Glass.SetSurfaceTint(g, p.tint[1], p.tint[2], p.tint[3], p.tint[4])
+        glass.SetSurfaceTint(g, p.tint[1], p.tint[2], p.tint[3], p.tint[4])
     else
-        Glass.SetSurfaceTint(g)   -- the colour it was built with
+        glass.SetSurfaceTint(g)   -- the colour it was built with
     end
-    g.grain:SetAlpha(Glass.STYLE.grain * (p.grain or 1))
+    g.grain:SetAlpha(glass.STYLE.grain * (p.grain or 1))
     g.wash:SetAlpha(p.wash or 1)
     return known
 end
@@ -414,16 +472,36 @@ end
 -- (Bar.glassPending: PLAYER_ENTERING_WORLD tries again). A throw is recorded,
 -- never raised: painting is optional, and it runs while the bar is built.
 Bar.glassPending = false
-function Bar.ApplyGlass(material, tint)
-    local g = Bar.glass
-    if not g then return true end
-    local ok, known = pcall(paintGlass, g, material, tint)
+Bar.surfaces = {}   -- { g, glass }: plugins' surfaces painted like the bar (API.MatchPanelGlass)
+
+local function paintOne(g, material, tint, glass)
+    local ok, known = pcall(paintGlass, g, material, tint, glass)
     if not ok then
         API.Fail("bar:glass", known)
         return true
     end
+    return known
+end
+
+function Bar.ApplyGlass(material, tint)
+    local g = Bar.glass
+    if not g then return true end
+    local known = paintOne(g, material, tint)
+    for _, s in ipairs(Bar.surfaces) do paintOne(s.g, material, tint, s.glass) end
     Bar.glassPending = not known
     return known
+end
+
+-- Public (#78): a plugin's own LibGlass surface painted like the bar, now and
+-- whenever the player changes the bar's glass or tint (XP+'s zoomed bar
+-- backing). `glass` is the instance that built it (GlassPanel.CleanGlass()'s,
+-- or GlassPanel.Glass when nil). A surface handed over twice is kept once.
+function API.MatchPanelGlass(g, glass)
+    if type(g) ~= "table" then return end
+    for _, s in ipairs(Bar.surfaces) do if s.g == g then return end end
+    Bar.surfaces[#Bar.surfaces + 1] = { g = g, glass = glass }
+    local d = GlassPanelDB or {}
+    paintOne(g, d.glass, d.glassTint, glass)
 end
 
 function Bar.Build()

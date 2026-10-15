@@ -62,6 +62,8 @@ GlassPanel.RegisterBlock({
     text     = function(block) return "GS: 2057" end,  -- plain string, or nil/"" for no space
     tooltip  = function(block, tt) tt:AddLine("GearScore") end,  -- tt is GameTooltip
     onClick  = function(block, mouseButton) end,
+    onDoubleClick = function(block, mouseButton) end,  -- optional: the second click of a double-click comes here
+                                       -- instead of onClick (any button; the first still goes to onClick)
     onShown  = function(block, visible) end,     -- appeared on / left the screen (hide, empty text, bar toggle)
     options  = {                                 -- on/off settings of your own, shown as checkboxes under
         { label = "Hide Blizzard's XP bar",      -- "Plugin options" in Options > AddOns > Glass Panel
@@ -70,6 +72,11 @@ GlassPanel.RegisterBlock({
           set   = function(on) MyDB.hide = on end },  -- store it in YOUR SavedVariables
         { label = "Choose currencies...",        -- or a button: run() is called on click
           run   = function() MyWindow:Show() end },
+        { label = "Scale",                       -- or a slider: get() -> number, set(number) rounded to step
+          min = 0.5, max = 2, step = 0.05,       -- (default 0.05) and clamped; fmt shows the value
+          fmt = "%.2f",                          -- (default "%.2f"); opening the panel never calls set()
+          get = function() return MyDB.scale or 1 end,
+          set = function(v) MyDB.scale = v end },
     },
 })
 ```
@@ -78,6 +85,9 @@ A block that draws more than text (the XP bar, `Plugins\XP\XP.lua`) adds:
 
 ```lua
     width = 360,                            -- fixed width in px; "" text then still shows the block, nil hides it
+                                            -- or function(block) -> px or nil, asked on every repaint: nil sizes
+                                            -- the block to its content (XP+ zoomed: its icon alone; with the icon
+                                            -- turned off, empty text shows the label instead, so it never vanishes)
     build = function(block) end,            -- once, when block.widget exists: create your own frames on it
     paint = function(block) end,            -- after every repaint while its text is valid and non-nil and it's on screen
 ```
@@ -134,3 +144,10 @@ text, such as the XP bar. It's GlassPanel's instance of the embedded library Lib
 (github.com/Spotnick2/LibGlass; its `CLAUDE.md` is the contract and `docs/GLASS-MATERIAL.md` the
 write-up). `Glass.MEDIA` names only the library's own textures: ship your own art under your own
 path.
+
+`GlassPanel.CleanGlass()` returns a second instance with LibGlass r6's clean preset (thin rims, no
+grain, softer bars), made once, or `nil` when the loaded library is older: fall back to
+`GlassPanel.Glass`. Presets are construction settings, so build surfaces with it but keep text on
+`GlassPanel.Glass` (the player's font setting). `GlassPanel.API.MatchPanelGlass(g, glass)` paints
+your own surface (`glass.Apply(...)`) like the bar, Clear or Smoked, Neutral or Class colour, now and
+whenever the player changes them; pass the instance that built it (nil: `GlassPanel.Glass`).
