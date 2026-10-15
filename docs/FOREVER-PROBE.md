@@ -99,3 +99,35 @@ tent's grant from the pool before and after.
 **Not measured:**
 - **The inn build-up rate:** a `/reload` restarted the in-memory sampler; the start is now saved.
 - **The cap.**
+
+## Rested XP (RestProbe, #81): run 2, 1.60.1.70374, 2026-10-15
+
+A level 16 hunter with Well Rested 5/5 (re-read: node 110301, 5/5; the configID differs per
+character, 13280556 here).
+
+**The build-up while resting is exactly Vanilla's rate plus Well Rested:**
+- At an inn, online: **6.000% of a level per 8 h**, +2 XP every ~60 s (`UPDATE_EXHAUSTION` each time).
+  That's Vanilla's 5% × 1.20.
+- Across a logout of about 27 min at the inn: 5.82% per 8 h, the same within rounding. Rest
+  builds offline.
+- `GetRestState()` = `1, "Rested", 2`: XP ×2 while rested.
+
+**Camp Tent (a buff and a debuff, matched by spell ID):**
+- **Camp Benefits** (1229741, 1 h): "Gained the following camp benefits: Tent: You received a
+  small amount of rest experience. You can only receive this effect once per 1 hour."
+- **Boosted Rest** (1229451, a debuff, 1 h): "You cannot gain more rested experience from a Camp
+  Tent for 1 hour."
+- The amount a tent grants wasn't measured: no campfire left.
+
+**Tooltip data loads lazily.**
+- `C_TooltipInfo.GetUnitBuffByAuraInstanceID` first returned only "57 minutes remaining" for Camp
+  Benefits. Read again 50 s later, it had the full text.
+- **Well Fed (1248406)**, read right after eating, returned only "20 minutes remaining", while the
+  game's own tooltip shows "Your Stamina is increased by 1. Experience gained from kills increased
+  by 5%".
+- So an XP buff is matched **by spell ID**, with its tooltip text only as a fallback.
+
+**Not measured:**
+- the rested cap: 0.42 of a level here; 1.5 levels in Vanilla, +20% says the talent;
+- a tent's grant;
+- Well Rested ranks 1-4.
