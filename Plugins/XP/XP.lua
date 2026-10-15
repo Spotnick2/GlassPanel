@@ -396,8 +396,10 @@ local function xpAuras()
     for _, filter in ipairs({ "HELPFUL", "HARMFUL" }) do
         for i = 1, 40 do
             local ok, a = pcall(A.GetAuraDataByIndex, "player", i, filter)
-            if not ok or a == nil then break end
-            if type(a) == "table" and not API.IsSecret(a) then
+            -- Secrecy first: comparing a secret, even with nil, throws on the client
+            -- (GetAuraDataByIndex is SecretWhenUnitAuraRestricted; Codex on #88).
+            if not ok or API.IsSecret(a) or a == nil then break end
+            if type(a) == "table" then
                 local id, name = plain(a.spellId), plain(a.name)
                 local what = filter == "HELPFUL" and XP_BUFFS[id] or (filter == "HARMFUL" and LOCKOUTS[id])
                 if not what and filter == "HELPFUL" and speaksOfXP(a) then what = "experience" end
