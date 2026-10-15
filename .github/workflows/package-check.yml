@@ -10,6 +10,7 @@ name: Package check
 on:
   push:
     branches: [main]
+    tags: ["v*"]   # the same checks on the tagged commit, alongside release.yml
   pull_request:
 
 permissions:

@@ -566,7 +566,9 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`).
   by the owner, with Fable as the fallback. Verify its claims before acting, and push back on
   complexity for a single-owner addon.
 - Releases are built by CurseForge's packager from the tag webhook, reading `.pkgmeta`. Every
-  tag needs a `CHANGELOG.md` entry, written for players.
+  tag needs a `CHANGELOG.md` entry, written for players. `release.yml` also publishes a GitHub
+  Release (zip + changelog notes) for every `v*` tag, with no CurseForge key; `alpha`/`beta` tags
+  are pre-releases. `package-check.yml` runs on tags too.
 
 ## Conventions
 

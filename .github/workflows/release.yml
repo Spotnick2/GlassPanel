@@ -1,0 +1,32 @@
+name: GitHub release
+
+# A GitHub Release for every tag, with the zip and the changelog notes, next to
+# CurseForge's own build (its webhook reads the same tag and .pkgmeta). No
+# CF_API_KEY here, so the packager uploads nowhere else: GITHUB_OAUTH alone
+# makes it create the release. Tags containing alpha or beta become
+# pre-releases (the packager does it).
+#
+# This is the only workflow with write access. The package/test workflow
+# (package-check.yml) stays read-only and also runs on tags, as a dry run of
+# the same build.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the packager reads tags for the version
+
+      # Pinned to a SHA, as in package-check.yml.
+      - name: Package and publish the GitHub release
+        uses: BigWigsMods/packager@e50a250f8705041e40f2fa1ddcb280a686d65aa0
+        env:
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
