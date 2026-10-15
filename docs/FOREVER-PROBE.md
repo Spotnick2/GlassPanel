@@ -38,7 +38,12 @@ The owner ran `/fp steps rxp arrow`: a Horde character in The Barrens, guide "12
 - Retargets showed up within about 0.3 s of the `RXP_STEP_ACTIVATED` messages.
 
 **RestedXP's arrow switched off (its "hide the waypoint arrow" option):**
-- `RXPG_ARROW` **stays shown**: only its drawing stops.
+- `RXPG_ARROW` **stayed shown**: only its drawing stopped.
+  - **Correction from the source** (Codex on #84): that's only until the next retarget.
+    `updateArrowData` then hides it (`map.lua:1047-1051`).
+  - The guide toggle leaves it alone while drawing is off (`IsFeatureEnabled`, `map.lua:61-64`).
+  - So with drawing off the frame's visibility says nothing. The plugin checks the waypoint is
+    still live, and that the guide is shown.
 - `af.orientation` and `af.distance` **went stale** (unchanged for about 17 s while ours moved).
 - `af.element` kept the target.
 - So the plugin computes its own bearing, never reads RestedXP's numbers, and doesn't treat

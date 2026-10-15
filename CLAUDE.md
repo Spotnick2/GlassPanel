@@ -361,6 +361,24 @@ core's `ADDON_LOADED`.
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles
   `list | move <id> <lane> [n] | layout reset | labels | label <id> | icon <id> | show <id> |
   hide <id> | toggle | font | glass | tint | room | options | export | import | covered | failures`.
+- **`Plugins\RestedXP`** (#80): a bridge to RestedXP Guides (`## Dependencies: GlassPanel, RXPGuides`:
+  the client never loads it without RestedXP; with RestedXP but no `RXP` table, no block and
+  `restedxp:missing`). RestedXP's waypoint arrow on the bar, drawn by the plugin (no core icon):
+  RestedXP's arrow art turned by **our own** bearing (HereBeDragons-2.0 world position and
+  `GetWorldVector`, minus `GetPlayerFacing`, as its `map.lua`; measured equal to its own on 70374,
+  `docs/FOREVER-PROBE.md`), then "Step N" (its arrow text or title when set, colour tokens dropped)
+  and the distance. **Never across two maps**: the embedded HereBeDragons ignores the instance, so
+  the player's and the target's instances are compared (else `~`; Codex on #82). The target
+  (`RXP.arrowFrame.element`, never cleared when targets run out) counts only while it's **live**
+  by RestedXP's own test (step active, not reached: `skip`, parent neither completed nor skipped),
+  **the guide is shown** (`showEnabled`), and the arrow frame is shown, unless its drawing is
+  switched off (`disableArrow`: RestedXP then hides the frame on every retarget, and the guide
+  toggle leaves it alone, while the target stays live). Codex on #84. No target: its logo alone. The arrow turns every 0.03 s on a frame that's a child of the
+  block (stops off screen); the words every 0.25 s, and a width change (in 12 px steps)
+  repaints; `width` is a function measuring them. Double-click (left): show or hide the guide
+  through its LibDataBroker launcher's left-click (safe in combat, measured), else
+  `RXP.settings.ToggleActive`. Repaints on `RXP_STEP_ACTIVATED` / `RXP_GUIDE_LOADED` (AceEvent).
+  Every read guarded: a throw shows the logo and is recorded once (`restedxp:read`).
 - **`Plugins\<Name>\`**: deploy puts each at the AddOns top level under its TOC name, and
   `.pkgmeta` `move-folders` does the same when packaging (the AltStable pattern).
 
@@ -506,7 +524,9 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`).
 - Secrets are `newproxy` userdata that throw on use. `WoW.moneySecret = true` makes `GetMoney`
   secret. No Lua 5.1 value can make a truth test or `==` throw, so those misuses are caught only
   in game and in review.
-- `loadAddon()` loads the core, then every plugin (after the core's `ADDON_LOADED`). A test file
+- `loadAddon()` loads the core, then every plugin (after the core's `ADDON_LOADED`), **like the
+  client only when its `## Dependencies` are installed**: the core, and `WoW.installed` for the
+  others (AltStable's stub always; `WoW.installRXP()` in `opts.before` for RestedXP). A test file
   that asserts on lanes sets `PLUGINS = { ... }` to pin which plugins load, so a new plugin
   doesn't reshuffle them; `opts.plugins = false` loads the core alone.
 - `loadAddon()` starts a fresh session (new namespace, new frames) and keeps client data the
