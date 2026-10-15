@@ -11,8 +11,8 @@
 -- - Our bearing is RestedXP's own (map.lua:123-139): HereBeDragons-2.0's
 --   world position and vector, minus GetPlayerFacing(), all plain outdoors.
 --   We compute it ourselves: with its arrow switched off, RestedXP's own
---   orientation and distance go stale (and RXPG_ARROW stays shown), while its
---   target, RXP.arrowFrame.element, keeps updating.
+--   orientation and distance go stale, while its target,
+--   RXP.arrowFrame.element, keeps updating (see target() for when it counts).
 -- - Step titles were nil: the label falls back to "Step N", as its arrow does.
 -- - The guide toggle is its LibDataBroker launcher's left-click (its minimap
 --   button), safe in combat (ToggleActive skips its secure frames there).
@@ -70,19 +70,34 @@ end
 -- The target and our bearing to it
 --------------------------------------------------------------------------------
 
--- The step the arrow leads to, or nil when there's none to trust. Its element
--- isn't cleared when the arrow runs out of targets (map.lua:1142-1145): it
--- counts only while its step is active and the arrow is on (shown, or drawing
--- switched off, which keeps the target live).
+-- Whether RestedXP would still lead to this waypoint: the test it picks a
+-- target with (map.lua:1043-1045, 676-679). Its step active, the waypoint not
+-- reached (skip, set on arrival: map.lua:1323-1329), its parent neither
+-- completed nor skipped.
+local function live(e)
+    if type(e.step) ~= "table" or not e.step.active or e.skip then return false end
+    local parent = e.parent
+    return not (type(parent) == "table" and (parent.completed or parent.skip))
+end
+
+-- The waypoint the arrow leads to, or nil when there's none to trust. Its
+-- element isn't cleared when the arrow runs out of targets (map.lua:1142-1145),
+-- so it must still be live. Never while the guide is hidden (showEnabled):
+-- with its arrow drawing switched off, the toggle leaves the arrow frame alone
+-- (IsFeatureEnabled, map.lua:61-64). And the frame counts only when that
+-- drawing is on: switched off, RestedXP keeps it hidden on every retarget
+-- (map.lua:1047-1051) while the target stays live (Codex on #84).
 local function target()
     local R = rxp()
     local af = R and R.arrowFrame
     if type(af) ~= "table" then return nil end
     local e = af.element
-    if type(e) ~= "table" or type(e.step) ~= "table" or not e.step.active then return nil end
+    if type(e) ~= "table" or not live(e) then return nil end
     local p = profile()
+    if p and p.showEnabled == false then return nil end
+    if p and p.disableArrow then return e, af end
     local ok, shown = pcall(af.IsShown, af)
-    if not (ok and shown == true) and not (p and p.disableArrow) then return nil end
+    if not (ok and shown == true) then return nil end
     return e, af
 end
 

@@ -71,7 +71,8 @@ function WoW.installRXP(opts)
                 WoW.rxpToggles = WoW.rxpToggles + 1
                 local p = RXP.settings.profile
                 p.showEnabled = not p.showEnabled
-                arrow:SetShown(p.showEnabled)
+                -- Its arrow is in the toggle only while drawn (IsFeatureEnabled, map.lua:61-64).
+                if not p.disableArrow then arrow:SetShown(p.showEnabled) end
             end,
         },
     })

@@ -369,9 +369,11 @@ core's `ADDON_LOADED`.
   `docs/FOREVER-PROBE.md`), then "Step N" (its arrow text or title when set, colour tokens dropped)
   and the distance. **Never across two maps**: the embedded HereBeDragons ignores the instance, so
   the player's and the target's instances are compared (else `~`; Codex on #82). The target
-  (`RXP.arrowFrame.element`) counts only while its step is active and the arrow is shown or its
-  drawing switched off (`disableArrow`, which keeps the target live but RestedXP's own numbers
-  stale). No target: its logo alone. The arrow turns every 0.03 s on a frame that's a child of the
+  (`RXP.arrowFrame.element`, never cleared when targets run out) counts only while it's **live**
+  by RestedXP's own test (step active, not reached: `skip`, parent neither completed nor skipped),
+  **the guide is shown** (`showEnabled`), and the arrow frame is shown, unless its drawing is
+  switched off (`disableArrow`: RestedXP then hides the frame on every retarget, and the guide
+  toggle leaves it alone, while the target stays live). Codex on #84. No target: its logo alone. The arrow turns every 0.03 s on a frame that's a child of the
   block (stops off screen); the words every 0.25 s, and a width change (in 12 px steps)
   repaints; `width` is a function measuring them. Double-click (left): show or hide the guide
   through its LibDataBroker launcher's left-click (safe in combat, measured), else

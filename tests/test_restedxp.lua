@@ -103,9 +103,31 @@ frame()
 eq(ui().words._text, "", "the arrow hidden by RestedXP: no target")
 RXP.settings.profile.disableArrow = true
 frame()
-eq(ui().art._file, ARROW, "its arrow drawing switched off: the target still counts (it stays live)")
+eq(ui().art._file, ARROW, "its arrow drawing switched off (frame hidden on retarget): the target still counts")
+-- ...but only while the waypoint is live (Codex on #84).
+e.skip = true
+frame()
+eq(ui().art._file, LOGO, "drawing off, the waypoint reached (its step still active): no target")
+e.skip = nil
+e.parent = { completed = true }
+frame()
+eq(ui().art._file, LOGO, "drawing off, its parent completed: no target")
+e.parent = nil
+frame()
+eq(ui().art._file, ARROW, "(live again)")
+-- ...and never while the guide is hidden, which with drawing off leaves the frame alone.
+local w0 = rx().widget
+w0._scripts.OnDoubleClick(w0, "LeftButton"); frame()
+eq(RXP.settings.profile.showEnabled, false, "(guide hidden, drawing off)")
+eq(ui().art._file, LOGO, "the guide hidden with drawing off: the logo, not the old target")
+w0._scripts.OnDoubleClick(w0, "LeftButton"); frame()
+eq(ui().art._file, ARROW, "shown again: the arrow")
 RXP.settings.profile.disableArrow = nil
+e.skip = true
 RXP.arrowFrame:Show()
+frame()
+eq(ui().art._file, LOGO, "drawing on, a reached waypoint: no target either")
+e.skip = nil
 frame(); WoW.tick()
 
 -- The tooltip.
@@ -117,12 +139,12 @@ check(t:find("Double-click: hide the guide", 1, true), "how to hide it")
 
 -- Double-click: the guide, through its own launcher.
 w._scripts.OnDoubleClick(w, "LeftButton"); frame(); WoW.tick()
-eq(WoW.rxpToggles, 1, "double-click: the launcher's left-click")
+eq(WoW.rxpToggles, 3, "double-click: the launcher's left-click")
 eq(RXP.settings.profile.showEnabled, false, "the guide hidden")
 eq(ui().art._file, LOGO, "the block shows the logo (the guide's arrow is hidden)")
 check(tooltip():find("Double-click: show the guide", 1, true), "and how to show it again")
 w._scripts.OnDoubleClick(w, "RightButton")
-eq(WoW.rxpToggles, 1, "a right double-click does nothing")
+eq(WoW.rxpToggles, 3, "a right double-click does nothing")
 w._scripts.OnDoubleClick(w, "LeftButton"); frame()
 eq(RXP.settings.profile.showEnabled, true, "shown again")
 eq(ui().art._file, ARROW, "and the arrow is back")
