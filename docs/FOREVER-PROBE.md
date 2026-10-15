@@ -69,3 +69,65 @@ fold**. The toggle is the minimize.
 so it's not usable as "x of y". Use the step index and `#RXP.currentGuide.steps` (196).
 
 **Not measured:** a dungeon (skipped), and whether the bearing reads plainly there.
+
+## Rested XP (RestProbe, #81): 1.60.1.70374, 2026-10-15, run 1
+
+The owner ran `/fp steps rest rested`. The raw log is in `RestProbe.lua` (SavedVariables).
+
+**Well Rested is a Legacy talent, readable exactly:**
+- Adventure tree **1188**, node **110301**, spell **1225478**.
+- `C_Traits.GetNodeInfo(C_Traits.GetConfigIDByTreeID(1188), 110301)` gives `activeRank = currentRank = ranksPurchased = 5`, `maxRanks = 5`. The owner confirmed 5/5 in the Legacy window.
+- Its spell description is "Your rested experience accumulates 20% faster and your rested experience cap is increased by 20%."
+- `Constants.LegacyConsts` exists: trees 1187/1188/1189, currency 4225, faction 2802.
+- All three Legacy trees share one configID (15132781) and have 9 nodes each, every one named.
+
+**The pool reads plainly:**
+- `GetXPExhaustion`, `UnitXP`, `UnitXPMax`, `GetRestState` (`1, "Rested", 2`) and `IsResting` all read normally.
+- The cap wasn't reached: the most seen was 6,760 / 16,000, about 0.42 of a level.
+
+**Well Fed is spell 1248406** (20 min). Its aura tooltip reads "Experience gained from kills increased by 5%" (owner's screenshot), but `C_Spell.GetSpellDescription` didn't contain "experience". **Read an XP buff's effect from the aura's tooltip** (`C_TooltipInfo.GetUnitBuffByAuraInstanceID`), not the spell description. The probe now does; run 2 checks it.
+
+**Camping, 13 minutes with "Campfire Nearby" and "Welcoming Campfire":**
+- It added **0** rested, and `IsResting()` was false, apart from one brief true.
+- "Welcoming Campfire" grants its benefits only "after 1 min spent sitting near the campfire", depending on the camp objects placed. Run 2 measures sitting.
+
+**Camp Tent (owner's screenshot):** using one leaves a debuff, "Boosted Rest": "You cannot gain more
+rested experience from a Camp Tent for 1 hour". So a tent grants rested **at once**, then locks itself
+for an hour. Run 1's minute sampler couldn't see that. The probe now reads debuffs too, and measures a
+tent's grant from the pool before and after.
+
+**Not measured:**
+- **The inn build-up rate:** a `/reload` restarted the in-memory sampler; the start is now saved.
+- **The cap.**
+
+## Rested XP (RestProbe, #81): run 2, 1.60.1.70374, 2026-10-15
+
+A level 16 hunter with Well Rested 5/5 (re-read: node 110301, 5/5; the configID differs per
+character, 13280556 here).
+
+**The build-up while resting is exactly Vanilla's rate plus Well Rested:**
+- At an inn, online: **6.000% of a level per 8 h**, +2 XP every ~60 s (`UPDATE_EXHAUSTION` each time).
+  That's Vanilla's 5% × 1.20.
+- Across a logout of about 27 min at the inn: 5.82% per 8 h, the same within rounding. Rest
+  builds offline.
+- `GetRestState()` = `1, "Rested", 2`: XP ×2 while rested.
+
+**Camp Tent (a buff and a debuff, matched by spell ID):**
+- **Camp Benefits** (1229741, 1 h): "Gained the following camp benefits: Tent: You received a
+  small amount of rest experience. You can only receive this effect once per 1 hour."
+- **Boosted Rest** (1229451, a debuff, 1 h): "You cannot gain more rested experience from a Camp
+  Tent for 1 hour."
+- The amount a tent grants wasn't measured: no campfire left.
+
+**Tooltip data loads lazily.**
+- `C_TooltipInfo.GetUnitBuffByAuraInstanceID` first returned only "57 minutes remaining" for Camp
+  Benefits. Read again 50 s later, it had the full text.
+- **Well Fed (1248406)**, read right after eating, returned only "20 minutes remaining", while the
+  game's own tooltip shows "Your Stamina is increased by 1. Experience gained from kills increased
+  by 5%".
+- So an XP buff is matched **by spell ID**, with its tooltip text only as a fallback.
+
+**Not measured:**
+- the rested cap: 0.42 of a level here; 1.5 levels in Vanilla, +20% says the talent;
+- a tent's grant;
+- Well Rested ranks 1-4.
