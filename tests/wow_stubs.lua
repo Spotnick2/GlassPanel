@@ -207,7 +207,13 @@ function Methods.SetHeight(w, y) w._height = y end
 function Methods.GetWidth(w) return w._width end
 function Methods.GetLeft(w) return w._rect and w._rect[1] or 0 end
 function Methods.GetEffectiveScale(w) return WoW.uiScale end
-function Methods.SetAlpha(w, a) w._alpha = a end
+-- Like the client (1.60.1.70374, porting guide section 3): a texture with a
+-- gradient ignores SetAlpha, made before or after SetGradient. Without this a
+-- test that asserts a wash's alpha passes against that bug (#83).
+function Methods.SetAlpha(w, a)
+    if w._gradient then return end
+    w._alpha = a
+end
 function Methods.SetScale(w, s) w._scale = s end
 function Methods.GetScale(w) return w._scale or 1 end
 -- Rect: set w._rect = { left, bottom, width, height } in a test; the bar gets
@@ -281,6 +287,7 @@ function Methods.AddMaskTexture(t, m) t._masks = t._masks or {}; table.insert(t.
 function Methods.SetGradient(t, orientation, c1, c2)
     assert(type(c1) == "table" and type(c2) == "table", "SetGradient takes color objects on this API")
     t._gradient = { orientation, c1, c2 }
+    t._alpha = nil   -- an alpha set before the gradient doesn't survive it either
 end
 function Methods.SetTextureSliceMargins(t, l, tp, r, b) t._slice = { l, tp, r, b } end
 

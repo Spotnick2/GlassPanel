@@ -17,7 +17,8 @@
   scale" in Options > AddOns > Glass Panel > Plugin options, where "Glass behind the zoomed bar" also
   puts a pane of glass behind it, matching the panel's Clear or Smoked and tint. The zoomed bar uses
   LibGlass's clean look (thin rims, no grain).
-- Ships LibGlass r6 (was r5).
+- Ships LibGlass r7 (was r5).
+- Smoked glass: its softer shine now actually applies (it was drawn at full strength).
 - Drag blocks to arrange the bar: drop next to other blocks to join their group, or on empty
   space to start a new group there. Shift-drag moves a whole group. `/gpanel move` does the same
   from the keyboard, and `/gpanel layout reset` starts over.

@@ -420,8 +420,10 @@ end
 -- the surface as the library built it (SetSurfaceTint(g), the instance's
 -- grain, the wash at its built strength), so it follows the library's look.
 -- Smoked is AltStable's darker body; its grain and wash are scales of the
--- built ones (AltStable's 0.35 / 0.45 and 0.14 / 0.18), set as region alpha,
--- which LibGlass's contract allows (GLASS-MATERIAL.md, "Region fields").
+-- built ones (AltStable's 0.35 / 0.45 and 0.14 / 0.18). The grain is a plain
+-- texture, set as region alpha. The wash is a gradient, which ignores
+-- SetAlpha on this client (#83, porting guide section 3): it goes through
+-- LibGlass r7's SetWash, which paints the gradient's peak.
 -- The class colour is shaded by the preset's classShade at the surface's
 -- alpha: at full strength it reads as painted plastic (AltStable, in game).
 Bar.GLASS = {
@@ -462,7 +464,7 @@ local function paintGlass(g, material, tint, glass)
         glass.SetSurfaceTint(g)   -- the colour it was built with
     end
     g.grain:SetAlpha(glass.STYLE.grain * (p.grain or 1))
-    g.wash:SetAlpha(p.wash or 1)
+    glass.SetWash(g, (glass.STYLE.wash or 0) * (p.wash or 1))
     return known
 end
 

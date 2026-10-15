@@ -104,7 +104,7 @@ core's `ADDON_LOADED`.
   `Bar.GLASS_TINTS` are the one allowlist. Clear is the surface **as built** (`SetSurfaceTint(g)`,
   the instance's grain and wash), so it follows the library; smoked is AltStable's body, its grain
   and wash as region-alpha scales of the built ones; the class colour from `C_ClassColor` × the
-  preset's `classShade` through `Glass.SetSurfaceTint` (**LibGlass r3+**, embedded r6). Painted last
+  preset's `classShade` through `Glass.SetSurfaceTint` (**LibGlass r3+**, embedded r7). Painted last
   in `Bar.Build`, under pcall (`API.Fail("bar:glass")`); a class colour not readable yet sets
   `Bar.glassPending`, is said once by the setter, and is retried at `PLAYER_ENTERING_WORLD`), mouse-less so
   empty space clicks through), one plain
@@ -403,7 +403,7 @@ texture names only grow; instances; upgrade rules).
   a dev copy comes from the LibGlass checkout (`$env:LIBGLASS`, default `..\LibGlass`) through its
   own `Tools\deploy.ps1`, which `Tools\deploy.ps1` here calls first (a refusal leaves the deployed
   addon untouched). The tests load the same checkout and fail loudly without one.
-- **The pin:** `.pkgmeta` pins a commit or tag (`r6` since #77/#78: the zoomed XP+ bar's clean preset; the bar's tint needs r3's
+- **The pin:** `.pkgmeta` pins a commit or tag (`r7` since #83: the smoked wash goes through r7's `SetWash`; r6's clean preset for the zoomed XP+ bar; the bar's tint needs r3's
   `SetSurfaceTint`), **never `tag: latest`**, and **no comment on a
   value line** (the packager keeps it in the value). Bump it only in a release made anyway: players
   get library fixes earlier through whichever glass addon ships the newest copy (LibStub runs that
