@@ -21,12 +21,14 @@ for line in f:lines() do
 end
 f:close()
 
--- Exercise everything so every method is recorded.
-loadAddon()
+-- Exercise everything so every method is recorded. RestedXP installed, so
+-- its bridge plugin loads too (#80).
+loadAddon({ before = function() WoW.installRXP() end })
 for _, blk in ipairs(GlassPanel.Engine.blocks) do
     local w = blk.widget
     w._scripts.OnEnter(w); w._scripts.OnLeave(w); w._scripts.OnClick(w, "LeftButton")
     w._scripts.OnDragStart(w); WoW.tick(); w._scripts.OnDragStop(w)
+    if w._scripts.OnDoubleClick then WoW.now = WoW.now + 1; w._scripts.OnDoubleClick(w, "LeftButton") end
 end
 do
     -- XP+ zoomed (#78): its own frame, built on the first zoom, so driven here.

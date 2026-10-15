@@ -86,6 +86,10 @@ function WoW.reset()
     WoW.chat = {}
     WoW.methodsCalled = {}
     WoW.addonVersion = "v1.0.0"
+    -- Other addons installed and enabled. Like the client, loadAddon skips a
+    -- plugin whose ## Dependencies names one that isn't (a bridge plugin
+    -- without its addon). AltStable's stub is always there.
+    WoW.installed = { AltStable = true }
     WoW.money = 12345
     WoW.moneySecret = false
     WoW.gameTime = { 18, 3 }
@@ -272,6 +276,7 @@ function Methods.CreateAnimationGroup(w) return newWidget("AnimationGroup", w) e
 function Methods.CreateAnimation(ag, atype) return newWidget(atype or "Animation", ag) end
 function Methods.SetTexture(t, file) t._file = file; return true end
 function Methods.SetColorTexture(t, r, g, b, a) t._color = { r, g, b, a } end
+function Methods.SetRotation(t, radians) t._rotation = radians end
 function Methods.AddMaskTexture(t, m) t._masks = t._masks or {}; table.insert(t._masks, m) end
 function Methods.SetGradient(t, orientation, c1, c2)
     assert(type(c1) == "table" and type(c2) == "table", "SetGradient takes color objects on this API")
