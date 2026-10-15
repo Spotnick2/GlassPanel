@@ -44,7 +44,7 @@ $AddOnsPath = (Resolve-Path -LiteralPath $AddOnsPath).ProviderPath
 
 # The probes: the ForeverProbe host first (a probe has ## Dependencies:
 # ForeverProbe, so without it the client loads none), then each Tools\<X>Probe
-# as AddOns\<X>Probe, its TOC and Lua only (forever-probe.pin is CI's).
+# as AddOns\<X>Probe, its TOC and Lua only.
 $ForeverProbe = if ($env:FOREVERPROBE) { $env:FOREVERPROBE } else { Join-Path (Split-Path -Parent $RepoRoot) "ForeverProbe" }
 function Deploy-Probes {
     if (-not (Test-Path -LiteralPath (Join-Path $ForeverProbe "Tools\deploy.ps1"))) {

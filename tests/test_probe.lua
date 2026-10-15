@@ -1,15 +1,11 @@
 -- RXPProbe (#80): every command runs on the stubbed client without throwing,
 -- logs to its saved table and never to chat, survives secrets and a missing
 -- RestedXP. It's a ForeverProbe module: the host is loaded from its checkout
--- (harness.lua's loadForeverProbe). ForeverProbe is private, so CI has no
--- checkout and this test skips there; locally it runs.
+-- (harness.lua's loadForeverProbe). ForeverProbe is private and local only:
+-- CI skips this file (FOREVERPROBE_OPTIONAL=1); locally a missing checkout is
+-- an error.
 dofile("tests/wow_stubs.lua")
 dofile("tests/harness.lua")
-
-if not foreverProbeRoot() then
-    io.write("test_probe: SKIPPED (no ForeverProbe checkout: ../ForeverProbe or $FOREVERPROBE)\n")
-    os.exit(0)
-end
 
 -- What the probe reads beyond the shared stub (70338 dump: GetPlayerFacing,
 -- UnitPosition, IsInInstance, IsIndoors). Facing is radians; "secret" makes it secret.
