@@ -170,6 +170,16 @@ core's `ADDON_LOADED`.
   as nothing, a corrupt one reads 1): the spot stays in screen units, so SetPoint offsets are divided
   by it and `GetCenter()` multiplied by it (GUF's `PlaceAt`). A 1 s `C_Timer` ticker repaints it only while shown. Its scripts, ticker and menu items
   run under `guarded` (`xp:float`). Figures from one `stats()` snapshot (the tooltip's too).
+  **Rested lines** (#81; measured on 70374 by RestProbe, `docs/FOREVER-PROBE.md`):
+  - **The cap:** Well Rested's rank from its Legacy node (tree 1188, node 110301, `C_Traits`;
+    `ID ~= 110301` or a secret means unknown, so no cap line). Cap = 1.5 levels × (1 + 0.04 × rank)
+    (unmeasured: the talent's text at 5/5).
+  - **"Full in (resting)"** while `IsResting()`, at the measured 5% × (1 + 0.04 × rank) of a level
+    per 8 h.
+  - **XP buffs by spell ID**, since tooltip data loads lazily: Well Fed 1248406, Camp Benefits
+    1229741, and the Camp Tent lockout Boosted Rest 1229451, a debuff. Another buff counts only if
+    its tooltip says "experience". Secret auras are skipped.
+  - Drawn under `pcall` (`xp:rested`).
   `/played` is requested with `TIME_PLAYED_MSG` muted on the chat frames, one request at a time
   (a token ties the unmute, the next frame after the answer or after 10 s, to its own request),
   **never** by replacing `ChatFrame_DisplayTimePlayed`. Graphical blocks aren't painted while off

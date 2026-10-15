@@ -324,6 +324,123 @@ local HINTS = {
 }
 
 -- `where`: "float" from the zoomed bar; the panel's block passes nothing.
+--------------------------------------------------------------------------------
+-- Rested: its cap, how soon it's full, the XP buffs (#81)
+--------------------------------------------------------------------------------
+
+-- Measured on 1.60.1.70374 (docs/FOREVER-PROBE.md, RestProbe):
+-- - Well Rested is a Legacy talent (the account-wide trees): Adventure tree
+--   1188, node 110301 (spell 1225478), read through C_Traits as Blizzard's
+--   own Camelot micro-menu override reads a Legacy node.
+-- - Resting builds 6.000% of a level per 8 h at Well Rested 5/5: Vanilla's
+--   5% x 1.20, online and across a logout.
+-- - XP buffs are matched by spell ID: tooltip data loads lazily (Well Fed's
+--   "+5% kill XP" line was missing right after eating).
+-- Not measured: the cap itself (Vanilla's 1.5 levels, +20% says the talent
+-- at 5/5) and ranks 1-4 (taken as 4% a rank, the 5/5 text's 20% spread).
+local WELL_RESTED_TREE, WELL_RESTED_NODE = 1188, 110301
+local BASE_CAP, BASE_RATE, PER_RANK = 1.5, 0.05, 0.04   -- levels; levels per 8 h; +4% a rank
+local EIGHT_HOURS = 8 * 3600
+-- spellID -> what it does for XP (buffs), or what it locks (debuffs).
+local XP_BUFFS = {
+    [1248406] = "+5% XP from kills",           -- Well Fed (XP food)
+    [1229741] = "rested gained from a tent",   -- Camp Benefits
+}
+local LOCKOUTS = {
+    [1229451] = "Camp Tent",                   -- Boosted Rest: a tent again in 1 h
+}
+
+-- Well Rested's rank (0..5), or nil when it can't be read (no C_Traits, no
+-- such node on this account, a secret).
+local function wellRestedRank()
+    local T = rawget(_G, "C_Traits")
+    if not (T and T.GetConfigIDByTreeID and T.GetNodeInfo) then return nil end
+    local ok, config = pcall(T.GetConfigIDByTreeID, WELL_RESTED_TREE)
+    config = ok and plain(config) or nil
+    if type(config) ~= "number" then return nil end
+    local okN, info = pcall(T.GetNodeInfo, config, WELL_RESTED_NODE)
+    if not okN or type(info) ~= "table" or API.IsSecret(info) then return nil end
+    if plain(info.ID) ~= WELL_RESTED_NODE then return nil end   -- an unknown node comes back as ID 0
+    local rank = plain(info.activeRank)
+    if type(rank) ~= "number" or rank < 0 or rank > 5 then return nil end
+    return rank
+end
+
+-- Seconds left on an aura, or nil (permanent, unreadable).
+local function timeLeft(a)
+    local e = plain(a.expirationTime)
+    if type(e) ~= "number" or e <= 0 then return nil end
+    return e - GetTime()
+end
+
+-- An unknown buff whose tooltip speaks of experience (lazy: may be missed).
+local function speaksOfXP(a)
+    local TI = rawget(_G, "C_TooltipInfo")
+    local id = plain(a.auraInstanceID)
+    if not (TI and TI.GetUnitBuffByAuraInstanceID and type(id) == "number") then return false end
+    local ok, data = pcall(TI.GetUnitBuffByAuraInstanceID, "player", id, "HELPFUL")
+    if not ok or API.IsSecret(data) or type(data) ~= "table" or type(data.lines) ~= "table" then return false end
+    for _, l in ipairs(data.lines) do
+        local t = type(l) == "table" and plain(l.leftText)
+        if type(t) == "string" and t:lower():find("experience", 1, true) then return true end
+    end
+    return false
+end
+
+-- { { name, what, left } } for the XP buffs and lockouts on the player.
+-- Unreadable auras (secret, in combat) are skipped.
+local function xpAuras()
+    local A = rawget(_G, "C_UnitAuras")
+    local out = {}
+    if not (A and A.GetAuraDataByIndex) then return out end
+    for _, filter in ipairs({ "HELPFUL", "HARMFUL" }) do
+        for i = 1, 40 do
+            local ok, a = pcall(A.GetAuraDataByIndex, "player", i, filter)
+            if not ok or a == nil then break end
+            if type(a) == "table" and not API.IsSecret(a) then
+                local id, name = plain(a.spellId), plain(a.name)
+                local what = filter == "HELPFUL" and XP_BUFFS[id] or (filter == "HARMFUL" and LOCKOUTS[id])
+                if not what and filter == "HELPFUL" and speaksOfXP(a) then what = "experience" end
+                if what then
+                    out[#out + 1] = { name = type(name) == "string" and name or "?", what = what,
+                                      lockout = filter == "HARMFUL", left = timeLeft(a) }
+                end
+            end
+        end
+    end
+    return out
+end
+
+-- The rested lines: the pool, its cap (when Well Rested reads), how soon it's
+-- full while resting, then the XP buffs and the Camp Tent's lockout.
+local function restedLines(tt, max, rested)
+    local blue = { 0.31, 0.56, 1 }
+    local resting = IsResting() == true
+    local rank = wellRestedRank()
+    if rested > 0 then line(tt, "Rested", num(rested) .. " (" .. pct(rested, max) .. ")", blue) end
+    if rank then
+        local cap = BASE_CAP * (1 + PER_RANK * rank) * max
+        local talent = rank > 0 and (" (Well Rested " .. rank .. "/5)") or ""
+        line(tt, "Rested cap", string.format("%.1f levels", cap / max) .. talent .. ", " .. pct(rested, cap), blue)
+        if resting and rested < cap then
+            local perSecond = BASE_RATE * (1 + PER_RANK * rank) * max / EIGHT_HOURS
+            line(tt, "Full in (resting)", duration((cap - rested) / perSecond), blue)
+        elseif rested >= cap then
+            line(tt, "Rested", "full", blue)
+        end
+    elseif resting then
+        line(tt, "Resting", "yes", blue)
+    end
+    for _, a in ipairs(xpAuras()) do
+        local left = a.left and duration(a.left) or nil
+        if a.lockout then
+            line(tt, a.what, left and ("again in " .. left) or "not yet", { 0.7, 0.7, 0.7 })
+        else
+            line(tt, a.name, a.what .. (left and (", " .. left) or ""), { 0.3, 1, 0.3 })
+        end
+    end
+end
+
 local function tooltip(_, tt, where)
     where = where or (detached() and "handle" or "panel")
     local s = stats()
@@ -343,7 +460,8 @@ local function tooltip(_, tt, where)
     tt:AddLine(" ")
     line(tt, "Current", num(cur) .. " / " .. num(max) .. " (" .. pct(cur, max) .. ")")
     line(tt, "Remaining", num(toLevel) .. " (" .. pct(toLevel, max) .. ")")
-    if rested > 0 then line(tt, "Rested", num(rested) .. " (" .. pct(rested, max) .. ")", { 0.31, 0.56, 1 }) end
+    local ok, err = pcall(restedLines, tt, max, rested)
+    if not ok then API.Fail("xp:rested", err) end
     if qc + qi > 0 then
         line(tt, "Quest XP", num(qc + qi) .. " (" .. pct(qc + qi, max) .. ")", { 0.9, 0.8, 0.1 })
         if qc > 0 then line(tt, "  Completed", num(qc) .. " (" .. pct(qc, max) .. ")", { 1, 0.59, 0.04 }) end
@@ -783,5 +901,5 @@ if block then
                     floatUI = function() return floatUI end, moving = function() return moving end,
                     setScale = setScale, floatScale = floatScale, surfaceGlass = surfaceGlass,
                     back = function() return back end, backGlass = function() return backGlass end,
-                    ticker = function() return ticker end }
+                    ticker = function() return ticker end, wellRestedRank = wellRestedRank, xpAuras = xpAuras }
 end
