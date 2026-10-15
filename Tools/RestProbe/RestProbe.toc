@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: RestProbe
+## Notes: Throwaway probe for XP+ (#81): the rested cap, Well Rested, XP buffs and how fast rested builds. A ForeverProbe module: /fp rest
+## Author: Spotnick
+## Version: dev
+## Dependencies: ForeverProbe
+## SavedVariables: RestProbeDB
+
+RestProbe.lua

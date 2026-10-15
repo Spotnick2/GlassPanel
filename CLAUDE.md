@@ -490,6 +490,10 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`).
   `tests\run.ps1` before every PR that touches a probe. **RXPProbe** (#80) measures RestedXP's arrow target, our own bearing to it (HereBeDragons +
   `GetPlayerFacing`, plain or secret) beside a test arrow, its launcher toggle and step-list
   collapse in and out of combat, and its messages: `/fp steps rxp arrow`.
+  **RestProbe** (#81): the rested pool against the cap, **Well Rested** (a node in Forever's
+  account-wide Legacy trees, read through `C_Traits` as Blizzard_MicroMenu's Camelot override does:
+  Adventure 1188, Progression 1189, Professions 1187; matched by spell name), XP buffs (auras with
+  their IDs) and the rested build-up rate: `/fp steps rest rested`.
 
 ## Addon basics
 
