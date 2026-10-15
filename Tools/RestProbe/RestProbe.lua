@@ -73,11 +73,12 @@ end
 -- The aura's own tooltip lines (what the player reads: Well Fed's "Experience
 -- gained from kills increased by 5%"), joined; nil when unreadable. The
 -- spell's description is a different text (run 1 found no "experience" in it).
-local function auraText(a)
+local function auraText(a, filter)
     local TI = rawget(_G, "C_TooltipInfo")
     local id = num(a.auraInstanceID)
-    if not (TI and TI.GetUnitBuffByAuraInstanceID and id) then return nil end
-    local ok, data = pcall(TI.GetUnitBuffByAuraInstanceID, "player", id, "HELPFUL")
+    local fn = TI and (filter == "HARMFUL" and TI.GetUnitDebuffByAuraInstanceID or TI.GetUnitBuffByAuraInstanceID)
+    if not (fn and id) then return nil end
+    local ok, data = pcall(fn, "player", id, filter)
     if not ok or secret(data) or type(data) ~= "table" or type(data.lines) ~= "table" then return nil end
     local parts = {}
     for _, line in ipairs(data.lines) do
@@ -87,35 +88,61 @@ local function auraText(a)
     return #parts > 0 and table.concat(parts, " / ") or nil
 end
 
--- Every helpful aura: spell ID, name, time left, its tooltip and its spell
+-- Every aura, buffs then debuffs (Boosted Rest, the Camp Tent's hour-long
+-- lockout, is a debuff): spell ID, name, time left, its tooltip and its spell
 -- description; marked XP when either speaks of experience. Returns how many do.
 local function buffs()
-    say("-- buffs (combat " .. inCombat() .. ")")
+    say("-- buffs and debuffs (combat " .. inCombat() .. ")")
     local A = rawget(_G, "C_UnitAuras")
     if not (A and A.GetAuraDataByIndex) then say("C_UnitAuras.GetAuraDataByIndex: MISSING") return 0 end
     local found, now = 0, GetTime()
-    for i = 1, 40 do
-        local ok, a = pcall(A.GetAuraDataByIndex, "player", i, "HELPFUL")
-        if not ok then say("aura " .. i .. ": ERROR " .. tostring(a)) break end
-        if a == nil then break end
-        if secret(a) then say("aura " .. i .. ": <secret table>") break end
-        local id, name = a.spellId, a.name
-        local left = num(a.expirationTime) and a.expirationTime > 0 and (a.expirationTime - now) or nil
-        local desc
-        local S = rawget(_G, "C_Spell")
-        if num(id) and S and S.GetSpellDescription then
-            local okD, d = pcall(S.GetSpellDescription, id)
-            desc = okD and d or nil
+    for _, filter in ipairs({ "HELPFUL", "HARMFUL" }) do
+        local kind = filter == "HELPFUL" and "aura" or "debuff"
+        for i = 1, 40 do
+            local ok, a = pcall(A.GetAuraDataByIndex, "player", i, filter)
+            if not ok then say(kind .. " " .. i .. ": ERROR " .. tostring(a)) break end
+            if a == nil then break end
+            if secret(a) then say(kind .. " " .. i .. ": <secret table>") break end
+            local id, name = a.spellId, a.name
+            local left = num(a.expirationTime) and a.expirationTime > 0 and (a.expirationTime - now) or nil
+            local desc
+            local S = rawget(_G, "C_Spell")
+            if num(id) and S and S.GetSpellDescription then
+                local okD, d = pcall(S.GetSpellDescription, id)
+                desc = okD and d or nil
+            end
+            local tip = auraText(a, filter)
+            local xp = mentionsXP(name) or mentionsXP(tip) or mentionsXP(desc)
+            if xp then found = found + 1 end
+            say(string.format("%s %d%s: id=%s name=%s left=%s source=%s", kind, i, xp and " XP" or "", show(id),
+                show(name), left and string.format("%.0fs", left) or "none", show(a.sourceUnit)))
+            say("    tooltip: " .. show(tip) .. " | description: " .. show(desc))
         end
-        local tip = auraText(a)
-        local xp = mentionsXP(name) or mentionsXP(tip) or mentionsXP(desc)
-        if xp then found = found + 1 end
-        say(string.format("aura %d%s: id=%s name=%s left=%s source=%s", i, xp and " XP" or "", show(id), show(name),
-            left and string.format("%.0fs", left) or "none", show(a.sourceUnit)))
-        say("    tooltip: " .. show(tip) .. " | description: " .. show(desc))
     end
     say(found .. " aura(s) speak of experience")
     return found
+end
+
+-- A Camp Tent grants rested at once, then Boosted Rest locks it for an hour:
+-- the pool read before using one (saved: a /reload in between is fine) and
+-- after, the difference logged as XP and as a share of the level.
+local function tent(phase)
+    local rested, max = num(GetXPExhaustion()), num(UnitXPMax("player"))
+    local d = rawget(_G, "RestProbeDB")
+    if phase == "before" then
+        if d then d.tent = { rested = rested, max = max } end
+        say("tent before: rested " .. show(rested) .. " max " .. show(max))
+        return rested
+    end
+    local b = d and d.tent
+    say("tent after: rested " .. show(rested) .. " max " .. show(max))
+    if b and b.rested and rested and max and max > 0 then
+        local gain = rested - b.rested
+        say(string.format("tent gain: +%s rested = %.4f of this level (%.2f%%)", show(gain), gain / max, gain / max * 100))
+        return gain
+    end
+    say("tent gain: unreadable (no saved 'before', or a pool that didn't read)")
+    return nil
 end
 
 --------------------------------------------------------------------------------
@@ -265,6 +292,8 @@ end
 Probe:Command("pool", pool, "the rested pool against the cap")
 Probe:Command("buffs", buffs, "your auras, and the ones about experience")
 Probe:Command("talent", talent, "Well Rested: found, and its rank")
+Probe:Command("tent", function(args) tent(args == "after" and "after" or "before") end,
+    "the rested pool around using a Camp Tent [before | after]")
 Probe:Command("watch", function(args)
     if args == "off" then setWatch(false) elseif args == "read" then setWatch("read") else setWatch(true) end
 end, "sample rested every minute [read: against the saved start | off]")
@@ -287,6 +316,11 @@ Probe:Steps("rested", {
     { text = "Stay resting, or log out at the inn, for at least 15 minutes (rest builds offline too; "
           .. "the start is saved). Back here, press Read.", button = "Read",
       run = function() return setWatch("read") end },
+    { text = "If your Camp Tent is ready (no Boosted Rest debuff), press Before; else Skip the next two steps.",
+      button = "Before", run = function() return tent("before") end },
+    { text = "Use the Camp Tent, then press After: the rested it gave.", button = "After",
+      run = function() return tent("after") end },
+    { text = "Press Read: your buffs and debuffs now (Boosted Rest should show).", button = "Read", run = buffs },
     { text = "Light your campfire and SIT next to it for 2 minutes (its benefits start after 1 minute "
           .. "sitting), then press Read: your buffs.", button = "Read", run = buffs },
     { text = "Still sitting: press Start to sample rested while camping.", button = "Start",
@@ -318,5 +352,5 @@ boot:SetScript("OnEvent", function(_, event, name)
     say("loaded (" .. db.loads .. " loads). /fp rest for the commands, /fp steps rest rested for the procedure")
 end)
 
-NS._test = { Probe = Probe, pool = pool, buffs = buffs, talent = talent, setWatch = setWatch, sample = sample,
+NS._test = { Probe = Probe, pool = pool, buffs = buffs, talent = talent, setWatch = setWatch, sample = sample, tent = tent,
              found = function() return found end }

@@ -10,9 +10,11 @@ dofile("tests/harness.lua")
 rawset(_G, "GetRestState", function() return 1, "Rested", 2 end)
 local resting = true
 rawset(_G, "IsResting", function() return resting end)
-local auras = {}
+local auras, debuffs = {}, {}
 rawset(_G, "C_UnitAuras", { GetAuraDataByIndex = function(unit, i, filter)
-    if unit == "player" and filter == "HELPFUL" then return auras[i] end
+    if unit ~= "player" then return nil end
+    if filter == "HELPFUL" then return auras[i] end
+    if filter == "HARMFUL" then return debuffs[i] end
 end })
 local spells = { [9001] = { "Well Rested", "Your rested experience accumulates 20% faster and your rested experience "
                             .. "cap is increased by 20%." },
@@ -42,7 +44,7 @@ rawset(_G, "Constants", { LegacyConsts = { LEGACY_TREE_ADVENTURE_ID = 1188 } })
 -- description. Measured on 70374: Well Fed 1248406's description had no
 -- "experience"; its tooltip says "Experience gained from kills increased by 5%".
 local tips = {}
-C_TooltipInfo.GetUnitBuffByAuraInstanceID = function(unit, id)
+local function tipFor(_, id)
     local t = tips[id]
     if t == "secret" then return WoW.Secret("tooltip") end
     if not t then return nil end
@@ -50,6 +52,8 @@ C_TooltipInfo.GetUnitBuffByAuraInstanceID = function(unit, id)
     for i, text in ipairs(t) do lines[i] = { leftText = text } end
     return { lines = lines }
 end
+C_TooltipInfo.GetUnitBuffByAuraInstanceID = tipFor
+C_TooltipInfo.GetUnitDebuffByAuraInstanceID = tipFor
 
 loadForeverProbe()
 local ns = {}
@@ -109,6 +113,13 @@ check(logHas("tooltip: \"Well Fed / Your Stamina is increased by 1. Experience g
     .. " | description: \"Restores health over time.\""), "both texts logged")
 check(logHas("1 aura(s) speak of experience"), "counted")
 check(logHas("aura 2: id=7002 name=\"Arcane Intellect\" left=none"), "a permanent one, not XP")
+-- Debuffs too: Boosted Rest, the Camp Tent's lockout (owner's screenshot, 70374).
+debuffs = { { spellId = 6001, name = "Boosted Rest", expirationTime = WoW.now + 3300, auraInstanceID = 61 } }
+tips[61] = { "Boosted Rest", "You cannot gain more rested experience from a Camp Tent for 1 hour." }
+fp("rest buffs")
+check(logHas("debuff 1 XP: id=6001 name=\"Boosted Rest\" left=3300s"), "a debuff about rested experience, marked")
+check(logHas("2 aura(s) speak of experience"), "counted with the buffs")
+debuffs = {}
 tips[51] = "secret"
 fp("rest buffs")
 check(logHas("tooltip: nil | description: \"Restores health over time.\""), "a secret tooltip: nil, not touched")
@@ -116,6 +127,18 @@ auras = { WoW.Secret("aura") }
 fp("rest buffs")
 check(logHas("aura 1: <secret table>"), "a secret aura: said, not touched")
 auras = {}
+
+-- A Camp Tent: the pool before and after, saved across a /reload.
+WoW.player.rested = 3000
+fp("rest tent before")
+eq(RestProbeDB.tent and RestProbeDB.tent.rested, 3000, "before: saved")
+WoW.player.rested = 3000 + 2250
+fp("rest tent after")
+check(logHas("tent gain: +2250 rested = 0.0500 of this level (5.00%)"), "the tent's gain, as a share of the level")
+RestProbeDB.tent = nil
+fp("rest tent after")
+check(logHas("tent gain: unreadable"), "no 'before': said")
+WoW.player.rested = 3000
 
 -- Build-up: a sample a minute, timed by the server's clock.
 fp("rest watch")
