@@ -583,6 +583,55 @@ do
     check(next(GlassPanel.failures) == nil, "no failures (saved zoom)")
 end
 
+-- Rested (#81): the cap from Well Rested, how soon it's full, the XP buffs.
+do
+    WoW.player = { level = 16, maxLevel = 60, xp = 664, maxXP = 16000, rested = 6770, xpDisabled = false }
+    WoW.quests = {}
+    GlassPanelXPDB = nil
+    WoW.wellRested, WoW.resting = 5, true
+    loadAddon()
+    eq(T().wellRestedRank(), 5, "Well Rested read from its Legacy node")
+    check(tooltipHas("Rested\t6,770 (42.3%)"), "the pool")
+    -- 5/5: 1.8 levels = 28,800; 6,770 of it.
+    check(tooltipHas("Rested cap\t1.8 levels (Well Rested 5/5), 23.5%"), "the cap, from the talent")
+    -- Measured: 6% of a level per 8 h at 5/5 = 960 XP per 8 h; 22,030 left = 183.6 h.
+    check(tooltipHas("Full in (resting)\t7d 15h"), "how soon it's full, at the measured rate")
+    WoW.resting = false
+    check(tooltipHas("Full in") == nil, "not resting: no estimate")
+    WoW.wellRested = 0
+    check(tooltipHas("Rested cap\t1.5 levels, 28.2%"), "no ranks: Vanilla's 1.5 levels")
+    WoW.wellRested = nil
+    check(tooltipHas("Rested cap") == nil, "no such node on this account: no cap (unknown, not guessed)")
+    WoW.wellRested = "secret"
+    check(tooltipHas("Rested cap") == nil, "a secret rank: no cap")
+    WoW.wellRested, WoW.resting = 5, true
+    WoW.player.rested = 30000
+    check(tooltipHas("Rested\tfull"), "at the cap: full")
+    WoW.player.rested = 6770
+
+    -- XP buffs by spell ID; the Camp Tent's lockout; an unknown buff by its tooltip.
+    WoW.buffs = {
+        { spellId = 1248406, name = "Well Fed", expirationTime = WoW.now + 900, auraInstanceID = 1 },
+        { spellId = 1229741, name = "Camp Benefits", expirationTime = WoW.now + 3300, auraInstanceID = 2 },
+        { spellId = 5232, name = "Mark of the Wild", expirationTime = WoW.now + 2900, auraInstanceID = 3 },
+        { spellId = 4242, name = "Scroll of Wisdom", expirationTime = WoW.now + 600, auraInstanceID = 4 },
+    }
+    WoW.auraTips[3] = { "Mark of the Wild", "Increases armor by 88 and all attributes by 3." }
+    WoW.auraTips[4] = { "Scroll of Wisdom", "Experience gained increased by 10%." }
+    WoW.debuffs = { { spellId = 1229451, name = "Boosted Rest", expirationTime = WoW.now + 3120, auraInstanceID = 9 } }
+    check(tooltipHas("Well Fed\t+5% XP from kills, 15m"), "Well Fed, by its spell ID (its tooltip loads lazily)")
+    check(tooltipHas("Camp Benefits\trested gained from a tent, 55m"), "Camp Benefits")
+    check(tooltipHas("Camp Tent\tagain in 52m"), "the Camp Tent's lockout (Boosted Rest, a debuff)")
+    check(tooltipHas("Scroll of Wisdom\texperience, 10m"), "an unknown buff whose tooltip speaks of experience")
+    check(tooltipHas("Mark of the Wild") == nil, "other buffs left out")
+    WoW.buffs = { WoW.Secret("aura") }
+    WoW.debuffs = {}
+    check(tooltipHas("Current\t"), "a secret aura: the tooltip still draws")
+    WoW.buffs = {}
+    check(next(GlassPanel.failures) == nil, "no failures (rested)")
+    WoW.wellRested, WoW.resting = nil, false
+end
+
 -- Durations.
 local d = T().duration
 eq(d(nil), "--", "unknown duration")

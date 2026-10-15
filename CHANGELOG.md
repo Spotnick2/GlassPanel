@@ -17,6 +17,11 @@
   scale" in Options > AddOns > Glass Panel > Plugin options, where "Glass behind the zoomed bar" also
   puts a pane of glass behind it, matching the panel's Clear or Smoked and tint. The zoomed bar uses
   LibGlass's clean look (thin rims, no grain).
+- XP+ tooltip:
+  - your rested cap, with the Well Rested Legacy talent's bonus;
+  - while resting, how long until you're fully rested;
+  - your XP buffs (Well Fed, Camp Benefits) with their time left;
+  - when your Camp Tent can grant rest again.
 - Ships LibGlass r7 (was r5).
 - Smoked glass: its softer shine now actually applies (it was drawn at full strength).
 - Drag blocks to arrange the bar: drop next to other blocks to join their group, or on empty
