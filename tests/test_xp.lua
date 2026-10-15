@@ -457,8 +457,41 @@ do
     x.options[2].set(true); WoW.tick()
     eq(f._shown, true, "and zooms")
     GlassPanelXPDB.spot = { x = 5, y = 6 }
-    x.options[3].run()
+    x.options[4].run()
     eq(GlassPanelXPDB.spot, nil, "Reset position")
+    -- Scale (the plugin's slider): live, the spot kept in screen units.
+    local function near(a, b) return type(a) == "number" and math.abs(a - b) < 1e-9 end
+    local sc = x.options[3]
+    check(sc.min == 0.5 and sc.max == 2 and sc.step == 0.05, "a slider, 0.5 to 2 in 0.05 steps")
+    eq(sc.get(), 1, "scale 1 by default")
+    GlassPanelXPDB.spot = { x = 100, y = 50 }
+    sc.set(1.5)
+    check(near(GlassPanelXPDB.scale, 1.5), "saved")
+    check(near(f._scale, 1.5), "applied at once")
+    p = f._points[1]
+    check(p[1] == "CENTER" and near(p[4], 100 / 1.5) and near(p[5], 50 / 1.5),
+          "offsets divided by the scale: the spot stays in screen units")
+    WoW.shift = true; f._scripts.OnDragStart(f); WoW.shift = false
+    f._center = { 400, 300 }   -- the float's own (scaled) units: 600, 450 on UIParent
+    f._scripts.OnDragStop(f)
+    check(near(GlassPanelXPDB.spot.x, 100) and near(GlassPanelXPDB.spot.y, 66), "a move at 1.5 saves screen units")
+    WoW.now = WoW.now + 1
+    sc.set(1.23); check(near(GlassPanelXPDB.scale, 1.25), "rounded to the step")
+    sc.set(5); check(near(GlassPanelXPDB.scale, 2), "clamped to 2")
+    sc.set(0.1); check(near(GlassPanelXPDB.scale, 0.5), "clamped to 0.5")
+    sc.set(0 / 0); check(near(GlassPanelXPDB.scale, 0.5), "NaN ignored")
+    sc.set(WoW.Secret("scale")); check(near(GlassPanelXPDB.scale, 0.5), "a secret ignored")
+    for _, bad in ipairs({ "big", 9, 0.1, 0 / 0 }) do
+        GlassPanelXPDB.scale = bad
+        eq(T().floatScale(), 1, "a corrupt saved scale reads as 1: " .. tostring(bad))
+    end
+    GlassPanelXPDB.spot = nil
+    sc.set(2)
+    p = f._points[1]
+    check(p[1] == "TOP" and near(p[5], -20), "the default spot at scale 2: still 40 under the top")
+    sc.set(1)
+    eq(GlassPanelXPDB.scale, nil, "1 is the default: nothing stored")
+    eq(f._scale, 1, "back to 1")
     WoW.player.level, WoW.player.maxXP = 60, 0
     WoW.player.maxLevel = 60
     WoW.fire("PLAYER_LEVEL_UP", 60); WoW.fire("PLAYER_XP_UPDATE", "player"); WoW.tick()

@@ -159,6 +159,29 @@ click(bad, true)
 check(GlassPanel.failures["options:opty:2"] ~= nil, "a throwing set is recorded")
 for k in pairs(GlassPanel.failures) do GlassPanel.failures[k] = nil end
 
+-- A slider option (#78): reads get(), writes set() rounded to its step and
+-- clamped; a refresh (open, any change) never writes back.
+local size, sets = 1.2, 0
+GlassPanel.RegisterBlock({ id = "slidy", label = "Slidy", text = function() return "s" end,
+    options = { { label = "Size", min = 0.5, max = 2, step = 0.1, get = function() return size end,
+                  set = function(v) sets = sets + 1; size = v end },
+                { label = "Junk", min = 0, max = 1, get = function() return "big" end, set = function() end } } })
+open()
+local sl = c["options:slidy:1"]
+eq(sl and sl._type, "Slider", "a slider on the panel")
+check(math.abs(sl._value - 1.2) < 1e-9, "reads get()")
+eq(sets, 0, "opening the panel writes nothing")
+sl:SetValue(1.53)
+check(math.abs(size - 1.5) < 1e-9, "a move calls set(), rounded to the step")
+eq(sets, 1, "once")
+O().panel:Hide(); open()
+eq(sets, 1, "reopening (a refresh) writes nothing")
+sl:SetValue(9)
+check(math.abs(size - 2) < 1e-9, "clamped to max")
+eq(c["options:slidy:2"]._value, 0, "a get() that isn't a number shows the minimum")
+GlassPanel.failures["options:opty:2:get"] = nil   -- the broken option above, read again by each open
+check(next(GlassPanel.failures) == nil, "no failures (sliders)")
+
 -- A category whose GetID throws: /gpanel options falls back to the hint.
 do
     local cat = O().category()

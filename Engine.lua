@@ -227,17 +227,26 @@ function GlassPanel.RegisterBlock(spec)
     -- optional setting mustn't take a plugin's readout off the bar.
     if spec.options ~= nil then
         local ok = type(spec.options) == "table"
+        local function num(v) return type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge end
         for _, o in ipairs(ok and spec.options or {}) do
-            -- A checkbox (get + set) or a button (run).
+            -- A checkbox (get + set), a slider (get + set with min < max, an
+            -- optional step > 0 and fmt string) or a button (run).
             local kind = type(o) == "table"
                 and ((type(o.get) == "function" and type(o.set) == "function") or type(o.run) == "function")
+            local slider = kind and (o.min ~= nil or o.max ~= nil or o.step ~= nil or o.fmt ~= nil)
+            if slider and not (num(o.min) and num(o.max) and o.min < o.max and o.run == nil
+                               and (o.step == nil or (num(o.step) and o.step > 0))
+                               and (o.fmt == nil or type(o.fmt) == "string")) then
+                kind = false
+            end
             if not kind or type(o.label) ~= "string" or (o.note ~= nil and type(o.note) ~= "string") then
                 ok = false
             end
         end
         if not ok then
             API.Fail(spec.id .. ":options",
-                "options must be a list of { label = string, get + set (a checkbox) or run (a button), note = string? }")
+                "options must be a list of { label = string, get + set (a checkbox; with min, max, step?, fmt?: a "
+                .. "slider) or run (a button), note = string? }")
             spec.options = nil
         end
     end

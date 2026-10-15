@@ -13,7 +13,8 @@
   the screen (time this level and this session above it; XP per hour, time to the next level,
   turn-in quest XP and rested under it). Only the icon stays on the panel; double-click it again to
   put the bar back. Shift-drag the zoomed bar to move it; right-click it for a menu (back to the
-  panel, reset session, reset position). It remembers where you left it.
+  panel, reset session, reset position). It remembers where you left it. Its size: "Zoomed bar's
+  scale" in Options > AddOns > Glass Panel > Plugin options.
 - Drag blocks to arrange the bar: drop next to other blocks to join their group, or on empty
   space to start a new group there. Shift-drag moves a whole group. `/gpanel move` does the same
   from the keyboard, and `/gpanel layout reset` starts over.

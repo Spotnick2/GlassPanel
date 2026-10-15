@@ -158,7 +158,9 @@ core's `ADDON_LOADED`.
   `GlassPanelXPDB.spot`, checked whole (a bad field: the default, TOP 0,-40) and from live
   `GetCenter()` values checked plain and finite before subtracting. Right-click: a `MenuUtil` menu
   (`CreateButton`: back to the panel, reset session, reset position; no `MenuUtil`: right-click
-  docks). A 1 s `C_Timer` ticker repaints it only while shown. Its scripts, ticker and menu items
+  docks). **Scale** 0.5-2 (0.05 steps; the plugin's slider option, `GlassPanelXPDB.scale`, 1 stored
+  as nothing, a corrupt one reads 1): the spot stays in screen units, so SetPoint offsets are divided
+  by it and `GetCenter()` multiplied by it (GUF's `PlaceAt`). A 1 s `C_Timer` ticker repaints it only while shown. Its scripts, ticker and menu items
   run under `guarded` (`xp:float`). Figures from one `stats()` snapshot (the tooltip's too).
   `/played` is requested with `TIME_PLAYED_MSG` muted on the chat frames, one request at a time
   (a token ties the unmute, the next frame after the answer or after 10 s, to its own request),
@@ -337,7 +339,9 @@ core's `ADDON_LOADED`.
 - **`Options.lua`** (#24): Options > AddOns > Glass Panel, a canvas panel on Retail's Settings
   framework (as GlassUnitFrames #39), registered at `PLAYER_LOGIN`. **Our `Settings` local shadows
   Blizzard's global `Settings`**: the framework is read with `rawget(_G, "Settings")`. Bar (shown,
-  captions, font, width, glass, tint), Layout (reset), Share setup (Export / Import), and a row per loaded plugin
+  captions, font, width, glass, tint), Layout (reset), Share setup (Export / Import), plugin options
+  (checkbox, button, or slider: hand-built after GUF's, `min`/`max`/`step`/`fmt`, validated in
+  `RegisterBlock`; a refresh never writes back), and a row per loaded plugin
   (Shown, Caption, Icon; Caption greyed for graphical blocks, Icon for blocks without one), all in
   name order (a plugin registered later gets its row on the next open, where its name sorts).
   Every open, and every setting change while it's open, re-reads the state.

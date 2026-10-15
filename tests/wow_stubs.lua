@@ -204,6 +204,8 @@ function Methods.GetWidth(w) return w._width end
 function Methods.GetLeft(w) return w._rect and w._rect[1] or 0 end
 function Methods.GetEffectiveScale(w) return WoW.uiScale end
 function Methods.SetAlpha(w, a) w._alpha = a end
+function Methods.SetScale(w, s) w._scale = s end
+function Methods.GetScale(w) return w._scale or 1 end
 -- Rect: set w._rect = { left, bottom, width, height } in a test; the bar gets
 -- one from the harness.
 function Methods.GetRect(w) if w._rect then return unpack(w._rect) end end
@@ -300,7 +302,17 @@ function Methods.SetFont(fs, file, size, flags) fs._font = { file, size, flags }
 function Methods.SetMinMaxValues(b, lo, hi, interp) b._min, b._max = lo, hi end
 function Methods.SetStatusBarColor(b, r, g, bl, a) b._color = { r, g, bl, a } end
 function Methods.GetValue(b) return b._value end
-function Methods.SetValue(b, v) b._value = v end
+-- A Slider clamps to its range and fires OnValueChanged (self, value,
+-- userInput) as on the client, a refresh included; a StatusBar just stores.
+function Methods.SetValue(b, v)
+    if b._type == "Slider" then
+        v = math.max(b._min or v, math.min(b._max or v, v))
+        b._value = v
+        if b._scripts.OnValueChanged then b._scripts.OnValueChanged(b, v, false) end
+        return
+    end
+    b._value = v
+end
 function Methods.SetStatusBarTexture(b, file)
     b._fill = b._fill or newWidget("Texture", b)
     b._fill._file = file

@@ -375,11 +375,15 @@ end
 -- icon on the panel) with it. The outer frame holds the rows above and below
 -- the bar, so clamping keeps them on screen. Its spot is CENTER offsets from
 -- UIParent's centre (GlassUnitFrames' cast bars), in GlassPanelXPDB.spot;
--- never set (or anything wrong with it): under the panel, top centre.
+-- never set (or anything wrong with it): under the panel, top centre. Its
+-- scale (GlassPanelXPDB.scale, the plugin's slider) leaves the spot in screen
+-- units: SetPoint offsets are in the float's own scaled units, so they are
+-- divided by it, and its centre multiplied by it (GlassUnitFrames' PlaceAt).
 local FLOAT_W, FLOAT_BAR_H, FLOAT_FONT = 480, 18, 12
 local ROW_H, ROW_FONT = 14, 10
 local DEFAULT_Y = -40       -- from UIParent's top
 local SPOT_LIMIT = 4096
+local SCALE_MIN, SCALE_MAX, SCALE_STEP = 0.5, 2, 0.05
 local GOLD = "|cffffd100"
 
 local float, floatUI, rows, ticker
@@ -410,25 +414,36 @@ local function savedSpot()
     return x, y
 end
 
+-- The saved scale, or 1 when unset or out of range.
+local function floatScale()
+    local s = finite(db().scale)
+    if not s or s < SCALE_MIN or s > SCALE_MAX then return 1 end
+    return s
+end
+
 local function placeFloat()
+    local scale = floatScale()
+    float:SetScale(scale)
     float:ClearAllPoints()
     local x, y = savedSpot()
     if x then
-        float:SetPoint("CENTER", UIParent, "CENTER", x, y)
+        float:SetPoint("CENTER", UIParent, "CENTER", x / scale, y / scale)
     else
-        float:SetPoint("TOP", UIParent, "TOP", 0, DEFAULT_Y)
+        float:SetPoint("TOP", UIParent, "TOP", 0, DEFAULT_Y / scale)
     end
 end
 
 -- Where the frame was let go, saved when every coordinate reads plainly and
 -- the offsets are in bounds; either way it's anchored on our point again (the
--- last good spot when this one isn't). Both centres are in UIParent units
--- (the float's scale is 1): no division.
+-- last good spot when this one isn't). The float's centre is in its own
+-- scaled units: times its scale, it's in UIParent's.
 local function saveSpot()
+    local scale = floatScale()
     local fx, fy = float:GetCenter()
     local ux, uy = UIParent:GetCenter()
     fx, fy, ux, uy = finite(fx), finite(fy), finite(ux), finite(uy)
     if fx and fy and ux and uy then
+        fx, fy = fx * scale, fy * scale
         local x, y = math.floor((fx - ux) * 2 + 0.5) / 2, math.floor((fy - uy) * 2 + 0.5) / 2
         if math.abs(x) <= SPOT_LIMIT and math.abs(y) <= SPOT_LIMIT then db().spot = { x = x, y = y } end
     end
@@ -437,6 +452,16 @@ end
 
 local function resetSpot()
     db().spot = nil
+    if float then placeFloat() end
+end
+
+-- The slider: clamped, in steps; 1 (the default) is stored as nothing. Live:
+-- the bar grows or shrinks around its spot.
+local function setScale(v)
+    v = finite(v)
+    if not v then return end
+    v = math.max(SCALE_MIN, math.min(SCALE_MAX, math.floor(v / SCALE_STEP + 0.5) * SCALE_STEP))
+    db().scale = (math.abs(v - 1) > 1e-6) and v or nil
     if float then placeFloat() end
 end
 
@@ -688,6 +713,8 @@ local block = GlassPanel.RegisterBlock({
           note = "Double-click XP+'s icon to zoom in or out. Shift-drag the zoomed bar to move it.",
           get = detached,
           set = function(on) setDetached(on) end },
+        { label = "Zoomed bar's scale", min = SCALE_MIN, max = SCALE_MAX, step = SCALE_STEP,
+          get = floatScale, set = setScale },
         { label = "Reset the zoomed bar's position", run = resetSpot },
     },
     onClick = function(_, button)
@@ -708,5 +735,6 @@ if block then
                     ui = function() return ui end, stats = stats, setDetached = setDetached,
                     float = function() return float end, rows = function() return rows end,
                     floatUI = function() return floatUI end, moving = function() return moving end,
+                    setScale = setScale, floatScale = floatScale,
                     ticker = function() return ticker end }
 end

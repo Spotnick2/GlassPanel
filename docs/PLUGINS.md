@@ -72,6 +72,11 @@ GlassPanel.RegisterBlock({
           set   = function(on) MyDB.hide = on end },  -- store it in YOUR SavedVariables
         { label = "Choose currencies...",        -- or a button: run() is called on click
           run   = function() MyWindow:Show() end },
+        { label = "Scale",                       -- or a slider: get() -> number, set(number) rounded to step
+          min = 0.5, max = 2, step = 0.05,       -- (default 0.05) and clamped; fmt shows the value
+          fmt = "%.2f",                          -- (default "%.2f"); opening the panel never calls set()
+          get = function() return MyDB.scale or 1 end,
+          set = function(v) MyDB.scale = v end },
     },
 })
 ```

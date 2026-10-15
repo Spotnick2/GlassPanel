@@ -258,6 +258,17 @@ badOptions("o1", "yes", "options not a list")
 badOptions("o2", { { label = 1, get = print, set = print } }, "label not a string")
 badOptions("o3", { { label = "x", get = print } }, "no set")
 badOptions("o4", { { label = "x", get = print, set = print, note = 5 } }, "note not a string")
+-- Sliders (#78): min < max, both finite numbers; step > 0 and fmt a string when given.
+badOptions("s1", { { label = "x", get = print, set = print, min = 1 } }, "slider without max")
+badOptions("s2", { { label = "x", get = print, set = print, min = 2, max = 1 } }, "slider min over max")
+badOptions("s3", { { label = "x", get = print, set = print, min = 0, max = 1 / 0 } }, "slider max infinite")
+badOptions("s4", { { label = "x", get = print, set = print, min = 0, max = 1, step = 0 } }, "slider step 0")
+badOptions("s5", { { label = "x", get = print, set = print, min = 0, max = 1, fmt = 3 } }, "slider fmt not a string")
+badOptions("s6", { { label = "x", run = print, min = 0, max = 1 } }, "a button with a range")
+badOptions("s7", { { label = "x", get = print, set = print, min = 0 / 0, max = 1 } }, "slider min NaN")
+local s8 = register({ id = "s8", text = function() end,
+                      options = { { label = "x", get = print, set = print, min = 0.5, max = 2, step = 0.1, fmt = "%.1f" } } })
+check(s8 ~= nil and s8.options ~= nil, "a valid slider is kept")
 local o5 = register({ id = "o5", text = function() end, options = { { label = "x", get = print, set = print } } })
 check(o5 ~= nil and o5.options ~= nil, "a valid option list is kept")
 
