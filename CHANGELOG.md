@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Windows (Share, Setup, Currencies, Ammo) have a new look, **Reflective**: a smoked glass shell lit from above, with a calm reading area under the title. Options > Windows (or `/gpanel window reflective|smoked`) switches back to the earlier **Smoked** look; a window already open changes after `/reload`.
 - Reagents: pick which of your class's reagents to show and in what order (powders, candles,
   runes, seeds, poisons, Ankhs, Fish Oil, Symbols), with a red 0 when you've run out. Left-click to choose.
 - A liquid-glass bar across the top of the screen, with gold and clock blocks.

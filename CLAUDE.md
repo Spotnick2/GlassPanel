@@ -54,7 +54,10 @@ core's `ADDON_LOADED`.
   gave it. **Never reparent a frame whose children call it through `GetParent()`** (Edit Mode's
   status bar containers do). `Button(parent, text, width, onClick)` is the
   one push-button helper, and `Window(name, w, h)` the one glass dialog (FULLSCREEN_DIALOG,
-  Escape, the opaque masked backing from #36, a title and a wrapping hint): Share, Setup and
+  Escape, a title and a wrapping hint; the look is the `windowGlass` setting (#93): `reflective`, the default,
+  is LIBGLASS-WINDOW-STYLING's shell on `CleanGlass()` with r9's `Glass.Reflect`, a masked backing (#36)
+  and a masked reading region `win.pane` under the hint; `smoked`, and a library older than r9, the
+  earlier opaque masked backing. Read when a window is built: a built one keeps its look until /reload): Share, Setup and
   Currencies use it. `API.Plain(v)` is the one "secret becomes nil" guard;
   use it at every read. `API.Returned(v)` asks "did the client return anything" without comparing:
   **never write `raw ~= nil` on a raw read**, since comparing a secret (even with nil) throws on
@@ -323,7 +326,7 @@ core's `ADDON_LOADED`.
   `SetIconFor`, `SetHidden`, `ResetLayout`, and `ApplyAll` for a whole imported setup, with one
   layout pass). `/gpanel`, the options panel and an import all call these, so they can't drift
   apart. Each calls `Settings.listener` after a change: an open options panel re-reads its controls.
-- **`Share.lua`** (#34): the setup (`font`, `shown`, `room`, `glass`, `glassTint`, `labels`, `hidden`, `labelsFor`,
+- **`Share.lua`** (#34): the setup (`font`, `shown`, `room`, `glass`, `glassTint`, `windowGlass`, `labels`, `hidden`, `labelsFor`,
   `iconsFor`, and the **effective** layout from `Layout.Lanes`) as `GP1:` + base64 of our own
   serialisation (sorted keys: same setup, same string). The input is **never run as code**: hard
   limits (16k chars, depth 6, 2000 values, 128-char strings), then `Share.Clean` checks every key
@@ -364,13 +367,13 @@ core's `ADDON_LOADED`.
   name order (a plugin registered later gets its row on the next open, where its name sorts).
   Every open, and every setting change while it's open, re-reads the state.
 - **`GlassPanel.lua`**: `GlassPanelDB` (`font`, `shown`, `hidden[id]`, `layout`, `room`, `glass`
-  (`clear`|`smoked`), `glassTint` (`neutral`|`class`), `labels`,
+  (`clear`|`smoked`), `glassTint` (`neutral`|`class`), `windowGlass` (`reflective`|`smoked`, #93), `labels`,
   `labelsFor[id]`, `iconsFor[id]` (only `false` is stored), `keep[id]` and `replaced["new>old"]` (#50: the player showed a
   replaced block again; the one-time "replaces" line was said) and `notedBuild` (the last client build
   the dev notice was said for), none of them part of a shared setup). The bar is built at
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles
   `list | move <id> <lane> [n] | layout reset | labels | label <id> | icon <id> | show <id> |
-  hide <id> | toggle | font | glass | tint | room | options | export | import | covered | failures`.
+  hide <id> | toggle | font | glass | tint | window | room | options | export | import | covered | failures`.
 - **`Plugins\RestedXP`** (#80): a bridge to RestedXP Guides (`## Dependencies: GlassPanel, RXPGuides`:
   the client never loads it without RestedXP; with RestedXP but no `RXP` table, no block and
   `restedxp:missing`). RestedXP's waypoint arrow on the bar, drawn by the plugin (no core icon):
@@ -420,7 +423,7 @@ texture names only grow; instances; upgrade rules).
   a dev copy comes from the LibGlass checkout (`$env:LIBGLASS`, default `..\LibGlass`) through its
   own `Tools\deploy.ps1`, which `Tools\deploy.ps1` here calls first (a refusal leaves the deployed
   addon untouched). The tests load the same checkout and fail loudly without one.
-- **The pin:** `.pkgmeta` pins a commit or tag (`r7` since #83: the smoked wash goes through r7's `SetWash`; r6's clean preset for the zoomed XP+ bar; the bar's tint needs r3's
+- **The pin:** `.pkgmeta` pins a commit or tag (`r9` since #93: `API.Window`'s reflective shell is r9's `Glass.Reflect`; r7: the smoked wash goes through r7's `SetWash`; r6's clean preset for the zoomed XP+ bar; the bar's tint needs r3's
   `SetSurfaceTint`), **never `tag: latest`**, and **no comment on a
   value line** (the packager keeps it in the value). Bump it only in a release made anyway: players
   get library fixes earlier through whichever glass addon ships the newest copy (LibStub runs that

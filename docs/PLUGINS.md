@@ -134,7 +134,7 @@ XP+ does. **Pick the frame with care:** a frame whose children call its methods 
 `GetParent()` breaks when reparented (XP+ hides `StatusTrackingBarManager`, not the Edit Mode
 container under it, which broke Edit Mode that way). `Button(parent, text, width, onClick)` makes a
 standard push button, and `Window(name, width, height)` a glass dialog like GlassPanel's own
-(opaque backing, Escape closes it, `win.title` / `win.hint`; anchor your content below `win.hint`).
+(the player's window glass, reflective or smoked; Escape closes it, `win.title` / `win.hint`; anchor your content below `win.hint`).
 
 `Plain(v)` returns `v`, or `nil` when it's secret: use it at every read before comparing or doing
 arithmetic.

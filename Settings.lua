@@ -8,7 +8,13 @@ local Settings = {}
 GlassPanel.Settings = Settings
 
 Settings.DEFAULTS = { font = "arial", shown = true, room = "auto", labels = true,
-                      glass = "clear", glassTint = "neutral" }
+                      glass = "clear", glassTint = "neutral", windowGlass = "reflective" }
+
+-- The dialogs' material (#93), AltStable's skin names: "reflective" (the
+-- lit shell of LIBGLASS-WINDOW-STYLING.md) or "smoked" (the opaque backing of
+-- #36). Read when a window is built (API.Window), so a window already built
+-- this session keeps its look until /reload.
+Settings.WINDOW_GLASS = { reflective = true, smoked = true }
 
 local function db() return GlassPanelDB end
 
@@ -40,6 +46,7 @@ function Settings.EnsureDefaults()
     if d.room ~= "auto" and d.room ~= "full" then d.room = Settings.DEFAULTS.room end
     if not Bar.GLASS[d.glass] then d.glass = Settings.DEFAULTS.glass end
     if not Bar.GLASS_TINTS[d.glassTint] then d.glassTint = Settings.DEFAULTS.glassTint end
+    if not Settings.WINDOW_GLASS[d.windowGlass] then d.windowGlass = Settings.DEFAULTS.windowGlass end
     return d
 end
 
@@ -57,6 +64,14 @@ local function setGlass(key, value, allowed)
 end
 function Settings.SetGlass(material) return setGlass("glass", material, Bar.GLASS) end
 function Settings.SetGlassTint(tint) return setGlass("glassTint", tint, Bar.GLASS_TINTS) end
+
+-- The windows' material (#93): false when it isn't one of them.
+function Settings.SetWindowGlass(material)
+    if type(material) ~= "string" or not Settings.WINDOW_GLASS[material] then return false end
+    db().windowGlass = material
+    changed()
+    return true
+end
 
 -- false when the font isn't known.
 function Settings.SetFont(key)
@@ -150,7 +165,7 @@ end
 function Settings.ApplyAll(setup)
     local d = db()
     d.font, d.shown, d.room, d.labels = setup.font, setup.shown, setup.room, setup.labels
-    d.glass, d.glassTint = setup.glass, setup.glassTint
+    d.glass, d.glassTint, d.windowGlass = setup.glass, setup.glassTint, setup.windowGlass
     d.hidden, d.labelsFor, d.iconsFor = copyMap(setup.hidden), copyMap(setup.labelsFor), copyMap(setup.iconsFor)
     d.layout = Layout.Clean(setup.layout)
     Glass.SetFont(d.font)
