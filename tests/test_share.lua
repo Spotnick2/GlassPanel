@@ -53,6 +53,7 @@ slash("font friz")
 slash("room full")
 slash("glass smoked")
 slash("tint class")
+slash("window smoked")
 slash("move gold 40")
 local before = S().Current()
 local exported = S().Encode(before)
@@ -81,6 +82,7 @@ eq(GlassPanelDB.font, "friz", "font applied")
 eq(GlassPanelDB.room, "full", "room applied")
 eq(GlassPanelDB.glass, "smoked", "glass applied")
 eq(GlassPanelDB.glassTint, "class", "glass tint applied")
+eq(GlassPanelDB.windowGlass, "smoked", "window glass applied")
 eq(GlassPanel.Bar.glass.tint._color[4], 0.62, "smoked glass painted at once (its alpha)")
 check(block("gold").widget.left > 300, "moved block placed where it was")
 
@@ -97,6 +99,7 @@ eq(s2 and s2.room, "auto", "missing room: default")
 eq(s2 and s2.shown, true, "missing shown: default")
 eq(s2 and s2.glass, "clear", "missing glass: default (clear)")
 eq(s2 and s2.glassTint, "neutral", "missing glass tint: default (neutral)")
+eq(s2 and s2.windowGlass, "reflective", "missing window glass: default (reflective)")
 check(s2 and next(s2.hidden) == nil and #s2.layout == 0, "missing lists: empty")
 
 -- Anything wrong changes nothing and says why.
@@ -133,6 +136,8 @@ rejected(pack({ glass = "frosted" }), "unknown glass", "unknown glass")
 rejected(pack({ glass = true }), "glass not a string", "unknown glass")
 rejected(pack({ glassTint = "red" }), "unknown glass tint", "glass tint")
 rejected(pack({ glassTint = 1 }), "glass tint not a string", "glass tint")
+rejected(pack({ windowGlass = "red" }), "unknown window glass", "window glass")
+rejected(pack({ windowGlass = 1 }), "window glass not a string", "window glass")
 rejected(pack({ labels = "on" }), "labels not a boolean", "labels")
 rejected(pack({ hidden = { gold = "yes" } }), "hidden value not true", "hidden")
 rejected(pack({ hidden = { "gold" } }), "hidden as a list", "hidden")
@@ -193,14 +198,21 @@ do
 end
 
 -- The window: /gpanel export shows the string, selected, read-only.
+GlassPanelDB = nil   -- a window is built once per session: a fresh one, reflective by default
+loadAddon()
 slash("export")
 T = S()._test
 local win = T.window()
 eq(win._shown, true, "export window open")
--- Readable over the Settings panel: an opaque backing under the glass,
--- inside its corners (#36); no scroll bar for a string that fits.
+-- Readable over the Settings panel: a backing under the glass tint, inside its
+-- corners (#36), and the reflective shell (#93) with a reading region under
+-- the hint; no scroll bar for a string that fits.
 local bk = T.backing()
-check(bk and bk._color and bk._color[4] >= 0.9, "opaque backing")
+check(bk and bk._color and bk._color[4] >= 0.5, "backing")
+check(win.pane and win.pane._color and win.pane._color[4] >= 0.9, "reading region under the hint")
+eq(win.pane._layer, "BACKGROUND", "reading region: background layer")
+check(win.pane._masks and #win.pane._masks == 1, "reading region: rounded mask")
+check(win.reflect and win.reflect.rim and win.reflect.top and win.reflect.header, "the reflective shell: lit rim, top highlight, header reflection")
 eq(bk._layer, "BACKGROUND", "backing: background layer")
 eq(bk._sublevel, -7, "backing: above the shadow (-8), under the tint (-6)")
 eq(bk._masks and bk._masks[1], T.glass().mask, "backing: clipped by the glass's own rounded mask")
@@ -221,6 +233,17 @@ win.edit._scripts.OnTextChanged(win.edit, true)
 eq(win.edit:GetText(), S().Encode(S().Current()), "typing puts the string back")
 win.edit._scripts.OnEscapePressed(win.edit)
 eq(win._shown, false, "Escape closes it")
+
+-- "Smoked" windows (#93): the earlier look, an opaque backing and no reading region.
+GlassPanelDB = nil
+loadAddon()
+slash("window smoked")
+slash("export")
+T = S()._test
+win = T.window()
+check(T.backing()._color[4] >= 0.9, "smoked window: opaque backing")
+eq(win.pane, nil, "smoked window: no reading region")
+eq(win.reflect, nil, "smoked window: no reflective layers")
 
 -- /gpanel import: Import is off until a valid string is pasted.
 GlassPanelDB = nil

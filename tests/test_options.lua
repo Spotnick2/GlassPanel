@@ -86,6 +86,11 @@ GlassPanel._test.slash("glass clear")
 eq(c.glass[1]:GetChecked(), true, "slash change shown at once: glass")
 click(c.glassTint[1])
 eq(GlassPanelDB.glassTint, "neutral", "tint radio back to neutral")
+eq(c.windowGlass[1]:GetChecked(), true, "windows: reflective by default")
+click(c.windowGlass[2])
+eq(GlassPanelDB.windowGlass, "smoked", "windows radio")
+GlassPanel._test.slash("window reflective")
+eq(c.windowGlass[1]:GetChecked(), true, "slash change shown at once: windows")
 
 -- A change made with /gpanel shows the next time the panel opens.
 GlassPanel._test.slash("hide gold")
