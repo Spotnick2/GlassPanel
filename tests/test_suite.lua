@@ -25,7 +25,8 @@ local function failed(key) return GlassPanel.failures[key] end
 local function bodyIsBuilt()   -- the bar's tint is the built surface's, not smoked's
     local c = GlassPanel.Bar.glass.tint._color
     local st = GlassPanel.Glass.STYLE
-    return math.abs(c[4] - st.tint[4]) < 1e-6
+    return math.abs(c[1] - st.tint[1]) < 1e-6 and math.abs(c[2] - st.tint[2]) < 1e-6
+        and math.abs(c[3] - st.tint[3]) < 1e-6 and math.abs(c[4] - st.tint[4]) < 1e-6
 end
 
 -- No Glass UI: our own look, Pearl by default; nothing asked, nothing reported.
@@ -132,8 +133,9 @@ check(GlassPanel.Glass ~= nil, "...the glass is still there")
 
 -- Following suspends the saved body and windows, and keeps them.
 fakeSuite()
-loadAddon({ db = { glass = "smoked", windowGlass = "smoked", glassTint = "neutral" } })
+loadAddon({ db = { glass = "smoked", windowGlass = "smoked", glassTint = "class" } })
 eq(GlassPanelDB.glass, "smoked", "the saved body is kept")
+eq(GlassPanelDB.glassTint, "class", "the saved tint is kept")
 eq(GlassPanelDB.windowGlass, "smoked", "the saved window look is kept")
 check(bodyIsBuilt(), "following: the bar wears the built body, not Smoked")
 eq(GlassPanel.Settings.SetGlass("clear"), false, "SetGlass refused while following")
@@ -145,14 +147,17 @@ eq(GlassPanelDB.glass, "smoked", "...and wrote nothing")
 GlassPanel._test.slash("window reflective")
 check(WoW.chat[#WoW.chat]:find("set in Glass UI", 1, true), "/gpanel window says so too")
 eq(GlassPanelDB.windowGlass, "smoked", "...and wrote nothing")
-GlassPanel._test.slash("tint class")
-eq(GlassPanelDB.glassTint, "class", "the tint stays local")
+eq(GlassPanel.Settings.SetGlassTint("neutral"), false, "SetGlassTint refused while following")
+GlassPanel._test.slash("tint neutral")
+check(WoW.chat[#WoW.chat]:find("set in Glass UI", 1, true), "/gpanel tint says it is set in Glass UI")
+eq(GlassPanelDB.glassTint, "class", "...and wrote nothing")
 GlassPanel._test.slash("font friz")
 eq(GlassPanelDB.font, "friz", "and so does the font")
 -- An import changes neither.
-GlassPanel.Settings.ApplyAll(GlassPanel.Share.Clean({ glass = "clear", windowGlass = "reflective", font = "arial" }))
+GlassPanel.Settings.ApplyAll(GlassPanel.Share.Clean({ glass = "clear", glassTint = "neutral", windowGlass = "reflective", font = "arial" }))
 eq(GlassPanelDB.glass, "smoked", "an import keeps the saved body")
 eq(GlassPanelDB.windowGlass, "smoked", "an import keeps the saved window look")
+eq(GlassPanelDB.glassTint, "class", "an import keeps the saved tint")
 -- The windows are Reflective while following, whatever was saved.
 GlassPanel._test.slash("export")
 local win = GlassPanel.Share._test.window()
@@ -164,6 +169,9 @@ open()
 local C = GlassPanel.Options._test.controls
 eq(C.glass[1]._disabled, true, "the body radios are disabled")
 eq(C.windowGlass[1]._disabled, true, "the window radios are disabled")
+eq(C.glassTint[1]._disabled, true, "the tint radios are disabled")
+local wn, sn = C.windowGlass[#C.windowGlass], C.suiteButton
+check(wn._points[1][5] - sn._points[1][5] >= 88, "the two notes under Windows each have room for two lines")
 eq(C.suiteButton._shown, true, "the Glass UI button is shown")
 C.suiteButton._scripts.OnClick(C.suiteButton)
 eq(opened, 1, "...and it calls Suite.Open")

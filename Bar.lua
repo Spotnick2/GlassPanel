@@ -478,7 +478,7 @@ Bar.surfaces = {}   -- { g, glass }: plugins' surfaces painted like the bar (API
 
 local function paintOne(g, material, tint, glass)
     -- Following Glass UI (#96) suspends the body: the saved choice is kept, the built look shows.
-    if GlassPanel.Suite.Following() then material = "clear" end
+    if GlassPanel.Suite.Following() then material, tint = "clear", "neutral" end
     local ok, known = pcall(paintGlass, g, material, tint, glass)
     if not ok then
         API.Fail("bar:glass", known)
