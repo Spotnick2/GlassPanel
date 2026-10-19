@@ -374,31 +374,6 @@ core's `ADDON_LOADED`.
   `ADDON_LOADED`, and every block repaints at `PLAYER_ENTERING_WORLD`. `/gpanel` handles
   `list | move <id> <lane> [n] | layout reset | labels | label <id> | icon <id> | show <id> |
   hide <id> | toggle | font | glass | tint | window | room | options | export | import | covered | failures`.
-- **`Plugins\RestedXP`** (#80): a bridge to RestedXP Guides (`## Dependencies: GlassPanel, RXPGuides`:
-  the client never loads it without RestedXP; with RestedXP but no `RXP` table, no block and
-  `restedxp:missing`). RestedXP's waypoint arrow on the bar, drawn by the plugin (no core icon):
-  RestedXP's arrow art turned by **our own** bearing (HereBeDragons-2.0 world position and
-  `GetWorldVector`, minus `GetPlayerFacing`, as its `map.lua`; measured equal to its own on 70374,
-  `docs/FOREVER-PROBE.md`), then "Step N" (its arrow text or title when set, colour tokens dropped)
-  and the distance. **Never across two maps**: the embedded HereBeDragons ignores the instance, so
-  the player's and the target's instances are compared (else `~`; Codex on #82). The target
-  (`RXP.arrowFrame.element`, never cleared when targets run out) counts only while it's **live**
-  by RestedXP's own test (step active, not reached: `skip`, parent neither completed nor skipped),
-  **the guide is shown** (`showEnabled`), and the arrow frame is shown, unless its drawing is
-  switched off (`disableArrow`: RestedXP then hides the frame on every retarget, and the guide
-  toggle leaves it alone, while the target stays live). Codex on #84. No target: its logo alone. The arrow turns every 0.03 s on a frame that's a child of the
-  block (stops off screen); the words every 0.25 s, and a width change (in 12 px steps)
-  repaints; `width` is a function measuring them. **The bar's arrow is THE arrow.** Double-click
-  (left) shows or hides **RestedXP's own on-screen arrow** by flipping its own "Hide waypoint arrow"
-  option (`profile.disableArrow`, saved by RestedXP; its target stays live), then its
-  `UpdateMap(true)` (else the frame hidden directly). **Never the guide** (`showEnabled` /
-  `hideGuideWindow`): either off at login sets its `isHidden`, its step handlers stop
-  (`GuideWindow.lua:250`), and the guide stops advancing. The tooltip lists its active steps
-  (`RXPFrame.activeSteps`, only the shown ones by its own `v2:IsActiveStepShown`: active, not
-  `hidewindow`/`hidetip`, the 4-step limit counting those; each `element.text` with its
-  `guideTextColors`, NPCs by the guide's own names. **Never its `ReplaceNpcIds`**: on a cache miss
-  `GetNpcName` borrows the global `GameTooltip`, the one being built; Codex on #90). Repaints on `RXP_STEP_ACTIVATED` / `RXP_GUIDE_LOADED` (AceEvent).
-  Every read guarded: a throw shows the logo and is recorded once (`restedxp:read`).
 - **`Plugins\<Name>\`**: deploy puts each at the AddOns top level under its TOC name, and
   `.pkgmeta` `move-folders` does the same when packaging (the AltStable pattern).
 
@@ -505,12 +480,9 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`).
   `Probe:Steps`; results read from `WTF\...\SavedVariables\<X>Probe.lua` and `ForeverProbe.lua`
   after the owner's `/reload`, and written to `docs/FOREVER-PROBE.md`. `.pkgmeta` ignores `Tools`, so
   they never ship. **Probe tests run locally only** (ForeverProbe is private: no token, no pin, no
-  secret): `tests\test_probe.lua` loads the host from `..\ForeverProbe` (or `$env:FOREVERPROBE`),
-  where a missing checkout is an **error**; CI sets `FOREVERPROBE_OPTIONAL=1` and skips it. So run
-  `tests\run.ps1` before every PR that touches a probe. **RXPProbe** (#80) measures RestedXP's arrow target, our own bearing to it (HereBeDragons +
-  `GetPlayerFacing`, plain or secret) beside a test arrow, its launcher toggle and step-list
-  collapse in and out of combat, and its messages: `/fp steps rxp arrow`.
-  **RestProbe** (#81): the rested pool against the cap, **Well Rested** (a node in Forever's
+  secret): a test of a probe loads the host from `..\ForeverProbe` (or `$env:FOREVERPROBE`), where a
+  missing checkout is an **error**, and CI sets `FOREVERPROBE_OPTIONAL=1` and skips it (none exists
+  now: RXPProbe's went with the RestedXP plugin, #98). **RestProbe** (#81): the rested pool against the cap, **Well Rested** (a node in Forever's
   account-wide Legacy trees, read through `C_Traits` as Blizzard_MicroMenu's Camelot override does:
   Adventure 1188, Progression 1189, Professions 1187; matched by spell name), XP buffs (auras with
   their IDs) and the rested build-up rate: `/fp steps rest rested`.
@@ -551,7 +523,7 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`).
   in game and in review.
 - `loadAddon()` loads the core, then every plugin (after the core's `ADDON_LOADED`), **like the
   client only when its `## Dependencies` are installed**: the core, and `WoW.installed` for the
-  others (AltStable's stub always; `WoW.installRXP()` in `opts.before` for RestedXP). A test file
+  others (AltStable's stub always). A test file
   that asserts on lanes sets `PLUGINS = { ... }` to pin which plugins load, so a new plugin
   doesn't reshuffle them; `opts.plugins = false` loads the core alone.
 - `loadAddon()` starts a fresh session (new namespace, new frames) and keeps client data the

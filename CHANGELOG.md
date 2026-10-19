@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The RestedXP block is gone (it wasn't good enough). If you installed the alpha, delete the `GlassPanelRestedXP` folder from your AddOns folder, since an update doesn't remove it. Its saved place in your layout is kept harmlessly.
 - Windows (Share, Setup, Currencies, Ammo) have a new look, **Reflective**: a smoked glass shell lit from above, with a calm reading area under the title. Options > Windows (or `/gpanel window reflective|smoked`) switches back to the earlier **Smoked** look; a window already open changes after `/reload`.
 - Reagents: pick which of your class's reagents to show and in what order (powders, candles,
   runes, seeds, poisons, Ankhs, Fish Oil, Symbols), with a red 0 when you've run out. Left-click to choose.
@@ -42,9 +43,6 @@
   the tooltip lists damaged items.
 - Bags: used and total bag slots, coloured as they fill; quivers and soul bags listed apart.
   Left-click opens or closes your bags.
-- RestedXP (only when RestedXP Guides is installed): its waypoint arrow on the bar, pointing the
-  way as you turn, with the step and the distance. Double-click it to also show RestedXP's own
-  arrow on the screen (or hide it again); the tooltip lists the guide's active steps.
 - Ammo (hunters, warriors and rogues): the arrows, bullets or thrown weapons you have left, chosen
   from your ranged weapon. Yellow when low and red when critical; left-click to set when, for your
   class. A red `!` means you have no ammo equipped, or the wrong kind for the weapon.
