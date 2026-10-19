@@ -287,7 +287,7 @@ end
 -- does on Forever). Fields: glass, backing, pane, reflect, title, and hint (which
 -- wraps inside the window: anchor content below `win.hint`). Hidden.
 --
--- The look is the reflective shell of References\LIBGLASS-WINDOW-STYLING.md
+-- The look is the reflective shell of References\Docs\LIBGLASS-WINDOW-STYLING.md
 -- (#93), on the clean instance (LibGlass r9's Reflect): a moderately smoked
 -- shell, an extra masked backing so the Settings panel can't show through
 -- (#36), a header reflection over the title and hint, and one masked reading

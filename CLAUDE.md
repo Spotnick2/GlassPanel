@@ -410,7 +410,7 @@ includes Titan's code and the owner's TBC plugins.
 
 The material is **LibGlass-1.0**, an embedded LibStub library (`..\LibGlass`,
 github.com/Spotnick2/LibGlass, public, MIT) that every glass addon embeds (#57; the migration
-guide is `C:\Projects\WoW\References\LIBGLASS-MIGRATION.md`). Its repo owns the code, the textures,
+guide is `C:\Projects\WoW\References\Docs\LIBGLASS-MIGRATION.md`). Its repo owns the code, the textures,
 the generator (`Tools/make_textures.py`) and the write-up (`docs/GLASS-MATERIAL.md`: layers,
 parameters, gotchas, history), and its `CLAUDE.md` holds the contract (the API, region fields and
 texture names only grow; instances; upgrade rules).
@@ -441,12 +441,12 @@ texture names only grow; instances; upgrade rules).
 
 ## References: read these before touching an unfamiliar API
 
-- `C:\Projects\WoW\References\PORTING-TBC-TO-FOREVER.md` holds the canonical addon-agnostic field
+- `C:\Projects\WoW\References\Docs\PORTING-TBC-TO-FOREVER.md` holds the canonical addon-agnostic field
   notes, measured on the live client. Treat them as fact. Other sessions edit this file, so
   write new addon-agnostic findings there, not into a copy here. Read "False friends" before
   porting any TBC call: several moved APIs return a struct instead of a tuple
   (`C_SkillInfo.GetSkillLineInfo`, `C_Container.GetContainerItemInfo`).
-- `C:\Projects\WoW\References\forever-api-1.60.1.70338.md` is the full API dump: functions, events,
+- `C:\Projects\WoW\References\Forever\api\forever-api-1.60.1.70338.md` is the full API dump: functions, events,
   **widget methods** (the only list of those) and the `_G` walk. It proves a name exists, not
   that it works. `GetProfessions` is listed but returns `nil x7`. **The `_G` walk includes the
   globals of whatever addons were loaded** (70124 and 70338 list `GetMapID`, `GetTalentData`, `ConvertID`,
@@ -500,7 +500,7 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`).
 - In game: `/console scriptErrors 1`, then `/reload`. Check the AddOns list shows the addon
   enabled and **not flagged out of date**. `/reload` loads a brand-new addon folder too; exit the
   client fully only to test persistence.
-- **Probes** (`Tools\<X>Probe`) are ForeverProbe modules (`References\PROBES.md`, the host's
+- **Probes** (`Tools\<X>Probe`) are ForeverProbe modules (`References\Docs\PROBES.md`, the host's
   `docs/GUIDE.md`): `/fp` console and their own saved log, never chat; guided procedures with
   `Probe:Steps`; results read from `WTF\...\SavedVariables\<X>Probe.lua` and `ForeverProbe.lua`
   after the owner's `/reload`, and written to `docs/FOREVER-PROBE.md`. `.pkgmeta` ignores `Tools`, so
