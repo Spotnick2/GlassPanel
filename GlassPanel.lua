@@ -81,6 +81,7 @@ local COMMANDS = {
     { "font arial|friz", "bar font" },
     { "glass clear|smoked", "the bar's glass" },
     { "tint neutral|class", "the glass's colour: neutral, or your class colour" },
+    { "window reflective|smoked", "the dialogs' material (a window already built keeps its look until /reload)" },
     { "options", "open the options panel (Options > AddOns > Glass Panel)" },
     { "setup", "move Blizzard's top frames below the bar in an Edit Mode layout (shows the plan first)" },
     { "setup back", "switch back to the Edit Mode layout you had before" },
@@ -169,6 +170,12 @@ local function slash(msg)
         if not Settings.SetGlass(arg:lower()) then say("glass: clear or smoked (now " .. db.glass .. ")") end
     elseif cmd == "tint" then
         if not Settings.SetGlassTint(arg:lower()) then say("tint: neutral or class (now " .. db.glassTint .. ")") end
+    elseif cmd == "window" then
+        if Settings.SetWindowGlass(arg:lower()) then
+            say("windows: " .. db.windowGlass .. " (a window already built keeps its look until /reload)")
+        else
+            say("window: reflective or smoked (now " .. db.windowGlass .. ")")
+        end
     elseif cmd == "room" then
         if arg:lower() == "why" then
             say("room (" .. db.room .. "): what each watched frame measured, screen px")

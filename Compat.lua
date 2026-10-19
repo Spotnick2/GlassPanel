@@ -284,11 +284,20 @@ end
 
 -- A glass dialog window: FULLSCREEN_DIALOG (above the Settings panel it may
 -- be opened from), clamped, Escape closes it (UISpecialFrames, as AltStable
--- does on Forever), and an opaque backing under the glass: the glass is made
--- for the world, and over the Settings panel its text showed through (#36).
--- The backing sits above the shadow (-8), under the tint (-6), clipped by the
--- glass's own rounded mask. Fields: glass, backing, title, and hint (which
+-- does on Forever). Fields: glass, backing, pane, reflect, title, and hint (which
 -- wraps inside the window: anchor content below `win.hint`). Hidden.
+--
+-- The look is the reflective shell of References\Docs\LIBGLASS-WINDOW-STYLING.md
+-- (#93), on the clean instance (LibGlass r9's Reflect): a moderately smoked
+-- shell, an extra masked backing so the Settings panel can't show through
+-- (#36), a header reflection over the title and hint, and one masked reading
+-- region (`pane`) under them for whatever the caller puts in the window.
+-- Backing (BACKGROUND -7) sits above the shadow (-8), under the tint (-6),
+-- clipped by the glass's own rounded mask. The earlier look (a near-opaque backing on the
+-- classic small glass) stays for the setting `windowGlass` "smoked" and for a library
+-- copy older than r9 (or no clean instance).
+local HEADER = 64   -- px the header reflection spans: gone before the reading region
+
 function API.Window(name, width, height)
     local Glass = GlassPanel.Glass
     local win = CreateFrame("Frame", name, UIParent)
@@ -300,16 +309,44 @@ function API.Window(name, width, height)
     win:Hide()
     local special = rawget(_G, "UISpecialFrames")
     if type(special) == "table" and name then table.insert(special, name) end
-    win.glass = Glass.Apply(win, "small")
-    win.backing = win:CreateTexture(nil, "BACKGROUND", nil, -7)
-    win.backing:SetAllPoints(win)
-    win.backing:SetColorTexture(0.05, 0.06, 0.08, 0.96)
-    win.backing:AddMaskTexture(win.glass.mask)
     win.title = Glass.Font(win, 14, "LEFT")
     win.title:SetPoint("TOPLEFT", win, "TOPLEFT", 14, -12)
     win.hint = Glass.Font(win, 11, "LEFT")
     win.hint:SetPoint("TOPLEFT", win.title, "BOTTOMLEFT", 0, -6)
     win.hint:SetPoint("RIGHT", win, "RIGHT", -14, 0)   -- wraps, never past the edge
     win.hint:SetTextColor(0.75, 0.75, 0.75)
+
+    local clean = GlassPanel.CleanGlass and GlassPanel.CleanGlass()
+    local smoked = type(GlassPanelDB) == "table" and GlassPanelDB.windowGlass == "smoked"   -- the player's choice (#93)
+    if clean and clean.Reflect and clean.SetSurfaceAlpha and not smoked then
+        local g = clean.Apply(win, "large")
+        win.glass = g
+        clean.SetSurfaceTint(g, 0.085, 0.095, 0.115, 0.78)
+        clean.SetWash(g, 0)
+        clean.SetEdge(g, 0, 0, 0)
+        clean.SetSurfaceAlpha(g, "rim", 0.12)
+        clean.SetSurfaceAlpha(g, "dark", 0.55)
+        clean.SetSurfaceAlpha(g, "grain", 0)
+        clean.SetSurfaceAlpha(g, "shadow", 0.18)
+        win.backing = win:CreateTexture(nil, "BACKGROUND", nil, -7)
+        win.backing:SetAllPoints(win)
+        win.backing:SetColorTexture(0.03, 0.03, 0.035, 0.55)
+        win.backing:AddMaskTexture(g.mask)
+        win.reflect = clean.Reflect(g, win, { header = math.max(0, math.min(HEADER, height - 12)) })
+        -- The reading region: one plain masked texture under the hint, to the
+        -- bottom, whatever the hint's line count.
+        win.pane = win:CreateTexture(nil, "BACKGROUND", nil, -7)
+        win.pane:SetPoint("TOPLEFT", win.hint, "BOTTOMLEFT", -6, -8)
+        win.pane:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -8, 8)
+        win.pane:SetColorTexture(0.072, 0.082, 0.10, 0.94)
+        local S = clean.SIZES.thin_small
+        win.pane:AddMaskTexture(clean.Mask(win, S.mask, S.maskMargin, 0, win.pane))
+    else
+        win.glass = Glass.Apply(win, "small")
+        win.backing = win:CreateTexture(nil, "BACKGROUND", nil, -7)
+        win.backing:SetAllPoints(win)
+        win.backing:SetColorTexture(0.05, 0.06, 0.08, 0.96)
+        win.backing:AddMaskTexture(win.glass.mask)
+    end
     return win
 end

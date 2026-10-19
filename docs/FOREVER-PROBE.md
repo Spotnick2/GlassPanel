@@ -1,7 +1,7 @@
 # Measured on Forever
 
 What GlassPanel's probes measured in game. Each entry names its build. Addon-agnostic findings are
-copied to `C:\Projects\WoW\References\PORTING-TBC-TO-FOREVER.md`.
+copied to `C:\Projects\WoW\References\Docs\PORTING-TBC-TO-FOREVER.md`.
 
 ## RestedXP Guides (RXPProbe, #80): 1.60.1.70374, 2026-10-15
 

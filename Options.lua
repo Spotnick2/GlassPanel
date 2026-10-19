@@ -304,6 +304,9 @@ local function build()
         function() return db().glass end, Settings.SetGlass)
     widgets.glassTint = radios(left, "Tint", { { "neutral", "Neutral" }, { "class", "Class colour" } },
         function() return db().glassTint end, Settings.SetGlassTint)
+    widgets.windowGlass = radios(left, "Windows", { { "reflective", "Reflective" }, { "smoked", "Smoked" } },
+        function() return db().windowGlass end, Settings.SetWindowGlass)
+    note(left, "Share, Setup and the other dialogs. A window already open keeps its look until /reload.")
 
     header(left, "Layout")
     note(left, "Drag a block to move it; shift-drag moves its whole lane.")

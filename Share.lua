@@ -2,7 +2,7 @@
 -- account to another, like Edit Mode's layout sharing.
 --
 -- What travels: the settings that describe the setup (layout, hidden,
--- labels, labelsFor, iconsFor, room, font, shown, glass, glassTint). Not
+-- labels, labelsFor, iconsFor, room, font, shown, glass, glassTint, windowGlass). Not
 -- plugins' own data
 -- (Layer's known layers, XP's session).
 --
@@ -190,7 +190,7 @@ function Share.Current()
     local d = GlassPanelDB
     return {
         font = d.font, shown = d.shown, room = d.room, labels = d.labels,
-        glass = d.glass, glassTint = d.glassTint,
+        glass = d.glass, glassTint = d.glassTint, windowGlass = d.windowGlass,
         hidden = copyMap(d.hidden), labelsFor = copyMap(d.labelsFor), iconsFor = copyMap(d.iconsFor),
         layout = Layout.Lanes(),
     }
@@ -279,6 +279,11 @@ function Share.Clean(raw)
     local tint = raw.glassTint == nil and D.glassTint or raw.glassTint
     if not (type(tint) == "string" and GlassPanel.Bar.GLASS_TINTS[tint]) then return nil, "unknown glass tint" end
     out.glassTint = tint
+    local windowGlass = raw.windowGlass == nil and D.windowGlass or raw.windowGlass
+    if not (type(windowGlass) == "string" and Settings.WINDOW_GLASS[windowGlass]) then
+        return nil, "unknown window glass"
+    end
+    out.windowGlass = windowGlass
     for _, k in ipairs({ "shown", "labels" }) do
         local v = raw[k]
         if v == nil then v = D[k] end
