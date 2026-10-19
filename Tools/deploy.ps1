@@ -23,7 +23,7 @@
 
     Usage:
         pwsh Tools/deploy.ps1
-        pwsh Tools/deploy.ps1 -Probe        # ...and the probes (RXPProbe)
+        pwsh Tools/deploy.ps1 -Probe        # ...and the probes (RestProbe)
         pwsh Tools/deploy.ps1 -ProbeOnly    # just the probes
         pwsh Tools/deploy.ps1 -AddOnsPath "D:\...\_classic_beta_\Interface\AddOns"
 #>
@@ -67,7 +67,7 @@ function Deploy-Probes {
 if ($ProbeOnly) {
     Deploy-Probes
     Write-Host ""
-    Write-Host "In game: /reload, then /fp steps rxp arrow (or /fp rxp)" -ForegroundColor Green
+    Write-Host "In game: /reload, then /fp steps rest rested" -ForegroundColor Green
     exit 0
 }
 

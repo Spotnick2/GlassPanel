@@ -21,9 +21,8 @@ for line in f:lines() do
 end
 f:close()
 
--- Exercise everything so every method is recorded. RestedXP installed, so
--- its bridge plugin loads too (#80).
-loadAddon({ before = function() WoW.installRXP() end })
+-- Exercise everything so every method is recorded.
+loadAddon()
 for _, blk in ipairs(GlassPanel.Engine.blocks) do
     local w = blk.widget
     w._scripts.OnEnter(w); w._scripts.OnLeave(w); w._scripts.OnClick(w, "LeftButton")
