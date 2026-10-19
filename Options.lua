@@ -57,10 +57,10 @@ local function header(col, text)
     place(col, label(text, "GameFontNormalLarge"), 26)
 end
 
-local function note(col, text, width)
+local function note(col, text, width, height)
     local fs = label(text, "GameFontHighlightSmall")
     fs:SetWidth(width or 300)
-    place(col, fs, 18, 4)
+    place(col, fs, height or 18, 4)
 end
 
 local function button(col, text, width, onClick)
@@ -309,14 +309,14 @@ local function build()
     widgets.glass = radios(left, "Glass", { { "clear", "Clear" }, { "smoked", "Smoked" } },
         function() return db().glass end, Settings.SetGlass, GlassPanel.Suite.Following)
     widgets.glassTint = radios(left, "Tint", { { "neutral", "Neutral" }, { "class", "Class colour" } },
-        function() return db().glassTint end, Settings.SetGlassTint)
+        function() return db().glassTint end, Settings.SetGlassTint, GlassPanel.Suite.Following)
     widgets.windowGlass = radios(left, "Windows", { { "reflective", "Reflective" }, { "smoked", "Smoked" } },
         function() return db().windowGlass end, Settings.SetWindowGlass, GlassPanel.Suite.Following)
-    note(left, "Share, Setup and the other dialogs. A window already open keeps its look until /reload.")
-    -- Following Glass UI (#96): the body and the windows are set there; ours stay saved.
-    local suiteNote = label("Following Glass UI (Pearl): the glass and the windows are set in Glass UI.", "GameFontHighlightSmall")
+    note(left, "Share, Setup and the other dialogs. A window already open keeps its look until /reload.", 300, 32)   -- two lines at this width
+    -- Following Glass UI (#96): the body, its tint and the windows are set there; ours stay saved.
+    local suiteNote = label("Following Glass UI (Pearl): the glass, its tint and the windows are set in Glass UI.", "GameFontHighlightSmall")
     suiteNote:SetWidth(300)
-    place(left, suiteNote, 30, 4)
+    place(left, suiteNote, 34, 4)
     widgets.suiteButton = button(left, "Open Glass UI", 160, function() GlassPanel.Suite.Open() end)
     refreshers[#refreshers + 1] = function()
         local on = GlassPanel.Suite.Following()
