@@ -166,6 +166,8 @@ local function slash(msg)
         Settings.SetShown(not db.shown)
     elseif cmd == "font" then
         if not Settings.SetFont(arg:lower()) then say("fonts: arial, friz") end
+    elseif (cmd == "glass" or cmd == "window") and GlassPanel.Suite.Following() then
+        say(cmd .. ": set in Glass UI (following the suite's Pearl; yours stay saved)")
     elseif cmd == "glass" then
         if not Settings.SetGlass(arg:lower()) then say("glass: clear or smoked (now " .. db.glass .. ")") end
     elseif cmd == "tint" then

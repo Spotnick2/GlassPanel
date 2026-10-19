@@ -144,7 +144,8 @@ local function slider(col, text, min, max, step, fmt, get, set)
 end
 
 -- Mutually exclusive choices: { { value, text }, ... }.
-local function radios(col, title, options, get, set)
+-- `locked()` (optional) greys the group out: its setting is suspended (#96).
+local function radios(col, title, options, get, set, locked)
     if title then place(col, label(title), 22, 4) end
     local group = {}
     for _, o in ipairs(options) do
@@ -159,7 +160,12 @@ local function radios(col, title, options, get, set)
     end
     refreshers[#refreshers + 1] = function()
         local current = get()
-        for _, rb in ipairs(group) do rb:SetChecked(rb.value == current) end
+        local off = locked and locked() and true or false
+        for _, rb in ipairs(group) do
+            rb:SetChecked(rb.value == current)
+            rb:SetEnabled(not off)
+            rb:SetAlpha(off and 0.35 or 1)
+        end
     end
     return group
 end
@@ -301,12 +307,22 @@ local function build()
         { "full", "Always full width" } },
         function() return db().room end, Settings.SetRoom)
     widgets.glass = radios(left, "Glass", { { "clear", "Clear" }, { "smoked", "Smoked" } },
-        function() return db().glass end, Settings.SetGlass)
+        function() return db().glass end, Settings.SetGlass, GlassPanel.Suite.Following)
     widgets.glassTint = radios(left, "Tint", { { "neutral", "Neutral" }, { "class", "Class colour" } },
         function() return db().glassTint end, Settings.SetGlassTint)
     widgets.windowGlass = radios(left, "Windows", { { "reflective", "Reflective" }, { "smoked", "Smoked" } },
-        function() return db().windowGlass end, Settings.SetWindowGlass)
+        function() return db().windowGlass end, Settings.SetWindowGlass, GlassPanel.Suite.Following)
     note(left, "Share, Setup and the other dialogs. A window already open keeps its look until /reload.")
+    -- Following Glass UI (#96): the body and the windows are set there; ours stay saved.
+    local suiteNote = label("Following Glass UI (Pearl): the glass and the windows are set in Glass UI.", "GameFontHighlightSmall")
+    suiteNote:SetWidth(300)
+    place(left, suiteNote, 30, 4)
+    widgets.suiteButton = button(left, "Open Glass UI", 160, function() GlassPanel.Suite.Open() end)
+    refreshers[#refreshers + 1] = function()
+        local on = GlassPanel.Suite.Following()
+        suiteNote:SetShown(on)
+        widgets.suiteButton:SetShown(on and GlassPanel.Suite.CanOpen())
+    end
 
     header(left, "Layout")
     note(left, "Drag a block to move it; shift-drag moves its whole lane.")

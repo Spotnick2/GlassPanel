@@ -477,6 +477,8 @@ Bar.glassPending = false
 Bar.surfaces = {}   -- { g, glass }: plugins' surfaces painted like the bar (API.MatchPanelGlass)
 
 local function paintOne(g, material, tint, glass)
+    -- Following Glass UI (#96) suspends the body: the saved choice is kept, the built look shows.
+    if GlassPanel.Suite.Following() then material = "clear" end
     local ok, known = pcall(paintGlass, g, material, tint, glass)
     if not ok then
         API.Fail("bar:glass", known)
