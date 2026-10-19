@@ -18,6 +18,22 @@ eq(WoW.settings.canvas and WoW.settings.canvas.name, "Glass Panel", "named Glass
 eq(WoW.settings.addon, WoW.settings.canvas, "listed under AddOns")
 GlassPanel._test.slash("options")
 eq(WoW.settings.opened, 4242, "/gpanel options opens it")
+-- The first open can leave the page empty (#104): one more ask a frame later, only if it isn't up.
+do
+    O().panel:Hide(); WoW.timers = {}
+    local asks, real = 0, Settings.OpenToCategory
+    Settings.OpenToCategory = function(...) asks = asks + 1; return real(...) end
+    GlassPanel.Options.Open()
+    eq(asks, 1, "Open asks once at once")
+    WoW.flushTimers()
+    eq(asks, 2, "...and again a frame later when the page isn't showing")
+    asks = 0
+    O().panel:Show()
+    GlassPanel.Options.Open(); WoW.flushTimers()
+    eq(asks, 1, "...but not when the page is already up")
+    O().panel:Hide()
+    Settings.OpenToCategory = real
+end
 
 open()
 local rows, c = O().rows, O().controls

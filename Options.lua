@@ -381,11 +381,22 @@ local function register()
 end
 
 -- Open the panel; false when the Settings framework can't (a throw from
--- GetID included).
-function Options.Open()
+-- GetID included). Opened from nothing (the Options window closed), the
+-- client has shown Glass Panel selected with an empty page (#104, seen from
+-- Glass UI's button): a frame later, if our page still isn't up, ask once more.
+local function openToCategory()
     local S = rawget(_G, "Settings")
     if not (category and type(S) == "table" and S.OpenToCategory) then return false end
     return pcall(function() return S.OpenToCategory(category:GetID()) end) and true or false
+end
+function Options.Open()
+    local ok = openToCategory()
+    if ok and C_Timer and C_Timer.After then
+        C_Timer.After(0, function()
+            if not panel:IsVisible() then openToCategory() end
+        end)
+    end
+    return ok
 end
 
 -- A setting changed (from /gpanel, an import, this panel): an open panel
