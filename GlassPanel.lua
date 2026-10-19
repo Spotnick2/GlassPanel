@@ -229,6 +229,7 @@ boot:SetScript("OnEvent", function(_, event, arg1)
         Glass.SetFont(db.font)
         Bar.Build()
         Bar.SetShown(db.shown)
+        GlassPanel.Edge.Start()
         SLASH_GLASSPANEL1 = "/gpanel"
         SlashCmdList.GLASSPANEL = slash
     elseif event == "PLAYER_LOGIN" then
