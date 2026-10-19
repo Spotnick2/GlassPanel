@@ -560,6 +560,7 @@ local function placeFloat()
     else
         float:SetPoint("TOP", UIParent, "TOP", 0, DEFAULT_Y / scale)
     end
+    API.UpdateTopEdge()
 end
 
 -- Where the frame was let go, saved when every coordinate reads plainly and
@@ -671,6 +672,7 @@ local function buildFloat()
     f:RegisterForDrag("LeftButton")
     f:Hide()
     float = f
+    API.TrackTopEdge(f)   -- the bar announces the top band it covers (#97)
 
     floatUI = makeBar(f, FLOAT_BAR_H, FLOAT_FONT, surfaceGlass())
     floatUI.host:SetPoint("LEFT", f, "LEFT", 0, 0)
@@ -709,6 +711,7 @@ local function buildFloat()
         lastMoveStop = GetTime()
         self:StopMovingOrSizing()
         saveSpot()
+        API.UpdateTopEdge()
     end))
     f:SetScript("OnClick", guarded(function(self, button)
         -- The release that ends a move is not a click.

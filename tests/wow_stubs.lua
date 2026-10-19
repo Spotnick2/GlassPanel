@@ -220,6 +220,7 @@ function Methods.GetScale(w) return w._scale or 1 end
 -- one from the harness.
 function Methods.GetRect(w) if w._rect then return unpack(w._rect) end end
 function Methods.GetTop(w) if w._rect then return w._rect[2] + w._rect[4] end end
+function Methods.GetBottom(w) if w._rect then return w._rect[2] end end
 -- The centre: w._center = { x, y } (a test moving a frame sets it), else the
 -- rect's middle; nil without either.
 function Methods.GetCenter(w)

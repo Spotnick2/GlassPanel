@@ -151,3 +151,12 @@ grain, softer bars), made once, or `nil` when the loaded library is older: fall 
 `GlassPanel.Glass` (the player's font setting). `GlassPanel.API.MatchPanelGlass(g, glass)` paints
 your own surface (`glass.Apply(...)`) like the bar, Clear or Smoked, Neutral or Class colour, now and
 whenever the player changes them; pass the instance that built it (nil: `GlassPanel.Glass`).
+
+**The top edge (#97).** `GlassPanel.EdgeState()` returns `{ top = n }` (UIParent units down from the
+screen's top to the lowest bottom of what GlassPanel occupies there: 0 for nothing, the bar's height
+for the bar alone), or nil before the first measure; EventRegistry `"GlassPanel.EdgeChanged"` carries
+`(top)`, at the first measure and then out of combat when it moves more than half a unit (a change in
+combat at `PLAYER_REGEN_ENABLED`). A block with a frame of its own at the top of the screen registers
+it with `GlassPanel.API.TrackTopEdge(frame)` (once; it counts while visible and with its top within 40
+units of the screen's top or of the bar's bottom) and calls `GlassPanel.API.UpdateTopEdge()` after
+moving or rescaling it. Additive: `API_VERSION` is unchanged.

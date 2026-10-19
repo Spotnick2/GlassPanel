@@ -304,6 +304,7 @@ do
     w._scripts.OnClick(w, "LeftButton"); w._scripts.OnDoubleClick(w, "LeftButton"); WoW.tick()
     eq(GlassPanelXPDB.detached, true, "double-click: zoomed, and saved")
     local f = T().float()
+    eq(GlassPanel.Edge._test.tracked()[1], f, "the zoomed bar is tracked for the top edge (#97)")
     check(f ~= nil and f._shown, "the zoomed bar shows")
     eq(f._parent, UIParent, "on UIParent, not the panel")
     eq(w._shown, true, "the handle stays on the panel")

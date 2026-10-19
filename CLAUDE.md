@@ -36,7 +36,7 @@ list; the layout keeps a disabled plugin's place. `test_toc.lua` checks every pl
 `.pkgmeta` `move-folders` line.
 
 Core TOC load order: `Libs\LibGlass-1.0\LibGlass-1.0.xml` → `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` →
-`Room.lua` → `Settings.lua` → `Share.lua` → `Setup.lua` → `Options.lua` → `GlassPanel.lua`. Plugins load after the
+`Room.lua` → `Edge.lua` → `Settings.lua` → `Share.lua` → `Setup.lua` → `Options.lua` → `GlassPanel.lua`. Plugins load after the
 core's `ADDON_LOADED`.
 
 - **`Compat.lua`**: `GlassPanel.API`, the only route to client APIs that moved or may be absent.
@@ -117,6 +117,7 @@ core's `ADDON_LOADED`.
   `Layout.lua`, and dragging: a marker shows the drop slot, shift-drag moves a lane by the
   cursor's displacement, a drag under 10 px is a wobbly click (no move), the release that ends a
   drag isn't a click, and the drop target is recomputed after any relayout mid-drag. Hidden and empty blocks take no space. **Nothing is secure**, so the bar may be touched in combat.
+- **`Edge.lua`** (#97): the top edge GlassPanel occupies, announced for the suite (GAB's EdgeState / EdgesChanged pattern). `GlassPanel.EdgeState()` returns a fresh `{ top = n }` (UIParent units down from the screen's top to the lowest bottom of what we occupy there: 0 for nothing, `Bar.HEIGHT` for the bar), nil before the first measure, and EventRegistry `"GlassPanel.EdgeChanged"` `(top)` fires at the first measure, then out of combat on a move over 0.5 (a combat change at `PLAYER_REGEN_ENABLED`; `EdgeState` still has it). The bar counts while shown; a plugin's frame counts through `API.TrackTopEdge(frame)` (XP+'s zoomed bar) while visible and in the top band (its top within `MARGIN` 40 of the screen's top or the bar's bottom), converted from its own scale; any unreadable value skips the frame. `API.UpdateTopEdge()` after it moves; a measure runs on the next frame, coalesced, on the engine's 1 s clock and on scale/display events. Additive: `API_VERSION` unchanged.
 - **`Room.lua`**: making room for Blizzard's top frames (#2) **without moving any of them**. The
   bar measures a short watch list (`Room.WATCH`: minimap cluster, buffs, debuffs, ticket status,
   unit frames) and pulls its ends in to stop short of any that reach into its band. A frame hidden
