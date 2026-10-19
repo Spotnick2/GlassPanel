@@ -35,7 +35,7 @@ the AddOns list: `## Group: GlassPanel`, title `Glass Panel |cFF0099FF[XP+]|r` u
 list; the layout keeps a disabled plugin's place. `test_toc.lua` checks every plugin TOC and the
 `.pkgmeta` `move-folders` line.
 
-Core TOC load order: `Libs\LibGlass-1.0\LibGlass-1.0.xml` → `Compat.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` →
+Core TOC load order: `Libs\LibGlass-1.0\LibGlass-1.0.xml` → `Compat.lua` → `Suite.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` →
 `Room.lua` → `Edge.lua` → `Settings.lua` → `Share.lua` → `Setup.lua` → `Options.lua` → `GlassPanel.lua`. Plugins load after the
 core's `ADDON_LOADED`.
 
@@ -67,9 +67,10 @@ core's `ADDON_LOADED`.
   raw `@project-version@`), never in a release (Priestly #76: what flags an addon out of date is the
   TOC's Interface, not this notice), and **once per new build** (`GlassPanelDB.notedBuild`), not at
   every login.
-- **`Glass.lua`**: `GlassPanel.Glass = LibStub("LibGlass-1.0"):New()`, this addon's instance of
-  the material (#57; see "The glass material" below). `GlassPanel.CleanGlass()` (public, #78): a
-  second instance with r6's clean preset, made once on demand, `nil` when the loaded copy's MINOR is
+- **`Suite.lua`** (#96): Glass UI's suite theme (`GlassUI\docs\SUITE.md`; Glass UI is optional, `## OptionalDeps: GlassUI`). Asked **once per session**, by `Glass.lua` at file scope before any glass is built: `rawget(_G, "GlassUI")`, `Suite` a table with `API == 1` exactly and `Theme`/`Report` functions (anything else is absent), then `pcall(Suite.Theme, "GlassPanel")`; a table with `preset == "pearl"` means **following** (opt-in, on Glass UI's page). Following suspends `glass` (the bar's body: the built look shows) and `windowGlass` (windows are Reflective): both stay saved untouched, `Settings.SetGlass`/`SetWindowGlass` refuse, `/gpanel glass|window` say "set in Glass UI", an import keeps them, the options radios are greyed with a note and an "Open Glass UI" button (`Suite.Open`, feature-detected with `rawget`, called under pcall). Still local: the font and the tint. `Suite.Report` (under pcall, `suite:report`) tells Glass UI `{ api = 1, built, reason, minor, options }`: `built = "pearl"` only when following and built, `reason` `"library-too-old"`/`"build-failed"` when it was following and couldn't. Never reads or writes Glass UI's data.
+- **`Glass.lua`**: `GlassPanel.Glass` is this addon's instance of
+  the material (#57; see "The glass material" below), built **Pearl** (LibGlass r11's preset, our own default look and the suite's, #96) with `{ preset = "pearl" }`; a library older than r11 (checked by MINOR) or a `New` that errors falls back to the earlier look (`lib:New()`), recorded as `glass:pearl` and reported. No retry: LibGlass never restyles a built instance. `GlassPanel.CleanGlass()` (public, #78): a
+  second instance (Pearl when the main glass is Pearl, else r6's clean preset), made once on demand, `nil` when the loaded copy's MINOR is
   under 6 (the newest copy among glass addons runs). Surfaces only: text stays on `GlassPanel.Glass`
   (the font setting). The panel itself stays classic.
 - **`Engine.lua`**: the block registry (`GlassPanel.RegisterBlock`, `GlassPanel.Refresh`) and
@@ -399,7 +400,7 @@ texture names only grow; instances; upgrade rules).
   a dev copy comes from the LibGlass checkout (`$env:LIBGLASS`, default `..\LibGlass`) through its
   own `Tools\deploy.ps1`, which `Tools\deploy.ps1` here calls first (a refusal leaves the deployed
   addon untouched). The tests load the same checkout and fail loudly without one.
-- **The pin:** `.pkgmeta` pins a commit or tag (`r9` since #93: `API.Window`'s reflective shell is r9's `Glass.Reflect`; r7: the smoked wash goes through r7's `SetWash`; r6's clean preset for the zoomed XP+ bar; the bar's tint needs r3's
+- **The pin:** `.pkgmeta` pins a commit or tag (`r11` since #96: Pearl; r9 since #93: `API.Window`'s reflective shell is r9's `Glass.Reflect`; r7: the smoked wash goes through r7's `SetWash`; r6's clean preset for the zoomed XP+ bar; the bar's tint needs r3's
   `SetSurfaceTint`), **never `tag: latest`**, and **no comment on a
   value line** (the packager keeps it in the value). Bump it only in a release made anyway: players
   get library fixes earlier through whichever glass addon ships the newest copy (LibStub runs that

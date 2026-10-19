@@ -318,6 +318,7 @@ function API.Window(name, width, height)
 
     local clean = GlassPanel.CleanGlass and GlassPanel.CleanGlass()
     local smoked = type(GlassPanelDB) == "table" and GlassPanelDB.windowGlass == "smoked"   -- the player's choice (#93)
+        and not GlassPanel.Suite.Following()   -- suspended while following Glass UI (#96)
     if clean and clean.Reflect and clean.SetSurfaceAlpha and not smoked then
         local g = clean.Apply(win, "large")
         win.glass = g

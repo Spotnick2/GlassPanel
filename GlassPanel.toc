@@ -5,10 +5,12 @@
 ## Version: @project-version@
 ## Group: GlassPanel
 ## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
+## OptionalDeps: GlassUI
 ## SavedVariables: GlassPanelDB
 
 Libs\LibGlass-1.0\LibGlass-1.0.xml
 Compat.lua
+Suite.lua
 Glass.lua
 Engine.lua
 Layout.lua

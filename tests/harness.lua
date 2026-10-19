@@ -115,6 +115,8 @@ end
 -- opts.before(): runs after the core's files load but before its ADDON_LOADED:
 -- a block registered there takes the early path (attached at Bar.Build).
 -- Real plugins load after it (below), so don't use this to stand in for one.
+-- opts.afterLibrary(): runs right after LibGlass loads, before the core's own files
+-- (Glass.lua builds at file scope, #96): a test of an older library goes here.
 function loadAddon(opts)
     opts = opts or {}
     -- A fresh session each call; client data (WoW.money, ...) set by the test stays.
@@ -134,6 +136,7 @@ function loadAddon(opts)
             local chunk = assert(loadfile(file))
             chunk("GlassPanel", ns)
         end
+        if line == LIBGLASS_XML and opts.afterLibrary then opts.afterLibrary() end
     end
     if opts.db then GlassPanelDB = opts.db end
     if opts.before then opts.before() end

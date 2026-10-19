@@ -570,7 +570,7 @@ do
     eq(T().surfaceGlass(), GlassPanel.Glass, "the zoomed bar on the panel's glass")
     local bg = T().backGlass()
     check(bg ~= nil and T().back()._shown, "a saved backing is built with the bar")
-    eq(bg.size, "small", "the panel's rims")
+    eq(bg.size, "thin_small", "the panel's rims (Pearl resolves small to thin_small)")
     check(next(GlassPanel.failures) == nil, "r5: nothing tried, nothing recorded")
     -- Hiding Blizzard's bar still follows XP+ on screen while zoomed.
     local c

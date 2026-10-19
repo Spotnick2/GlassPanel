@@ -55,6 +55,7 @@ end
 -- right now is said, and painted once it can be (Bar.glassPending).
 local function setGlass(key, value, allowed)
     if not allowed[value] then return false end
+    if key == "glass" and GlassPanel.Suite.Following() then return false end   -- set in Glass UI (#96)
     db()[key] = value
     if not Bar.ApplyGlass(db().glass, db().glassTint) then
         GlassPanel.API.Print("your class colour can't be read yet: the glass takes it when it can.")
@@ -68,6 +69,7 @@ function Settings.SetGlassTint(tint) return setGlass("glassTint", tint, Bar.GLAS
 -- The windows' material (#93): false when it isn't one of them.
 function Settings.SetWindowGlass(material)
     if type(material) ~= "string" or not Settings.WINDOW_GLASS[material] then return false end
+    if GlassPanel.Suite.Following() then return false end   -- set in Glass UI (#96)
     db().windowGlass = material
     changed()
     return true
@@ -165,7 +167,9 @@ end
 function Settings.ApplyAll(setup)
     local d = db()
     d.font, d.shown, d.room, d.labels = setup.font, setup.shown, setup.room, setup.labels
-    d.glass, d.glassTint, d.windowGlass = setup.glass, setup.glassTint, setup.windowGlass
+    d.glassTint = setup.glassTint
+    -- Following Glass UI suspends the body and the windows' look: an import keeps ours (#96).
+    if not GlassPanel.Suite.Following() then d.glass, d.windowGlass = setup.glass, setup.windowGlass end
     d.hidden, d.labelsFor, d.iconsFor = copyMap(setup.hidden), copyMap(setup.labelsFor), copyMap(setup.iconsFor)
     d.layout = Layout.Clean(setup.layout)
     Glass.SetFont(d.font)
