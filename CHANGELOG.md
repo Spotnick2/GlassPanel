@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- New plugin **Combat**: a combat timer. On the bar it shows crossed swords and "Out of Combat", or the fight's time. Double-click the icon to zoom it: a glass pill appears on the screen, only while you're in combat (shift-drag to move it; Options > Plugin options > Combat has a preview to place it). The zoomed XP+ bar and the pill stack so they never overlap; drop one onto the other and it snaps clear. If you use Glass Unit Frames, its portrait timer can be turned off from Combat's options ("Use this timer instead of Glass Unit Frames'").
+- New plugin **Combat**: a combat timer. On the bar it shows crossed swords and "Out of Combat", or the fight's time. Double-click the icon to zoom it: the bar then says "In Combat" and a glass pill with the time appears on the screen, only while you're in combat, at XP+'s text size (its scale is a slider) (shift-drag to move it; Options > Plugin options > Combat has a preview to place it). The zoomed XP+ bar and the pill stack so they never overlap; drop one onto the other and it snaps clear. If you use Glass Unit Frames, its portrait timer can be turned off from Combat's options ("Use this timer instead of Glass Unit Frames'").
 - Window titles are gold like the stock UI's. If you follow Glass UI, the gold of the bar's captions and the window titles takes Glass UI's accent colour, live.
 - Opening Glass Panel's settings from Glass UI's button no longer leaves an empty page the first time.
 - The glass is now **Pearl**, the suite's look: the same depth with softer highlights. If you use Glass UI, you can switch Glass Panel to follow its theme on Glass UI's page; the glass, its tint and window choices here are then set there (and come back as you left them when you stop following).

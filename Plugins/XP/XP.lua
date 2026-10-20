@@ -581,7 +581,7 @@ end
 
 local function resetSpot()
     db().spot = nil
-    if float then placeFloat() end
+    if float then placeFloat(); API.PlaceFloats() end
 end
 
 -- The slider: clamped, in steps; 1 (the default) is stored as nothing. Live:
@@ -591,7 +591,7 @@ local function setScale(v)
     if not v then return end
     v = math.max(SCALE_MIN, math.min(SCALE_MAX, math.floor(v / SCALE_STEP + 0.5) * SCALE_STEP))
     db().scale = (math.abs(v - 1) > 1e-6) and v or nil
-    if float then placeFloat() end
+    if float then placeFloat(); API.PlaceFloats() end
 end
 
 local function stopTicker()

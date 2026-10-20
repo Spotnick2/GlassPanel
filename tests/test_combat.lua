@@ -33,7 +33,7 @@ eq(textOf("combat"), "00:00", "a fight starts at 00:00")
 WoW.now = 1007.4
 GlassPanel.Refresh("combat"); WoW.tick()
 eq(textOf("combat"), "00:07", "seven seconds in")
-eq(block("combat").interval(), 1, "ticking each second while it counts")
+eq(block("combat").interval, 1, "ticking each second")
 WoW.now = 4700
 GlassPanel.Refresh("combat"); WoW.tick()
 eq(textOf("combat"), "1:01:40", "past an hour")
@@ -43,11 +43,17 @@ WoW.fire("PLAYER_ENTERING_WORLD"); WoW.tick()
 eq(textOf("combat"), "1:01:50", "a loading screen inside a fight keeps its start")
 leave()
 eq(textOf("combat"), "Out of Combat", "back to idle")
-eq(block("combat").interval(), 30, "no fast clock when idle")
+-- The engine's clock alone moves the docked time (a retained idle deadline must not delay it).
+WoW.now = 6000
+enter()
+WoW.now = 6003
+WoW.tick(1.0); WoW.tick()
+eq(textOf("combat"), "00:03", "the clock repaints the time within a second of the fight starting")
+leave()
 local tipLines = {}
 widget()._scripts.OnEnter(widget())
 for _, l in ipairs(GameTooltip._lines) do tipLines[#tipLines + 1] = l end
-check(table.concat(tipLines, "\n"):find("1:01:50", 1, true), "the tooltip remembers the last fight")
+check(table.concat(tipLines, "\n"):find("00:03", 1, true), "the tooltip remembers the last fight")
 GameTooltip:Hide()
 
 -- A /reload mid-fight counts from the reload; entering the world out of combat is idle.
@@ -65,8 +71,8 @@ WoW.combat = false
 loadAddon()
 dbl()
 eq(GlassPanelCombatDB.detached, true, "double-click zooms, and saves")
-eq(textOf("combat"), "", "the bar keeps only the icon")
-eq(widget()._width, 4 + 14 + 4 + 4, "the panel keeps the icon alone")
+eq(textOf("combat"), "Out of Combat", "zoomed, out of fight: the bar says so")
+eq(widget()._width, 104, "the same width zoomed")
 eq(C().pill(), nil, "zoomed but out of combat: no pill built")
 WoW.now = 100
 enter()
@@ -86,7 +92,10 @@ enter()
 check(pill._shown, "the next fight shows it again")
 dbl()
 eq(pill._shown, false, "docking hides it")
-check(textOf("combat") ~= "", "docked in combat: the bar shows the time")
+eq(textOf("combat"), "00:00", "docked in combat: the bar shows the time")
+dbl()
+eq(textOf("combat"), "In Combat", "zoomed in combat: the bar says In Combat, the pill has the time")
+dbl()
 leave()
 
 -- Moving: shift-drag, saved from UIParent's centre; never a plain drag.
@@ -96,16 +105,25 @@ pill._scripts.OnDragStart(pill)
 eq(pill._moving, nil, "a plain drag doesn't move it")
 WoW.shift = true; pill._scripts.OnDragStart(pill); WoW.shift = false
 eq(pill._moving, true, "shift-drag moves it")
-pill._center = { 600.3, 700 }
+pill._center = { 400, 700 }
 pill._scripts.OnDragStop(pill)
-check(GlassPanelCombatDB.spot and GlassPanelCombatDB.spot.x == 100.5 and GlassPanelCombatDB.spot.y == 316, "saved, rounded to 0.5")
+local sc = C().pillScale()
+eq(sc, 1.5, "the pill is at XP+'s usual scale")
+check(GlassPanelCombatDB.spot and GlassPanelCombatDB.spot.x == 400 * sc - 500 and GlassPanelCombatDB.spot.y == 700 * sc - 384, "saved in screen units, rounded to 0.5")
 local p = pill._points[1]
-check(#pill._points == 1 and p[1] == "CENTER" and p[4] == 100.5 and p[5] == 316, "anchored on the saved spot")
+check(#pill._points == 1 and p[1] == "CENTER" and p[4] == (400 * sc - 500) / sc, "anchored on the saved spot, in its own scale")
+eq(pill._scale, sc, "scaled")
+C().setScale(1)
+eq(pill._scale, 1, "the slider rescales it live")
+eq(pill._points[1][4], 400 * 1.5 - 500, "...around the same screen spot")
+C().setScale(9)
+eq(C().pillScale(), 2, "clamped")
+C().setScale(1.5)
 -- Hidden mid-move (the fight ends): stopped, the last good spot kept.
 WoW.shift = true; pill._scripts.OnDragStart(pill); WoW.shift = false
 leave()
 eq(pill._moving, false, "hidden mid-move: stopped")
-eq(GlassPanelCombatDB.spot.x, 100.5, "the saved spot is untouched")
+eq(GlassPanelCombatDB.spot.x, 400 * 1.5 - 500, "the saved spot is untouched")
 C().resetSpot()
 eq(GlassPanelCombatDB.spot, nil, "reset position")
 -- A corrupt saved spot: the default slot.
@@ -150,7 +168,7 @@ local xpF = block("xp")._test.float()
 local cp = C().pill()
 check(xpF and xpF._shown and cp and cp._shown, "both zoomed floats are up")
 eq(xpF._points[1][5], -40, "XP+ takes the first slot")
-eq(cp._points[1][5], -40 - 46 - 8, "the pill sits under it")
+eq(cp._points[1][5], (-40 - 46 - 8) / C().pillScale(), "the pill sits under it (offset in its own scale)")
 -- A drop snaps clear of the other float, for both.
 local snaps = {}
 local realSnap = GlassPanel.API.SnapFloat
@@ -172,10 +190,16 @@ leave(); thirdPlaces = 0
 enter()
 check(thirdPlaces > 0, "the pill showing places the floats after it")
 GlassPanelCombatDB.spot, GlassPanelXPDB.spot = nil, nil
+-- XP+'s scale and reset reflow the pill's slot.
+local xt = block("xp")._test
+xt.setScale(2)
+eq(cp._points[1][5] * C().pillScale(), -40 - 46 * 2 - 8, "a bigger XP+ pushes the pill down")
+xt.setScale(1)
+eq(cp._points[1][5] * C().pillScale(), -40 - 46 - 8, "...and a smaller one pulls it up")
 GlassPanelXPDB.detached = nil
 block("xp")._test.setDetached(false)
 WoW.tick()
-eq(cp._points[1][5], -40, "XP+ docked: the pill moves up to the first slot")
+eq(cp._points[1][5], -40 / C().pillScale(), "XP+ docked: the pill moves up to the first slot")
 PLUGINS = { "GlassPanelCombat" }
 
 -- Glass Unit Frames' timer: a click's choice, read again, never copied.

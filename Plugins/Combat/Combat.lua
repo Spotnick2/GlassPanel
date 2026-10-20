@@ -1,6 +1,6 @@
 -- Plugins/Combat/Combat.lua: a combat timer (#108). On the bar, crossed
 -- swords and "Out of Combat", or the fight's time. Zoomed (left double-click,
--- as XP+): the bar keeps only the icon, and a glass pill floats on the screen
+-- as XP+): the bar says "In Combat" (the pill has the time), and a glass pill floats on the screen
 -- while you are in combat, and only then.
 --
 -- The clock is our own GetTime() stamp at PLAYER_REGEN_DISABLED (plain, never
@@ -24,6 +24,7 @@ local P = API.Plain
 
 local WIDTH = 104                 -- the block docked: icon + "Out of Combat"
 local PILL_W, PILL_H, PILL_FONT = 92, 26, 12   -- the text about XP+'s zoomed bar's
+local SCALE_MIN, SCALE_MAX, SCALE_STEP, SCALE_DEFAULT = 0.5, 2, 0.05, 1.5   -- XP+'s zoomed bar is usually 1.5
 local PREVIEW = 30                -- seconds the preview shows the pill
 local SPOT_LIMIT = 4096
 
@@ -80,13 +81,22 @@ local function savedSpot()
     return x, y
 end
 
+-- The saved scale, or the default when unset or out of range.
+local function pillScale()
+    local s = finite(db().scale)
+    if not s or s < SCALE_MIN or s > SCALE_MAX then return SCALE_DEFAULT end
+    return s
+end
+
 local function placePill()
+    local scale = pillScale()
+    pill:SetScale(scale)
     pill:ClearAllPoints()
     local x, y = savedSpot()
     if x then
-        pill:SetPoint("CENTER", UIParent, "CENTER", x, y)
+        pill:SetPoint("CENTER", UIParent, "CENTER", x / scale, y / scale)
     else
-        pill:SetPoint("TOP", UIParent, "TOP", 0, API.FloatDefaultY(pill))
+        pill:SetPoint("TOP", UIParent, "TOP", 0, API.FloatDefaultY(pill) / scale)
     end
     API.UpdateTopEdge()
 end
@@ -98,6 +108,8 @@ local function saveSpot()
     local ux, uy = UIParent:GetCenter()
     fx, fy, ux, uy = finite(fx), finite(fy), finite(ux), finite(uy)
     if fx and fy and ux and uy then
+        local scale = pillScale()
+        fx, fy = fx * scale, fy * scale
         local x, y = math.floor((fx - ux) * 2 + 0.5) / 2, math.floor((fy - uy) * 2 + 0.5) / 2
         if math.abs(x) <= SPOT_LIMIT and math.abs(y) <= SPOT_LIMIT then db().spot = { x = x, y = y } end
     end
@@ -106,6 +118,16 @@ end
 
 local function resetSpot()
     db().spot = nil
+    if pill then placePill() end
+    API.PlaceFloats()
+end
+
+-- The slider: clamped, in steps; live around the spot.
+local function setScale(v)
+    v = finite(v)
+    if not v then return end
+    v = math.max(SCALE_MIN, math.min(SCALE_MAX, math.floor(v / SCALE_STEP + 0.5) * SCALE_STEP))
+    db().scale = v
     if pill then placePill() end
     API.PlaceFloats()
 end
@@ -281,18 +303,14 @@ local block = GlassPanel.RegisterBlock({
     label = "Combat",
     icon = "Interface\\Icons\\Ability_DualWield",   -- crossed swords
     order = 25,
-    -- Zoomed: sized to its content, which is the icon alone (the handle that docks it back).
-    width = function()
-        if detached() then return nil end
-        return WIDTH
-    end,
+    width = function() return WIDTH end,
     events = { "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED" },
     onEvent = onEvent,
-    -- Docked, the time ticks once a second while it counts.
-    interval = function() return (inCombat and not detached()) and 1 or 30 end,
+    -- Docked, the time ticks once a second while it counts. Always 1: the engine only
+    -- re-asks a function when its countdown ends, so a 30 would delay the first tick.
+    interval = 1,
     text = function()
-        if detached() then return "" end
-        if inCombat then return format(elapsed()) end
+        if inCombat then return detached() and "In Combat" or format(elapsed()) end
         return "Out of Combat"
     end,
     tooltip = function(_, tt)
@@ -314,6 +332,8 @@ local block = GlassPanel.RegisterBlock({
           note = "Double-click the icon to zoom in or out. Shift-drag the pill to move it.",
           get = detached,
           set = function(on) setDetached(on) end },
+        { label = "Pill's scale", min = SCALE_MIN, max = SCALE_MAX, step = SCALE_STEP,
+          get = pillScale, set = setScale },
         { label = "Preview the pill for 30 s (to place it)", run = setPreview },
         { label = "Reset the pill's position", run = resetSpot },
         { label = "Use this timer instead of Glass Unit Frames'",
@@ -331,5 +351,5 @@ if block then
     block._test = { format = format, pill = function() return pill end, pillText = function() return pillText end,
                     setDetached = setDetached, setPreview = setPreview, state = function() return inCombat, startedAt, lastFight end,
                     ticker = function() return ticker end, usingOurs = usingOurs, useOurs = useOurs,
-                    resetSpot = resetSpot, moving = function() return moving end }
+                    resetSpot = resetSpot, setScale = setScale, pillScale = pillScale, moving = function() return moving end }
 end
