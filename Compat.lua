@@ -310,6 +310,7 @@ function API.Window(name, width, height)
     local special = rawget(_G, "UISpecialFrames")
     if type(special) == "table" and name then table.insert(special, name) end
     win.title = Glass.Font(win, 14, "LEFT")
+    GlassPanel.Suite.Accented(win.title)   -- the stock UI's gold, or the suite's accent (#106)
     win.title:SetPoint("TOPLEFT", win, "TOPLEFT", 14, -12)
     win.hint = Glass.Font(win, 11, "LEFT")
     win.hint:SetPoint("TOPLEFT", win.title, "BOTTOMLEFT", 0, -6)

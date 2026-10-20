@@ -26,6 +26,7 @@ local api                  -- GlassUI.Suite, when it speaks API 1
 local following = false
 local decided = false
 local built, failure, minor
+local listen             -- the accent listener (below)
 
 -- Glass UI's suite API, when it speaks version 1 exactly (anything else
 -- counts as absent: the released Glass UI has no `Suite` at all).
@@ -47,6 +48,7 @@ function Suite.Decide()
         local ok, answer = pcall(api.Theme, Suite.ADDON)
         if ok and type(answer) == "table" and answer.preset == "pearl" then following = true end
     end
+    if following then listen() end
     return following
 end
 
@@ -87,4 +89,47 @@ function Suite.Open()
     return ok and opened == true
 end
 
-Suite._test = { suiteAPI = suiteAPI, built = function() return built, failure, minor end }
+-- The suite's accent (#106): the colour of the stock UI's gold text (bar
+-- captions, window titles) follows Glass UI's accent while we follow the suite.
+-- `Suite.Accent` was added within API 1: feature-detected, called under pcall
+-- with no name (the current accent), its answer checked (three plain numbers
+-- 0-1). Anything else, or not following: Blizzard's gold.
+local GOLD = { 1, 0.82, 0 }
+local accented = {}        -- the fontstrings wearing it
+
+function Suite.AccentColor()
+    if following and api and type(rawget(api, "Accent")) == "function" then
+        local ok, c = pcall(api.Accent)
+        if ok and type(c) == "table" then
+            local r, g, b = c.r or c[1], c.g or c[2], c.b or c[3]
+            if API.Plain(r) and API.Plain(g) and API.Plain(b)
+               and type(r) == "number" and type(g) == "number" and type(b) == "number"
+               and r >= 0 and r <= 1 and g >= 0 and g <= 1 and b >= 0 and b <= 1 then
+                return r, g, b
+            end
+        end
+    end
+    return GOLD[1], GOLD[2], GOLD[3]
+end
+
+local function paintAccented()
+    local r, g, b = Suite.AccentColor()
+    for _, fs in ipairs(accented) do fs:SetTextColor(r, g, b) end
+end
+
+-- Dress a fontstring in the accent now and whenever Glass UI changes it.
+function Suite.Accented(fs)
+    accented[#accented + 1] = fs
+    fs:SetTextColor(Suite.AccentColor())
+end
+
+-- Live: Glass UI fires LookChanged (an EventRegistry event) on every look
+-- change, in combat too. Registered once, when we follow.
+function listen()
+    local E = rawget(_G, "EventRegistry")
+    if not (following and type(E) == "table" and E.RegisterCallback) then return end
+    local ok, err = pcall(E.RegisterCallback, E, "GlassUI.Suite.LookChanged", paintAccented, Suite)
+    if not ok then API.Fail("suite:accent", err) end
+end
+
+Suite._test = { suiteAPI = suiteAPI, paint = paintAccented, built = function() return built, failure, minor end }

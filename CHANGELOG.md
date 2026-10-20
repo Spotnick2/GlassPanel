@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Window titles are gold like the stock UI's. If you follow Glass UI, the gold of the bar's captions and the window titles takes Glass UI's accent colour, live.
 - Opening Glass Panel's settings from Glass UI's button no longer leaves an empty page the first time.
 - The glass is now **Pearl**, the suite's look: the same depth with softer highlights. If you use Glass UI, you can switch Glass Panel to follow its theme on Glass UI's page; the glass, its tint and window choices here are then set there (and come back as you left them when you stop following).
 - The RestedXP block is gone (it wasn't good enough). If you installed the alpha, delete the `GlassPanelRestedXP` folder from your AddOns folder, since an update doesn't remove it. Its saved place in your layout is kept harmlessly.
