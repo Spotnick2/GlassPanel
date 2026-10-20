@@ -18,6 +18,32 @@ eq(WoW.settings.canvas and WoW.settings.canvas.name, "Glass Panel", "named Glass
 eq(WoW.settings.addon, WoW.settings.canvas, "listed under AddOns")
 GlassPanel._test.slash("options")
 eq(WoW.settings.opened, 4242, "/gpanel options opens it")
+-- The first open can leave the page empty (#104): Blizzard skips a category that is already current,
+-- so a frame later, if our page isn't up, the selection is forced; never when it is.
+do
+    local forced, asked, rejected = 0, 0, nil
+    local cat = { id = O().category():GetID() }
+    rawset(_G, "SettingsPanel", {
+        GetCategoryList = function() return { GetCategory = function(_, id) asked = asked + 1; return id == cat.id and cat or nil end } end,
+        ActivateCategory = function(_, c, force) if c == cat and force == true then forced = forced + 1 end end,
+    })
+    O().panel:Hide(); WoW.timers = {}
+    GlassPanel.Options.Open()
+    eq(forced, 0, "Open doesn't force at once")
+    WoW.flushTimers()
+    eq(forced, 1, "...a frame later it forces the selection when the page isn't showing")
+    O().panel:Show()
+    GlassPanel.Options.Open(); WoW.flushTimers()
+    eq(forced, 1, "...but not when the page is already up")
+    O().panel:Hide()
+    rawset(_G, "SettingsPanel", { ActivateCategory = function() error("boom") end })
+    GlassPanel.Options.Open(); WoW.flushTimers()
+    check(GlassPanel.failures["options:redisplay"] ~= nil, "a throwing client is recorded, not raised")
+    GlassPanel.failures["options:redisplay"] = nil
+    rawset(_G, "SettingsPanel", nil)
+    GlassPanel.Options.Open(); WoW.flushTimers()
+    GlassPanel.failures["options:redisplay"] = nil
+end
 
 open()
 local rows, c = O().rows, O().controls
