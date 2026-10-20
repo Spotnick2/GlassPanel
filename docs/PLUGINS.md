@@ -160,3 +160,11 @@ combat at `PLAYER_REGEN_ENABLED`). A block with a frame of its own at the top of
 it with `GlassPanel.API.TrackTopEdge(frame)` (once; it counts while visible and with its top within 40
 units of the screen's top or of the bar's bottom) and calls `GlassPanel.API.UpdateTopEdge()` after
 moving or rescaling it. Additive: `API_VERSION` is unchanged.
+
+**Floats (#108).** A zoomed block that floats on the screen registers with
+`GlassPanel.API.RegisterFloat(frame, { order = n, placed = function, place = function })` so that floats
+never overlap: `placed()` says whether the player saved a spot, `place()` puts the frame where it
+belongs (an unplaced one at `API.FloatDefaultY(frame)`, a slot stacked under the shown unplaced floats of
+lower `order`). Call `API.PlaceFloats()` after the float shows or hides, and `API.SnapFloat(frame)` after
+a drop and before saving its spot (it moves the frame clear of another float). A saved spot is never
+moved by the core. RegisterFloat also tracks the frame for the top-edge announcement. Additive.

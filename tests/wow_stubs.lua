@@ -206,7 +206,8 @@ function Methods.SetWidth(w, x) w._width = x end
 function Methods.SetHeight(w, y) w._height = y end
 function Methods.GetWidth(w) return w._width end
 function Methods.GetLeft(w) return w._rect and w._rect[1] or 0 end
-function Methods.GetEffectiveScale(w) return WoW.uiScale end
+function Methods.GetRight(w) if w._rect then return w._rect[1] + w._rect[3] end end
+function Methods.GetEffectiveScale(w) return WoW.uiScale * (w._scale or 1) end
 -- Like the client (1.60.1.70374, porting guide section 3): a texture with a
 -- gradient ignores SetAlpha, made before or after SetGradient. Without this a
 -- test that asserts a wash's alpha passes against that bug (#83).

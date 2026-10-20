@@ -17,6 +17,7 @@ Layout.lua
 Bar.lua
 Room.lua
 Edge.lua
+Floats.lua
 Settings.lua
 Share.lua
 Setup.lua
