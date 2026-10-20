@@ -312,7 +312,7 @@ function Bar.Attach(block)
     -- The caption ("Durability: ", gold, Titan-style) and the value after it.
     local caption = Glass.Font(top, Bar.FONT_SIZE, "LEFT")
     caption:SetPoint("LEFT", b, "LEFT", x, 0)
-    caption:SetTextColor(1, 0.82, 0)
+    GlassPanel.Suite.Accented(caption)   -- Blizzard's gold, or the suite's accent while following (#106)
     b.caption = caption
     local fs = Glass.Font(top, Bar.FONT_SIZE, "LEFT")
     fs:SetPoint("LEFT", caption, "RIGHT", 0, 0)

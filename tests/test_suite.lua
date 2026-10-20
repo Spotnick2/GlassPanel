@@ -15,6 +15,7 @@ local function fakeSuite(over)
         end,
         Report = function(addon, state) reports[#reports + 1] = { addon = addon, state = state } end,
         Open = function() opened = opened + 1; return true end,
+        Accent = function() return { 0.65, 0.835, 0.905 } end,
     }
     for k, v in pairs(over or {}) do suite[k] = v end
     GlassUI = { Suite = suite }
@@ -130,6 +131,40 @@ end })
 eq(reports[1].state.reason, "build-failed", "New errors: build-failed")
 eq(reports[1].state.built, nil, "...built = nil")
 check(GlassPanel.Glass ~= nil, "...the glass is still there")
+
+-- The accent (#106): the stock UI's gold (bar captions, window titles) follows Glass UI's accent while following.
+local function col(fs) local c = fs._textColor; return c and string.format("%.3f,%.3f,%.3f", c[1], c[2], c[3]) end
+noSuite()
+loadAddon()
+local cap = block("gold").widget.caption
+eq(col(cap), "1.000,0.820,0.000", "not following: captions are Blizzard's gold")
+fakeSuite()
+loadAddon()
+cap = block("gold").widget.caption
+eq(col(cap), "0.650,0.835,0.905", "following: captions wear the suite's accent")
+GlassPanel._test.slash("export")
+eq(col(GlassPanel.Share._test.window().title), "0.650,0.835,0.905", "...and so do window titles")
+local function lookChanged() local l = WoW.callbacks["GlassUI.Suite.LookChanged"]; l[#l][1]() end   -- this session's listener
+local gold = { 1, 0.82, 0 }
+GlassUI.Suite.Accent = function() return gold end   -- Glass UI changes it
+lookChanged()
+eq(col(cap), "1.000,0.820,0.000", "LookChanged repaints live")
+for _, bad in ipairs({ "x", {}, { 2, 0, 0 }, { 1, 1 } }) do
+    GlassUI.Suite.Accent = function() return bad end
+    lookChanged()
+    eq(col(cap), "1.000,0.820,0.000", "a bad accent answer: gold")
+end
+GlassUI.Suite.Accent = function() error("boom") end
+lookChanged()
+eq(col(cap), "1.000,0.820,0.000", "a throwing Accent: gold")
+fakeSuite(); GlassUI.Suite.Accent = nil
+loadAddon()
+eq(col(block("gold").widget.caption), "1.000,0.820,0.000", "an older Glass UI without Accent: gold")
+eq(WoW.callbacks["GlassUI.Suite.LookChanged"] ~= nil, true, "(still listening)")
+noSuite()
+WoW.callbacks = {}
+loadAddon()
+eq(WoW.callbacks["GlassUI.Suite.LookChanged"], nil, "not following: no listener")
 
 -- Following suspends the saved body and windows, and keeps them.
 fakeSuite()

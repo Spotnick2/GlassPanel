@@ -315,6 +315,7 @@ function Methods.SetFont(fs, file, size, flags) fs._font = { file, size, flags }
 -- StatusBar.
 function Methods.SetMinMaxValues(b, lo, hi, interp) b._min, b._max = lo, hi end
 function Methods.SetStatusBarColor(b, r, g, bl, a) b._color = { r, g, bl, a } end
+function Methods.SetTextColor(fs, r, g, b, a) fs._textColor = { r, g, b, a } end
 function Methods.GetValue(b) return b._value end
 -- A Slider clamps to its range and fires OnValueChanged (self, value,
 -- userInput) as on the client, a refresh included; a StatusBar just stores.
