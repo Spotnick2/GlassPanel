@@ -24,6 +24,7 @@ move-folders:
   GlassPanel/Plugins/Warlock: GlassPanelWarlock
   GlassPanel/Plugins/Reagents: GlassPanelReagents
   GlassPanel/Plugins/Ammo: GlassPanelAmmo
+  GlassPanel/Plugins/Combat: GlassPanelCombat
 
 manual-changelog:
   filename: CHANGELOG.md

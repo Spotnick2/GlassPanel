@@ -504,7 +504,6 @@ end
 -- divided by it, and its centre multiplied by it (GlassUnitFrames' PlaceAt).
 local FLOAT_W, FLOAT_BAR_H, FLOAT_FONT = 480, 18, 12
 local ROW_H, ROW_FONT = 14, 10
-local DEFAULT_Y = -40       -- from UIParent's top
 local SPOT_LIMIT = 4096
 local SCALE_MIN, SCALE_MAX, SCALE_STEP = 0.5, 2, 0.05
 local GOLD = "|cffffd100"
@@ -558,7 +557,7 @@ local function placeFloat()
     if x then
         float:SetPoint("CENTER", UIParent, "CENTER", x / scale, y / scale)
     else
-        float:SetPoint("TOP", UIParent, "TOP", 0, DEFAULT_Y / scale)
+        float:SetPoint("TOP", UIParent, "TOP", 0, API.FloatDefaultY(float) / scale)
     end
     API.UpdateTopEdge()
 end
@@ -672,7 +671,9 @@ local function buildFloat()
     f:RegisterForDrag("LeftButton")
     f:Hide()
     float = f
-    API.TrackTopEdge(f)   -- the bar announces the top band it covers (#97)
+    -- Registered as a float (#108): its default slot is the first, a drop snaps clear of the
+    -- others, and the top-edge announcement counts it (#97).
+    API.RegisterFloat(f, { order = 1, placed = function() return savedSpot() ~= nil end, place = function() placeFloat() end })
 
     floatUI = makeBar(f, FLOAT_BAR_H, FLOAT_FONT, surfaceGlass())
     floatUI.host:SetPoint("LEFT", f, "LEFT", 0, 0)
@@ -710,6 +711,7 @@ local function buildFloat()
         moving = false
         lastMoveStop = GetTime()
         self:StopMovingOrSizing()
+        API.SnapFloat(self)
         saveSpot()
         API.UpdateTopEdge()
     end))
@@ -749,6 +751,7 @@ local function applyFloat()
     elseif not want then
         float:Hide()   -- OnHide stops the ticker
     end
+    API.PlaceFloats()   -- the others' default slots follow what is shown (#108)
 end
 
 local function paintFloat(s)

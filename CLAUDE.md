@@ -36,7 +36,7 @@ list; the layout keeps a disabled plugin's place. `test_toc.lua` checks every pl
 `.pkgmeta` `move-folders` line.
 
 Core TOC load order: `Libs\LibGlass-1.0\LibGlass-1.0.xml` → `Compat.lua` → `Suite.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` →
-`Room.lua` → `Edge.lua` → `Settings.lua` → `Share.lua` → `Setup.lua` → `Options.lua` → `GlassPanel.lua`. Plugins load after the
+`Room.lua` → `Edge.lua` → `Floats.lua` → `Settings.lua` → `Share.lua` → `Setup.lua` → `Options.lua` → `GlassPanel.lua`. Plugins load after the
 core's `ADDON_LOADED`.
 
 - **`Compat.lua`**: `GlassPanel.API`, the only route to client APIs that moved or may be absent.
@@ -119,6 +119,7 @@ core's `ADDON_LOADED`.
   cursor's displacement, a drag under 10 px is a wobbly click (no move), the release that ends a
   drag isn't a click, and the drop target is recomputed after any relayout mid-drag. Hidden and empty blocks take no space. **Nothing is secure**, so the bar may be touched in combat.
 - **`Edge.lua`** (#97): the top edge GlassPanel occupies, announced for the suite (GAB's EdgeState / EdgesChanged pattern). `GlassPanel.EdgeState()` returns a fresh `{ top = n }` (UIParent units down from the screen's top to the lowest bottom of what we occupy there: 0 for nothing, `Bar.HEIGHT` for the bar), nil before the first measure, and EventRegistry `"GlassPanel.EdgeChanged"` `(top)` fires at the first measure, then out of combat on a move over 0.5 (a combat change at `PLAYER_REGEN_ENABLED`; `EdgeState` still has it). The bar counts while shown; a plugin's frame counts through `API.TrackTopEdge(frame)` (XP+'s zoomed bar) while visible and in the top band (its top within `MARGIN` 40 of the screen's top or the bar's bottom), converted from its own scale; any unreadable value skips the frame. `API.UpdateTopEdge()` after it moves; a measure runs on the next frame, coalesced, on the engine's 1 s clock and on scale/display events. Additive: `API_VERSION` unchanged.
+- **`Floats.lua`** (#108): zoomed plugins that float on the screen (XP+'s bar, the combat pill) never overlap. `API.RegisterFloat(frame, { order, placed, place })` (once per frame; it tracks the frame for the top edge too): an **unplaced** float (no saved spot) sits in a **default slot**, `API.FloatDefaultY(frame)`, stacked down from the top (`Floats.TOP` -40) under every shown, unplaced float of lower `order` (XP+ 1, the pill 2), with `Floats.GAP` between; `API.PlaceFloats()` (after one shows or hides) places the others again; `API.SnapFloat(frame)` (after a drop, before saving the spot) moves the frame clear of any overlapping shown float by the smallest shift (`Floats.Snap`, pure). **A saved spot stays exactly where the player put it**: nothing moves it but a drop onto another float. Additive: `API_VERSION` unchanged.
 - **`Room.lua`**: making room for Blizzard's top frames (#2) **without moving any of them**. The
   bar measures a short watch list (`Room.WATCH`: minimap cluster, buffs, debuffs, ticket status,
   unit frames) and pulls its ends in to stop short of any that reach into its band. A frame hidden
@@ -208,6 +209,7 @@ core's `ADDON_LOADED`.
   member is found; the tooltip's roster scan runs only after `GUILD_ROSTER_UPDATE` marks it stale.
   Names through `Ambiguate(name, "guild")`, never split on spaces. Left-click: `ToggleGuildFrame`. Its caption is
   the guild's name (`caption`, re-read on every repaint; `Bar.UpdateCaption`, secrets refused).
+- **`Plugins\Combat`** (#108): a combat timer. On the bar, crossed swords (`Ability_DualWield`, unmeasured) and "Out of Combat", or the fight's time from our own `GetTime()` stamp at `PLAYER_REGEN_DISABLED` (Glass Unit Frames' format: `00:07`, `1:00:05`; a /reload mid-fight counts from the reload, entering the world inside a fight keeps its start). **Zoomed** (left double-click, `GlassPanelCombatDB.detached`, as XP+): the bar keeps the icon alone and a **glass pill** (92x26, text 12, painted like the panel through `MatchPanelGlass`) floats on UIParent **only while in combat** (or a 30 s preview from the plugin's option, to place it); shift-drag moves it (spot in `GlassPanelCombatDB.spot`, a float of order 2, see `Floats.lua`), right-click a menu. **Glass Unit Frames' own timer**: the plugin's option "Use this timer instead of Glass Unit Frames'" calls `GlassUF.Settings.SetCombatTimer(not on)` (feature-detected, under pcall) **from the click only** and reads `GlassUF.Timer.enabled` each time the options open; the state is never copied, never applied at login (one printed hint, once ever, when both would show).
 - **`Plugins\Role`** (#20): the group role (`UnitGroupRolesAssigned`) with its inline icon, hidden
   when not `IsInGroup`. Left-click: a `MenuUtil.CreateContextMenu` of radio items (Tank, Healer,
   Damage, No Role) calling `UnitSetRole`. A menu that throws changes nothing (it's reported); only
