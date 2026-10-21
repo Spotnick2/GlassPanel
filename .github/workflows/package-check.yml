@@ -82,6 +82,7 @@ jobs:
           }
           {
             echo GlassPanel/GlassPanel.toc
+            echo GlassPanel/LICENSE
             tocfiles GlassPanel.toc GlassPanel
             for toc in Plugins/*/*.toc; do
               name=$(basename "$toc" .toc)

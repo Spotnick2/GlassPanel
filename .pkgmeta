@@ -54,6 +54,7 @@ ignore:
   - Tools
   - CLAUDE.md
   - README.md
+  - README.curseforge.md
   - CHANGELOG.md
   # The library's own .pkgmeta ignores these, but CurseForge's packager, which
   # builds the release, doesn't apply an external's list (Priestly #53). So
