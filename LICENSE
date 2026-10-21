@@ -24,7 +24,7 @@ SOFTWARE.
 
 THIRD-PARTY COMPONENTS
 
-The MIT terms above cover Glass Action Bars' own code. They do NOT relicense the
+The MIT terms above cover Glass Panel's own code. They do NOT relicense the
 library bundled under Libs/, which is redistributed under its own terms and
 remains the work of its author:
 
