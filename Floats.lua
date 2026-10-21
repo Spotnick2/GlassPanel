@@ -125,6 +125,9 @@ function API.FloatDefaultY(frame)
             if h * sm <= barBottom - barTop then   -- it fits between the two bars
                 return (barBottom + barTop) / 2 + h * sm / 2, x
             end
+            if isPlaced(over) then   -- no room: right under where it is now, on its middle
+                return top - (num(over.frame:GetHeight()) or 0) * so - Floats.GAP, x
+            end
         end
         if not isPlaced(over) then before[#before + 1] = over end   -- no room there: stack under it instead
     end

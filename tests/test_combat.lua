@@ -229,7 +229,15 @@ xpF._rect = { 700, 600, 480, 46 }; xpF._center = nil
 local ucx = UIParent:GetCenter()
 xt.setScale(1)
 eq(cp._points[1][4] * ps, 700 + 240 - ucx, "the pill follows XP+'s middle sideways")
+-- A saved XP+ with no room above it for the pill: under it, never on top of it.
+xt.setScale(0.5)
+UIParent._rect = UIParent._rect or { 0, 0, 1920, 1080 }
+xpF._rect = { 1400, (UIParent:GetTop() - 40) / 0.5 - 46, 480, 46 }   -- in its own units: scale 0.5, its top 40 down
+xt.setScale(0.5)
+local xbottom = -40 - 23
+eq(cp._points[1][5] * C().pillScale(), xbottom - 8, "a saved XP+ and no room: the pill sits right under it")
 GlassPanelXPDB.spot = nil
+xt.setScale(1)
 GlassPanelXPDB.detached = nil
 block("xp")._test.setDetached(false)
 WoW.tick()
