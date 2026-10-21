@@ -211,11 +211,18 @@ xt.setScale(2)
 eq(cp._points[1][5] * C().pillScale(), ((-24) + (-40 - 28)) / 2 + 15, "a bigger XP+ moves the pill to its (taller) top row")
 xt.setScale(1)
 eq(cp._points[1][5] * C().pillScale(), ((-24) + (-40 - 14)) / 2 + 15, "...and a smaller one back")
--- Never into XP+'s own bar, even where the band is smaller than the pill (a small XP+).
+-- Where the band between the bars is smaller than the pill (a small XP+, or a big pill) it
+-- stacks under XP+ instead: it never covers the panel or XP+'s bar.
 xt.setScale(0.5)
 local ps = C().pillScale()
-check(cp._points[1][5] * ps - 20 * ps >= -40 - 14 * 0.5, "a small XP+: the pill's bottom clears the progress bar")
+local top = cp._points[1][5] * ps
+check(top <= -40 - 46 * 0.5, "a small XP+: the pill sits under it, clear of both bars")
+C().setScale(2)
 xt.setScale(1)
+check(cp._points[1][5] * 2 <= -40 - 46, "a big pill: under XP+ too")
+C().setScale(1.5); ps = C().pillScale()
+xt.setScale(1)
+eq(cp._points[1][5] * ps, ((-24) + (-40 - 14)) / 2 + 15, "it fits again: back in the band")
 -- An XP+ moved sideways: the unplaced pill follows its middle.
 GlassPanelXPDB.spot = { x = 300, y = -200 }
 xpF._rect = { 700, 600, 480, 46 }; xpF._center = nil

@@ -12,7 +12,9 @@
 --     The frame is tracked for the top-edge announcement too (API.TrackTopEdge).
 --     Optional: `topRow = h` says the float's top h units are a band with a free
 --     middle (XP+'s text row); `overlay = true` puts an unplaced float into the
---     band of the nearest shown float of lower order that declares one.
+--     band of the nearest shown float of lower order that declares one, centred
+--     between the bar's bottom and that float's own bar when it fits there, else
+--     stacked under it as any float (it never overlaps either).
 --   API.FloatDefaultY(frame) -> the y offset from UIParent's top, in UIParent
 --     units (negative), for an unplaced float; a second value, the x offset from
 --     UIParent's centre (0 but for an overlay float, which follows its host).
@@ -120,9 +122,11 @@ function API.FloatDefaultY(frame)
             local h = num(me.frame:GetHeight()) or 0
             local barBottom = -((GlassPanel.Bar and num(GlassPanel.Bar.HEIGHT)) or 0)
             local barTop = top - over.topRow * so   -- the float's own bar starts here
-            local center = math.max((barBottom + barTop) / 2, barTop + h * sm / 2)   -- never into that bar
-            return center + h * sm / 2, x
+            if h * sm <= barBottom - barTop then   -- it fits between the two bars
+                return (barBottom + barTop) / 2 + h * sm / 2, x
+            end
         end
+        if not isPlaced(over) then before[#before + 1] = over end   -- no room there: stack under it instead
     end
     table.sort(before, function(a, b) return a.order < b.order end)
     for _, e in ipairs(before) do
