@@ -4,6 +4,7 @@
 ## Author: Spotnick
 ## Version: @project-version@
 ## Group: GlassPanel
+## X-Wago-ID: n6VYw3Nd
 ## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
 ## OptionalDeps: GlassUI
 ## SavedVariables: GlassPanelDB
