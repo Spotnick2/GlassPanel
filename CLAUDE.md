@@ -539,8 +539,10 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`).
 ## Workflow (sibling conventions)
 
 - Issue → branch off `main` → PR with `Closes #N` → review → squash-merge. **The owner merges,
-  closes PRs and launches reviews.** Never commit to `main`, never `gh pr merge`. Commit or push
-  only when asked. Before committing, `pwsh tests\run.ps1` must be green.
+  closes PRs and launches reviews.** Never commit to `main`, and `gh pr merge` only when the owner
+  says to merge that PR. Commit or push only when asked, with one exception: **a fix for review
+  findings (Codex, `/code-review`) on an open PR is committed and pushed to that PR's branch at
+  once, without asking**, and reported. Before committing, `pwsh tests\run.ps1` must be green.
 - Adversarial review goes through `/codex-consult` (`.claude/skills/codex-consult/`), launched
   by the owner, with Fable as the fallback. Verify its claims before acting, and push back on
   complexity for a single-owner addon.
