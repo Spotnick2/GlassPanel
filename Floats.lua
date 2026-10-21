@@ -10,8 +10,14 @@
 --     once per frame. `placed` says whether the player saved a spot; `place`
 --     puts the frame where it belongs (it asks API.FloatDefaultY when unplaced).
 --     The frame is tracked for the top-edge announcement too (API.TrackTopEdge).
+--     Optional: `topRow = h` says the float's top h units are a band with a free
+--     middle (XP+'s text row); `overlay = true` puts an unplaced float into the
+--     band of the nearest shown float of lower order that declares one, centred
+--     between the bar's bottom and that float's own bar when it fits there, else
+--     stacked under it as any float (it never overlaps either).
 --   API.FloatDefaultY(frame) -> the y offset from UIParent's top, in UIParent
---     units (negative), for an unplaced float.
+--     units (negative), for an unplaced float; a second value, the x offset from
+--     UIParent's centre (0 but for an overlay float, which follows its host).
 --   API.PlaceFloats() -> after a float shows, hides or rescales: every shown
 --     unplaced float is placed again.
 --   API.SnapFloat(frame) -> after a drop, before saving the spot: moves the
@@ -78,7 +84,8 @@ end
 function API.RegisterFloat(frame, opts)
     if type(frame) ~= "table" or type(opts) ~= "table" or entryOf(frame) then return false end
     if type(opts.order) ~= "number" or type(opts.placed) ~= "function" or type(opts.place) ~= "function" then return false end
-    list[#list + 1] = { frame = frame, order = opts.order, placed = opts.placed, place = opts.place }
+    list[#list + 1] = { frame = frame, order = opts.order, placed = opts.placed, place = opts.place,
+                        topRow = type(opts.topRow) == "number" and opts.topRow or nil, overlay = opts.overlay == true }
     API.TrackTopEdge(frame)
     return true
 end
@@ -88,9 +95,41 @@ function API.FloatDefaultY(frame)
     local y = Floats.TOP
     if not me then return y end
     local ui = num(UIParent:GetEffectiveScale()) or 1
+    local over   -- the float whose top row we sit in the middle of
+    if me.overlay then
+        for _, e in ipairs(list) do
+            if e ~= me and e.order < me.order and e.topRow and shown(e) and (not over or e.order > over.order) then over = e end
+        end
+    end
     local before = {}
     for _, e in ipairs(list) do
-        if e ~= me and e.order < me.order and shown(e) and not isPlaced(e) then before[#before + 1] = e end
+        if e ~= me and e ~= over and e.order < me.order and shown(e) and not isPlaced(e) then before[#before + 1] = e end
+    end
+    if over then
+        local so = (num(over.frame:GetEffectiveScale()) or ui) / ui
+        local sm = (num(me.frame:GetEffectiveScale()) or ui) / ui
+        local top, x = nil, 0
+        if isPlaced(over) then   -- where it is now, down from UIParent's top
+            local t, ut = num(over.frame:GetTop()), num(UIParent:GetTop())
+            if t and ut then top = t * so - ut end
+            local cx, ucx = num(over.frame:GetCenter()), num(UIParent:GetCenter())
+            if cx and ucx then x = cx * so - ucx end   -- its middle, off the screen's centre
+        else
+            top = API.FloatDefaultY(over.frame)
+        end
+        if top then
+            -- centred in the band between the bar's bottom and the float's own bar
+            local h = num(me.frame:GetHeight()) or 0
+            local barBottom = -((GlassPanel.Bar and num(GlassPanel.Bar.HEIGHT)) or 0)
+            local barTop = top - over.topRow * so   -- the float's own bar starts here
+            if h * sm <= barBottom - barTop then   -- it fits between the two bars
+                return (barBottom + barTop) / 2 + h * sm / 2, x
+            end
+            if isPlaced(over) then   -- no room: right under where it is now, on its middle
+                return top - (num(over.frame:GetHeight()) or 0) * so - Floats.GAP, x
+            end
+        end
+        if not isPlaced(over) then before[#before + 1] = over end   -- no room there: stack under it instead
     end
     table.sort(before, function(a, b) return a.order < b.order end)
     for _, e in ipairs(before) do

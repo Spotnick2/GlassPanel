@@ -79,18 +79,33 @@ enter()
 local pill = C().pill()
 check(pill ~= nil and pill._shown, "in combat: the pill shows")
 eq(pill._parent, UIParent, "on UIParent")
-eq(pill._width .. "x" .. pill._height, "92x26", "a pill")
+eq(pill._width .. "x" .. pill._height, "92x20", "a pill")
 eq(C().pillText()._text, "00:00", "its time")
 check(C().ticker() ~= nil, "a ticker runs while it shows")
+check(pill._alpha < 0.2, "it fades in from nothing")
+WoW.tick(0.1)
+check(pill._alpha > 0 and pill._alpha < 1, "...part of the way")
+WoW.tick(0.3)
+eq(pill._alpha, 1, "...and is fully there")
+eq(pill._scripts.OnUpdate, nil, "no OnUpdate at rest")
 WoW.now = 112
 WoW.fireTickers()
 eq(C().pillText()._text, "00:12", "the ticker updates it")
 leave()
+check(pill._shown and pill._alpha < 1, "combat over: it starts fading out")
+WoW.tick(0.1)
+enter()
+eq(pill._shown, true, "back in a fight mid-fade: it stays")
+WoW.tick(0.3)
+eq(pill._alpha, 1, "...and returns to full")
+leave()
+WoW.tick(0.3)
 eq(pill._shown, false, "combat over: the pill is gone")
+eq(pill._alpha, 1, "...and reset for the next time")
 eq(C().ticker(), nil, "and the ticker stops")
 enter()
 check(pill._shown, "the next fight shows it again")
-dbl()
+dbl(); WoW.tick(0.3)
 eq(pill._shown, false, "docking hides it")
 eq(textOf("combat"), "00:00", "docked in combat: the bar shows the time")
 dbl()
@@ -149,7 +164,7 @@ loadAddon()
 C().setPreview()
 check(C().pill() and C().pill()._shown, "preview shows the pill")
 WoW.now = WoW.now + 31
-WoW.flushTimers()
+WoW.flushTimers(); WoW.tick(0.3)
 eq(C().pill()._shown, false, "...and it ends")
 dbl()   -- docked
 WoW.chat = {}
@@ -168,7 +183,7 @@ local xpF = block("xp")._test.float()
 local cp = C().pill()
 check(xpF and xpF._shown and cp and cp._shown, "both zoomed floats are up")
 eq(xpF._points[1][5], -40, "XP+ takes the first slot")
-eq(cp._points[1][5], (-40 - 46 - 8) / C().pillScale(), "the pill sits under it (offset in its own scale)")
+eq(cp._points[1][5], (((-24) + (-40 - 14)) / 2 + 20 * C().pillScale() / 2) / C().pillScale(), "the pill sits centred between the bar and XP+'s bar")
 -- A drop snaps clear of the other float, for both.
 local snaps = {}
 local realSnap = GlassPanel.API.SnapFloat
@@ -193,9 +208,36 @@ GlassPanelCombatDB.spot, GlassPanelXPDB.spot = nil, nil
 -- XP+'s scale and reset reflow the pill's slot.
 local xt = block("xp")._test
 xt.setScale(2)
-eq(cp._points[1][5] * C().pillScale(), -40 - 46 * 2 - 8, "a bigger XP+ pushes the pill down")
+eq(cp._points[1][5] * C().pillScale(), ((-24) + (-40 - 28)) / 2 + 15, "a bigger XP+ moves the pill to its (taller) top row")
 xt.setScale(1)
-eq(cp._points[1][5] * C().pillScale(), -40 - 46 - 8, "...and a smaller one pulls it up")
+eq(cp._points[1][5] * C().pillScale(), ((-24) + (-40 - 14)) / 2 + 15, "...and a smaller one back")
+-- Where the band between the bars is smaller than the pill (a small XP+, or a big pill) it
+-- stacks under XP+ instead: it never covers the panel or XP+'s bar.
+xt.setScale(0.5)
+local ps = C().pillScale()
+local top = cp._points[1][5] * ps
+check(top <= -40 - 46 * 0.5, "a small XP+: the pill sits under it, clear of both bars")
+C().setScale(2)
+xt.setScale(1)
+check(cp._points[1][5] * 2 <= -40 - 46, "a big pill: under XP+ too")
+C().setScale(1.5); ps = C().pillScale()
+xt.setScale(1)
+eq(cp._points[1][5] * ps, ((-24) + (-40 - 14)) / 2 + 15, "it fits again: back in the band")
+-- An XP+ moved sideways: the unplaced pill follows its middle.
+GlassPanelXPDB.spot = { x = 300, y = -200 }
+xpF._rect = { 700, 600, 480, 46 }; xpF._center = nil
+local ucx = UIParent:GetCenter()
+xt.setScale(1)
+eq(cp._points[1][4] * ps, 700 + 240 - ucx, "the pill follows XP+'s middle sideways")
+-- A saved XP+ with no room above it for the pill: under it, never on top of it.
+xt.setScale(0.5)
+UIParent._rect = UIParent._rect or { 0, 0, 1920, 1080 }
+xpF._rect = { 1400, (UIParent:GetTop() - 40) / 0.5 - 46, 480, 46 }   -- in its own units: scale 0.5, its top 40 down
+xt.setScale(0.5)
+local xbottom = -40 - 23
+eq(cp._points[1][5] * C().pillScale(), xbottom - 8, "a saved XP+ and no room: the pill sits right under it")
+GlassPanelXPDB.spot = nil
+xt.setScale(1)
 GlassPanelXPDB.detached = nil
 block("xp")._test.setDetached(false)
 WoW.tick()

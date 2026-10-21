@@ -23,8 +23,9 @@ local API, Glass = GlassPanel.API, GlassPanel.Glass
 local P = API.Plain
 
 local WIDTH = 104                 -- the block docked: icon + "Out of Combat"
-local PILL_W, PILL_H, PILL_FONT = 92, 26, 12   -- the text about XP+'s zoomed bar's
+local PILL_W, PILL_H, PILL_FONT = 92, 20, 12   -- the text about XP+'s zoomed bar's
 local SCALE_MIN, SCALE_MAX, SCALE_STEP, SCALE_DEFAULT = 0.5, 2, 0.05, 1.5   -- XP+'s zoomed bar is usually 1.5
+local FADE = 0.2                  -- seconds the pill takes to appear and to go
 local PREVIEW = 30                -- seconds the preview shows the pill
 local SPOT_LIMIT = 4096
 
@@ -42,6 +43,7 @@ local inCombat, startedAt, lastFight = false, 0, nil
 local onScreen = false
 local pill, pillText, ticker, previewUntil
 local moving, lastMoveStop = false, -1
+local fadeTarget   -- 1 while appearing, 0 while going; nil at rest
 
 local function guarded(fn)
     return function(...)
@@ -96,7 +98,8 @@ local function placePill()
     if x then
         pill:SetPoint("CENTER", UIParent, "CENTER", x / scale, y / scale)
     else
-        pill:SetPoint("TOP", UIParent, "TOP", 0, API.FloatDefaultY(pill) / scale)
+        local dy, dx = API.FloatDefaultY(pill)
+        pill:SetPoint("TOP", UIParent, "TOP", (dx or 0) / scale, dy / scale)
     end
     API.UpdateTopEdge()
 end
@@ -175,7 +178,10 @@ local function buildPill()
     tf:SetFrameLevel(f:GetFrameLevel() + 12)   -- over the glass's rims
     pillText = Glass.Font(tf, PILL_FONT, "CENTER")
     pillText:SetPoint("CENTER", f, "CENTER", 0, 0)
-    API.RegisterFloat(f, { order = 2, placed = function() return savedSpot() ~= nil end,
+    -- Bolder: the library's face with an outline (a later font setting restyles it plainly).
+    local file, size = pillText:GetFont()
+    if file and size then pcall(pillText.SetFont, pillText, file, size, "OUTLINE") end
+    API.RegisterFloat(f, { order = 2, overlay = true, placed = function() return savedSpot() ~= nil end,
                            place = function() placePill() end })
 
     f:SetScript("OnDragStart", guarded(function(self)
@@ -204,8 +210,28 @@ local function buildPill()
         end
         if ticker then ticker:Cancel() end
         ticker = nil
+        self:SetScript("OnUpdate", nil)
+        fadeTarget = nil
+        self:SetAlpha(1)
     end))
     placePill()
+end
+
+-- Fades the pill in or out (a real Hide at the end of the way out). Only while it
+-- is moving does the pill carry an OnUpdate.
+local function fadeTo(target)
+    fadeTarget = target
+    pill:SetScript("OnUpdate", guarded(function(self, dt)
+        local a = self:GetAlpha() + (fadeTarget == 1 and dt or -dt) / FADE
+        if fadeTarget == 1 and a >= 1 then a = 1 elseif fadeTarget == 0 and a <= 0 then a = 0 end
+        self:SetAlpha(a)
+        if a == fadeTarget then
+            self:SetScript("OnUpdate", nil)
+            local gone = fadeTarget == 0
+            fadeTarget = nil
+            if gone then self:Hide() end   -- OnHide stops the ticker
+        end
+    end))
 end
 
 -- Shown while zoomed, the block on screen, and in combat (or previewing).
@@ -213,12 +239,22 @@ local function applyPill()
     local want = onScreen and detached() and (inCombat or previewing())
     if want and not pill then buildPill() end
     if not pill then return end
-    if want and not pill:IsShown() then
-        pill:Show()
-        paintPill()
-        if not ticker then ticker = C_Timer.NewTicker(1, guarded(paintPill)) end
-    elseif not want then
-        pill:Hide()   -- OnHide stops the ticker
+    if want then
+        if not pill:IsShown() then
+            pill:SetAlpha(0)
+            pill:Show()
+            paintPill()
+            if not ticker then ticker = C_Timer.NewTicker(1, guarded(paintPill)) end
+            fadeTo(1)
+        elseif fadeTarget == 0 then
+            fadeTo(1)   -- back in a fight while it was going
+        end
+    elseif pill:IsShown() and fadeTarget ~= 0 then
+        if moving then
+            pill:Hide()   -- OnHide stops the move
+        else
+            fadeTo(0)
+        end
     end
     API.PlaceFloats()
 end
