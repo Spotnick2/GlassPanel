@@ -42,6 +42,12 @@ for a full-width bar; `/gpanel setup` can also write an Edit Mode layout that ma
   Healthstone, Soulstone) and **AltStable** (your alts' gold, needs
   [AltStable](https://www.curseforge.com/wow/addons/altstable)).
 
+XP+ docked on the bar, and zoomed out onto the screen with the combat timer idle:
+
+![XP+ docked in the middle of the bar](https://raw.githubusercontent.com/Spotnick2/GlassPanel/main/docs/screenshots/xp-docked.png)
+
+![XP+ zoomed under the bar, the Combat block saying Out of Combat](https://raw.githubusercontent.com/Spotnick2/GlassPanel/main/docs/screenshots/xp-zoomed.png)
+
 **Zoomed blocks never overlap.** The XP+ bar and the combat pill each have a default spot
 (the pill sits between the bar and XP+), and dropping one onto another snaps it clear. A spot you
 choose yourself is never moved.
