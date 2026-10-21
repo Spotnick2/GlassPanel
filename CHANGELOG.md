@@ -28,7 +28,7 @@
   - while resting, how long until you're fully rested;
   - your XP buffs (Well Fed, Camp Benefits) with their time left;
   - when your Camp Tent can grant rest again.
-- Ships LibGlass r7 (was r5).
+- Ships LibGlass r11.
 - Smoked glass: its softer shine now actually applies (it was drawn at full strength).
 - Drag blocks to arrange the bar: drop next to other blocks to join their group, or on empty
   space to start a new group there. Shift-drag moves a whole group. `/gpanel move` does the same
