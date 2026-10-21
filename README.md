@@ -96,6 +96,13 @@ you expected and what happened instead. Lua errors are hidden by default on this
 `/console scriptErrors 1`, do it again, and send the error text, plus the output of
 `/gpanel failures`.
 
+## Coming from Titan Panel?
+
+Glass Panel includes the readouts of these Titan Panel plugins, so you can drop them:
+[Titan Panel [GearScore]](https://www.curseforge.com/wow/addons/titan-panel-gearscore) (the GearScore plugin),
+[Titan Panel [Layer]](https://www.curseforge.com/wow/addons/titan-panel-layer) (the Layer plugin) and
+[Titan Panel [XP]](https://www.curseforge.com/wow/addons/titan-panel-xp) (the XP+ plugin).
+
 ## Development
 
 The code, the plugin contract (`docs/PLUGINS.md`) and the plan (`docs/PLAN.md`) are in this
