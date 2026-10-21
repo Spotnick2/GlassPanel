@@ -547,9 +547,13 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`).
   by the owner, with Fable as the fallback. Verify its claims before acting, and push back on
   complexity for a single-owner addon.
 - Releases are built by CurseForge's packager from the tag webhook, reading `.pkgmeta`. Every
-  tag needs a `CHANGELOG.md` entry, written for players. `release.yml` also publishes a GitHub
-  Release (zip + changelog notes) for every `v*` tag, with no CurseForge key; `alpha`/`beta` tags
-  are pre-releases. `package-check.yml` runs on tags too.
+  tag needs a `CHANGELOG.md` section `## vX.Y.Z` (written for players; off a tag the check reads
+  `## Unreleased`). `package-check.yml` is the one workflow (`References\Docselease`'s template, RELEASING.md §2):
+  `check` on every run (tests, dry-run package, allowlist, `tests/release_files.sh` writing `notes.md` and
+  `release.json`, the file WoWUp reads), then on a `v*` tag `release` (a GitHub Release: that same zip, `release.json`,
+  the tag's notes) and `wago` (the same zip to Wago project `n6VYw3Nd`, the TOC's `X-Wago-ID`, with the
+  `WAGO_API_TOKEN` secret). `alpha`/`beta` tags are pre-releases. `workflow_dispatch` (tag, both|github|wago)
+  publishes an existing tag again.
 
 ## Conventions
 
