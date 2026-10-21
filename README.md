@@ -97,4 +97,4 @@ repository. Tests run with `pwsh tests\run.ps1` (Lua 5.1).
 
 ## License
 
-The bundled LibGlass-1.0 is MIT, see `Libs/LibGlass-1.0/LICENSE`.
+MIT, see [LICENSE](LICENSE). The bundled LibGlass-1.0 keeps its own MIT license.
