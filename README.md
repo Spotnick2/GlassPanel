@@ -52,7 +52,7 @@ XP+ docked on the bar, and zoomed out onto the screen with the combat timer idle
 (the pill sits between the bar and XP+), and dropping one onto another snaps it clear. A spot you
 choose yourself is never moved.
 
-**Arrange it your way.** Shift-drag a block to move it; blocks sit in lanes you can pack left,
+**Arrange it your way.** Drag a block to move it, or shift-drag to move its whole lane; lanes can pack left,
 right or centre. Captions, icons and each plugin's visibility are options, and
 **Share setup** exports your layout as a string you can paste to a friend.
 
