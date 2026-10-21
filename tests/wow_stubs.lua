@@ -215,6 +215,7 @@ function Methods.SetAlpha(w, a)
     if w._gradient then return end
     w._alpha = a
 end
+function Methods.GetAlpha(w) return w._alpha or 1 end
 function Methods.SetScale(w, s) w._scale = s end
 function Methods.GetScale(w) return w._scale or 1 end
 -- Rect: set w._rect = { left, bottom, width, height } in a test; the bar gets

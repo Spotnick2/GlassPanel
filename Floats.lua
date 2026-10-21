@@ -14,7 +14,8 @@
 --     middle (XP+'s text row); `overlay = true` puts an unplaced float into the
 --     band of the nearest shown float of lower order that declares one.
 --   API.FloatDefaultY(frame) -> the y offset from UIParent's top, in UIParent
---     units (negative), for an unplaced float.
+--     units (negative), for an unplaced float; a second value, the x offset from
+--     UIParent's centre (0 but for an overlay float, which follows its host).
 --   API.PlaceFloats() -> after a float shows, hides or rescales: every shown
 --     unplaced float is placed again.
 --   API.SnapFloat(frame) -> after a drop, before saving the spot: moves the
@@ -105,16 +106,22 @@ function API.FloatDefaultY(frame)
     if over then
         local so = (num(over.frame:GetEffectiveScale()) or ui) / ui
         local sm = (num(me.frame:GetEffectiveScale()) or ui) / ui
-        local top
+        local top, x = nil, 0
         if isPlaced(over) then   -- where it is now, down from UIParent's top
             local t, ut = num(over.frame:GetTop()), num(UIParent:GetTop())
             if t and ut then top = t * so - ut end
+            local cx, ucx = num(over.frame:GetCenter()), num(UIParent:GetCenter())
+            if cx and ucx then x = cx * so - ucx end   -- its middle, off the screen's centre
         else
             top = API.FloatDefaultY(over.frame)
         end
         if top then
+            -- centred in the band between the bar's bottom and the float's own bar
             local h = num(me.frame:GetHeight()) or 0
-            return top - over.topRow * so / 2 + h * sm / 2
+            local barBottom = -((GlassPanel.Bar and num(GlassPanel.Bar.HEIGHT)) or 0)
+            local barTop = top - over.topRow * so   -- the float's own bar starts here
+            local center = math.max((barBottom + barTop) / 2, barTop + h * sm / 2)   -- never into that bar
+            return center + h * sm / 2, x
         end
     end
     table.sort(before, function(a, b) return a.order < b.order end)
