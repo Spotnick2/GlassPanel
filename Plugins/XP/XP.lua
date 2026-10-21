@@ -673,7 +673,7 @@ local function buildFloat()
     float = f
     -- Registered as a float (#108): its default slot is the first, a drop snaps clear of the
     -- others, and the top-edge announcement counts it (#97).
-    API.RegisterFloat(f, { order = 1, placed = function() return savedSpot() ~= nil end, place = function() placeFloat() end })
+    API.RegisterFloat(f, { order = 1, topRow = ROW_H, placed = function() return savedSpot() ~= nil end, place = function() placeFloat() end })
 
     floatUI = makeBar(f, FLOAT_BAR_H, FLOAT_FONT, surfaceGlass())
     floatUI.host:SetPoint("LEFT", f, "LEFT", 0, 0)

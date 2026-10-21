@@ -79,7 +79,7 @@ enter()
 local pill = C().pill()
 check(pill ~= nil and pill._shown, "in combat: the pill shows")
 eq(pill._parent, UIParent, "on UIParent")
-eq(pill._width .. "x" .. pill._height, "92x26", "a pill")
+eq(pill._width .. "x" .. pill._height, "92x20", "a pill")
 eq(C().pillText()._text, "00:00", "its time")
 check(C().ticker() ~= nil, "a ticker runs while it shows")
 WoW.now = 112
@@ -168,7 +168,7 @@ local xpF = block("xp")._test.float()
 local cp = C().pill()
 check(xpF and xpF._shown and cp and cp._shown, "both zoomed floats are up")
 eq(xpF._points[1][5], -40, "XP+ takes the first slot")
-eq(cp._points[1][5], (-40 - 46 - 8) / C().pillScale(), "the pill sits under it (offset in its own scale)")
+eq(cp._points[1][5], (-40 - 14 * 1 / 2 + 20 * C().pillScale() / 2) / C().pillScale(), "the pill sits in the middle of XP+'s top row")
 -- A drop snaps clear of the other float, for both.
 local snaps = {}
 local realSnap = GlassPanel.API.SnapFloat
@@ -193,9 +193,9 @@ GlassPanelCombatDB.spot, GlassPanelXPDB.spot = nil, nil
 -- XP+'s scale and reset reflow the pill's slot.
 local xt = block("xp")._test
 xt.setScale(2)
-eq(cp._points[1][5] * C().pillScale(), -40 - 46 * 2 - 8, "a bigger XP+ pushes the pill down")
+eq(cp._points[1][5] * C().pillScale(), -40 - 14 + 15, "a bigger XP+ moves the pill to its (taller) top row")
 xt.setScale(1)
-eq(cp._points[1][5] * C().pillScale(), -40 - 46 - 8, "...and a smaller one pulls it up")
+eq(cp._points[1][5] * C().pillScale(), -40 - 7 + 15, "...and a smaller one back")
 GlassPanelXPDB.detached = nil
 block("xp")._test.setDetached(false)
 WoW.tick()

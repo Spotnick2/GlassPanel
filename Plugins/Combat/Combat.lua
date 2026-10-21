@@ -23,7 +23,7 @@ local API, Glass = GlassPanel.API, GlassPanel.Glass
 local P = API.Plain
 
 local WIDTH = 104                 -- the block docked: icon + "Out of Combat"
-local PILL_W, PILL_H, PILL_FONT = 92, 26, 12   -- the text about XP+'s zoomed bar's
+local PILL_W, PILL_H, PILL_FONT = 92, 20, 12   -- the text about XP+'s zoomed bar's
 local SCALE_MIN, SCALE_MAX, SCALE_STEP, SCALE_DEFAULT = 0.5, 2, 0.05, 1.5   -- XP+'s zoomed bar is usually 1.5
 local PREVIEW = 30                -- seconds the preview shows the pill
 local SPOT_LIMIT = 4096
@@ -175,7 +175,7 @@ local function buildPill()
     tf:SetFrameLevel(f:GetFrameLevel() + 12)   -- over the glass's rims
     pillText = Glass.Font(tf, PILL_FONT, "CENTER")
     pillText:SetPoint("CENTER", f, "CENTER", 0, 0)
-    API.RegisterFloat(f, { order = 2, placed = function() return savedSpot() ~= nil end,
+    API.RegisterFloat(f, { order = 2, overlay = true, placed = function() return savedSpot() ~= nil end,
                            place = function() placePill() end })
 
     f:SetScript("OnDragStart", guarded(function(self)
