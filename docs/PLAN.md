@@ -33,7 +33,7 @@ Released 2026-10-21 on CurseForge, GitHub and Wago. The core and 17 plugins ship
 | `Bar.lua` | the strip, one plain Button per block, placement and drag and drop, width follows text |
 | `Room.lua` | the bar stops short of Blizzard's top frames (#2) |
 | `Edge.lua` | the top edge GlassPanel occupies, announced for the suite (#97) |
-| `Floats.lua` | zoomed floats (XP+'s bar, the combat pill) stack and snap apart (#108) |
+| `Floats.lua` | zoomed floats (XP+'s bar, the combat pill, the flight bar) stack and snap apart (#108) |
 | `Settings.lua` | `GlassPanelDB` defaults and the one place a setting is changed |
 | `Share.lua` | export/import of a setup as a string (#34) |
 | `Setup.lua` | opt-in Edit Mode layout with room for the bar (#10) |
@@ -58,15 +58,20 @@ overlap.
 
 ## What's open
 
+In progress: **Flight** (#124, zoomable bar under XP+'s; times from the client's path lengths, then landings).
+
 Issues: **#74** share the picker window between Currencies and Reagents (and the item-name
 loader with GearScore); **#45** Gold without AltStable (postponed); **#26** Layer from
 NovaWorldBuffs guild messages (postponed).
 
 Not measured yet:
 - Build 70338 is what the code and the offline stubs were checked against
-  (`API.MEASURED_ON_BUILD`); the newest API dump is higher (up to 70450).
+  (`API.MEASURED_ON_BUILD`); the newest API dump is higher (up to 70532).
 - Ammo for warriors and rogues (`UnitUsesAmmo`) and the thrown count; the Well Rested cap at
   5/5 (XP+ rested lines).
+- Flight (#124): `UnitOnTaxi` at `PLAYER_CONTROL_LOST` (EllesmereUI found it false at takeoff),
+  `C_TaxiMap.GetAllTaxiNodes(GetTaxiMapID())` giving node ids on the flight map, Frequent
+  Flier (Legacy node 110300) and its 20%, and the flight master icon.
 - The first open of the options page from Glass UI's button (#104/#105) was fixed from
   Blizzard's source, not measured.
 

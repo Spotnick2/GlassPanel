@@ -476,6 +476,16 @@ function EnumerateFrames(after)
 end
 
 function hooksecurefunc(t, name, fn)
+    if type(t) == "string" then   -- the global form: hooksecurefunc("TakeTaxiNode", fn)
+        local gname, hook = t, name
+        local orig = _G[gname]
+        rawset(_G, gname, function(...)
+            local r = orig(...)
+            hook(...)
+            return r
+        end)
+        return
+    end
     local orig = t[name]
     rawset(t, name, function(self, ...)
         local r = orig(self, ...)

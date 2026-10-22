@@ -21,9 +21,17 @@ C_UnitAuras = { GetAuraDataByIndex = function(unit, index, filter)
     return WoW.buffs[index]
 end }
 
+-- Flight (#124) reads Frequent Flier, node 110300 of the same tree:
+-- WoW.frequentFlier is its rank (nil: no such node, "secret": a secret rank).
+table.insert(WoW.resetHooks, function() WoW.frequentFlier = 0 end)
+
 C_Traits = {
     GetConfigIDByTreeID = function(treeID) return treeID == 1188 and 13280556 or nil end,
     GetNodeInfo = function(configID, nodeID)
+        if configID == 13280556 and nodeID == 110300 and WoW.frequentFlier ~= nil then
+            local rank = WoW.frequentFlier == "secret" and WoW.Secret("rank") or WoW.frequentFlier
+            return { ID = 110300, activeRank = rank, currentRank = rank, ranksPurchased = rank, maxRanks = 1 }
+        end
         if configID ~= 13280556 or nodeID ~= 110301 or WoW.wellRested == nil then
             return { ID = 0, activeRank = 0, maxRanks = 0 }
         end

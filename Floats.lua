@@ -1,5 +1,5 @@
 -- Floats.lua: zoomed plugins that float on the screen (XP+'s bar, the combat
--- timer's pill, #108) must not overlap each other. The rule:
+-- timer's pill, #108; the flight bar, #124) must not overlap each other. The rule:
 --   * a float with no saved spot sits in a DEFAULT slot, stacked down from the
 --     top by `order` below every float of lower order that is shown and unplaced
 --     (so the pill starts under XP+'s bar, and moves up when that is docked);

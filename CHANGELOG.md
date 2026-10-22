@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- New plugin **Flight**: a flight timer. On a taxi the bar shows the flight master icon and the time left, from your very first flight: it's worked out from the length of the route the taxi flies (the game's own flight paths), and after you land it knows that route to the second, on every character. A flight that runs longer than predicted counts on in orange (`+0:07`). Double-click the icon to zoom it: a glass bar with the destination and the time left then appears on the screen while you fly, right under the zoomed XP+ bar; it empties as you fly, like a channelled spell (an option makes it fill up instead) (shift-drag to move it; Options > Plugin options > Flight has a preview, a scale and "Forget learned flight times"). A `/reload` mid-flight picks the flight back up. Glass Unit Frames can show the same flight on its cast bar (from Glass Panel's times); it steps aside while this one is zoomed.
+
 ## v1.0.0
 
 - New plugin **Combat**: a combat timer. On the bar it shows crossed swords and "Out of Combat", or the fight's time. Double-click the icon to zoom it: the bar then says "In Combat" and a glass pill with the time appears on the screen, only while you're in combat, at XP+'s text size (its scale is a slider) (shift-drag to move it; Options > Plugin options > Combat has a preview to place it). The pill sits in the empty middle of the zoomed XP+ bar's top text row (so the game's red error text doesn't land on it), and floats otherwise stack so they never overlap; drop one onto the other and it snaps clear. If you use Glass Unit Frames, its portrait timer can be turned off from Combat's options ("Use this timer instead of Glass Unit Frames'").
