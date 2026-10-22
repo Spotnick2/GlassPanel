@@ -53,7 +53,7 @@ jobs:
       # $LIBGLASS, the packager fetches the same pin into Libs/LibGlass-1.0.
       - name: Fetch LibGlass at the pinned ref
         run: |
-          bash tests/fetch_libglass.sh "$RUNNER_TEMP/LibGlass"
+          bash tests/fetch_lib.sh LibGlass-1.0 "$RUNNER_TEMP/LibGlass"
           echo "LIBGLASS=$RUNNER_TEMP/LibGlass" >> "$GITHUB_ENV"
 
       # WoW runs Lua 5.1, so the tests do too. tests/run.ps1 is the Windows

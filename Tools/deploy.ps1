@@ -78,7 +78,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $LibGlass "Tools\deploy.ps1"))) {
 }
 
 # The pin check, shared with tests\run.ps1.
-. (Join-Path $PSScriptRoot "LibGlassPin.ps1")
+. (Join-Path $PSScriptRoot "LibPin.ps1")
 
 # Copy the files a TOC lists (plus the TOC) from $src to $dest, rewriting the
 # version token, and remove Lua files the TOC no longer lists. Libs\ belongs
@@ -109,7 +109,7 @@ function Deploy-Toc([string]$src, [string]$tocName, [string]$dest) {
 }
 
 $core = Join-Path $AddOnsPath "GlassPanel"
-$warning = Test-LibGlassPin $RepoRoot $LibGlass
+$warning = Test-LibPin $RepoRoot "LibGlass-1.0" $LibGlass
 if ($warning) { Write-Host "  WARNING: $warning" -ForegroundColor Yellow }
 # The library first: its deploy checks the checkout and may refuse, and a
 # refusal must leave the deployed addon as it was (a new TOC naming a library

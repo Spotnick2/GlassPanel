@@ -408,8 +408,8 @@ texture names only grow; instances; upgrade rules).
   value line** (the packager keeps it in the value). Bump it only in a release made anyway: players
   get library fixes earlier through whichever glass addon ships the newest copy (LibStub runs that
   one). `tests\run.ps1` and deploy warn when the checkout isn't at the pin (one check,
-  `Tools\LibGlassPin.ps1`, reading the LibGlass entry as `fetch_libglass.sh` does). CI
-  (`.github/workflows/package-check.yml`) fetches the pin (`tests/fetch_libglass.sh`), tests
+  `Tools\LibPin.ps1`, reading the library's entry as `fetch_lib.sh` does). CI
+  (`.github/workflows/package-check.yml`) fetches the pin (`tests/fetch_lib.sh LibGlass-1.0`), tests
   against it, and asserts the zip holds exactly the core, its library (that commit's shipped files)
   and each plugin folder.
 - **`GlassPanel.Glass` is an instance**: `STYLE`, the setters and the font registry are this
@@ -521,7 +521,7 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`).
   (`WoW.KNOWN_EVENTS.X = false`).
 - The tests run on Windows and on CI's Linux: list folders through `WoW.list(dir, ext)`, never a
   bare `dir` or `ls`, and match file names' case exactly.
-- `loadAddon()` expands the core TOC's LibGlass XML line from the checkout (`libGlassScripts`) and
+- `loadAddon()` expands the core TOC's LibGlass XML line from the checkout (`libScripts`, the `EMBEDDED` table) and
   drops `LibStub` with the old session, so each session loads the library afresh.
 - Secrets are `newproxy` userdata that throw on use. `WoW.moneySecret = true` makes `GetMoney`
   secret. No Lua 5.1 value can make a truth test or `==` throw, so those misuses are caught only

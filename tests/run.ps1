@@ -41,12 +41,12 @@ try {
     # The tests load the LibGlass checkout as it is ($env:LIBGLASS, default
     # ..\LibGlass); CI loads the .pkgmeta pin. (A missing checkout fails in
     # the tests themselves, loudly.)
-    . (Join-Path $RepoRoot "Tools\LibGlassPin.ps1")
+    . (Join-Path $RepoRoot "Tools\LibPin.ps1")
     $libGlass = if ($env:LIBGLASS) { $env:LIBGLASS } else { Join-Path (Split-Path -Parent $RepoRoot) "LibGlass" }
     if (Test-Path -LiteralPath $libGlass) {
-        $warning = Test-LibGlassPin $RepoRoot $libGlass
+        $warning = Test-LibPin $RepoRoot "LibGlass-1.0" $libGlass
         if ($warning) { Write-Host "WARNING: $warning (CI tests the pin)" -ForegroundColor Yellow }
-        else { Write-Host "LibGlass: $libGlass at the pin ($(Get-LibGlassPin $RepoRoot))" -ForegroundColor DarkGray }
+        else { Write-Host "LibGlass: $libGlass at the pin ($(Get-LibPin $RepoRoot 'LibGlass-1.0'))" -ForegroundColor DarkGray }
     }
 
     # Without the API dump the tests accept every event name and skip the
