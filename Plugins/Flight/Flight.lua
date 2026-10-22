@@ -12,8 +12,9 @@
 --   * the length of its hops (Routes.lua, generated from the client's own
 --     TaxiPath tables by Tools/taxi_routes.py) at SPEED: InFlight's measured
 --     Classic times give 29.96 yd/s over 266 routes, within about a second;
---   * else an estimate ("~"): the other Frequent Flier kind, scaled, or the
---     learned hops; with none, the time flown so far shows (grey, "+").
+--   * else an estimate ("~"): the other Frequent Flier kind, scaled, or hop by
+--     hop (a hop's length, else its landed time: a path newer than Routes.lua
+--     mixed with known ones); with none, the time flown so far shows (grey, "+").
 -- Frequent Flier (Legacy node 110300, spell 1225490: flight paths 20% faster
 -- per InFlight and EllesmereUI; unmeasured here) keeps times of its own. An
 -- unreadable perk learns nothing and makes the route's time an estimate.
@@ -232,10 +233,11 @@ local function lengthOf(route, fast)
         return t, fast == nil and "estimate" or "route"
     end
     local base = asBase(path)
-    if not base and #route.keys > 2 then   -- the sum of its learned hops
+    if not base and #route.keys > 2 then   -- hop by hop: its length, else its landed time (a new path)
         base = 0
         for i = 1, #route.keys - 1 do
-            local hop = asBase(pathOf(route.keys, i, i + 1))
+            local key = pathOf(route.keys, i, i + 1)
+            local hop = (YARDS[key] and YARDS[key] / SPEED) or asBase(key)
             if not hop then base = nil break end
             base = base + hop
         end

@@ -241,6 +241,12 @@ takeOff(3)
 eq(textOf("flight"), "~3:20", "an unreadable perk: the route's time is an estimate")
 landNow()
 WoW.frequentFlier = 0
+-- A path newer than Routes.lua (a new zone's): landed once, then mixed with known hops.
+WoW.taxi.nodes[3] = { id = 904, name = "Riverlands Post, The Riverlands" }
+GlassPanelFlightDB.routes["25>904"] = { base = 40 }
+takeOff(3)
+eq(textOf("flight"), "~2:30", "a known hop's length plus a new hop's landed time (3304 / 30 + 40)")
+landNow()
 WoW.taxi.nodes = savedTaxi
 repaint()
 
