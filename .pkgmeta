@@ -48,7 +48,7 @@ externals:
   # never in a plugin folder move-folders moves (EMBEDDED-LIBRARIES section 3).
   Libs/LibTaxiTime-1.0:
     url: https://github.com/Spotnick2/LibTaxiTime
-    commit: d94cc15a761c3400d1c97fc98e33e4f64c802952
+    commit: b1443e32997b7d0d338d30996df635f52fccc765
 
 # YAML list, not markdown bullets. Every pattern matches the WHOLE path from
 # the package root, so the top-level names below never reach inside Libs/.
