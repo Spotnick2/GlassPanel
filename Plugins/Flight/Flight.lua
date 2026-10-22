@@ -5,14 +5,17 @@
 -- a fill. It is a float of order 3 (API.RegisterFloat): its default slot
 -- stacks under XP+'s zoomed bar, and a drop snaps clear of the others.
 --
--- The client gives no flight duration, so times are learned: each landing at
--- the end of a flight records that exact path (GlassPanelFlightDB.routes,
--- account-wide, keyed by the node ids along the way, "6>74>71"). A path never
--- flown is estimated from its learned single hops ("~"); with neither, the
--- time flown so far shows (grey, "+"). Frequent Flier (Legacy node 110300,
--- flight paths 20% faster per EllesmereUI; unmeasured here) keeps times of its
--- own: the other kind is only an estimate, scaled by FF_FACTOR. An unreadable
--- perk learns nothing.
+-- The client gives no flight duration. The time comes, best first, from:
+--   * this exact path as you landed it last (GlassPanelFlightDB.routes,
+--     account-wide, keyed by the node ids along the way, "6>74>71");
+--   * the length of its hops (Routes.lua, generated from the client's own
+--     TaxiPath tables by Tools/taxi_routes.py) at SPEED: InFlight's measured
+--     Classic times give 29.96 yd/s over 266 routes, within about a second;
+--   * else an estimate ("~"): the other Frequent Flier kind, scaled, or the
+--     learned hops; with none, the time flown so far shows (grey, "+").
+-- Frequent Flier (Legacy node 110300, spell 1225490: flight paths 20% faster
+-- per InFlight and EllesmereUI; unmeasured here) keeps times of its own. An
+-- unreadable perk learns nothing and makes the route's time an estimate.
 --
 -- Lifecycle (EllesmereUI's, built on Forever): picking a node on the flight
 -- map (TakeTaxiNode, hooked, never replaced) records the route;
@@ -31,8 +34,10 @@
 -- shows a flight, and EventRegistry "GlassPanel.Flight.ZoomedChanged"
 -- (zoomed) says when that changes. Nothing is written to it.
 
+local _, ns = ...
 GlassPanel = GlassPanel or {}
 local API, Glass = GlassPanel.API, GlassPanel.Glass
+local YARDS = ns.YARDS or {}   -- Routes.lua
 local P = API.Plain
 
 local WIDTH = 72                  -- the block: icon + "~12:34"
@@ -43,7 +48,8 @@ local PREVIEW = 30                -- seconds the preview flies
 local BOARD = 5                   -- seconds from picking a node to losing control
 local SETTLE = 3                  -- seconds a landing waits for its other half (off the taxi, control back)
 local MIN_FLIGHT, MAX_FLIGHT = 5, 3600   -- a learned time outside these is noise
-local FF_FACTOR = 1.2             -- Frequent Flier's speed (EllesmereUI's figure, unmeasured)
+local FF_FACTOR = 1.2             -- Frequent Flier's speed (InFlight's and EllesmereUI's figure, unmeasured)
+local SPEED = 30                  -- yd/s along the path (fitted to InFlight's Classic times; Tools/taxi_routes.py)
 local LEGACY_TREE, FF_NODE = 1188, 110300
 local SPOT_LIMIT = 4096
 local GREY, GOLD = "|cff999999", "|cffffd100"
@@ -192,12 +198,30 @@ local function asBase(path)
     return t and t * FF_FACTOR
 end
 
--- The flight's length in seconds and whether it is an estimate, or nil.
+-- The route's length in yards from the client's paths, or nil when a hop isn't there.
+local function yardsOf(route)
+    local yards = 0
+    for i = 1, #route.keys - 1 do
+        local y = YARDS[pathOf(route.keys, i, i + 1)]
+        if not y then return nil end
+        yards = yards + y
+    end
+    return yards
+end
+
+-- The flight's length in seconds and where it comes from ("learned", "route"
+-- or "estimate"), or nil.
 local function lengthOf(route, fast)
     local path = pathOf(route.keys)
     if fast ~= nil then
         local t = stored(path, kindOf(fast))
-        if t then return t, false end
+        if t then return t, "learned" end
+    end
+    local yards = yardsOf(route)
+    if yards then
+        local t = yards / SPEED
+        if fast then t = t / FF_FACTOR end
+        return t, fast == nil and "estimate" or "route"
     end
     local base = asBase(path)
     if not base and #route.keys > 2 then   -- the sum of its learned hops
@@ -209,7 +233,7 @@ local function lengthOf(route, fast)
         end
     end
     if not base then return nil end
-    return fast and base / FF_FACTOR or base, true
+    return fast and base / FF_FACTOR or base, "estimate"
 end
 
 local function learn(fl, took)
@@ -234,7 +258,8 @@ end
 --------------------------------------------------------------------------------
 
 local function previewFlight()
-    return { route = { keys = { 0, 1 }, names = { "Here", "Preview flight" } }, start = previewStart, total = PREVIEW }
+    return { route = { keys = { 0, 1 }, names = { "Here", "Preview flight" } }, start = previewStart, total = PREVIEW,
+             source = "route" }
 end
 
 -- The flight on show: the real one, else the preview's.
@@ -492,7 +517,9 @@ end
 local land   -- below
 
 local function tick()
-    if flight and GetTime() - flight.start > 2 and not onTaxi() then
+    if flight and onTaxi() then
+        flight.offAt = nil   -- SETTLE counts time off the taxi in one go (Codex on #125)
+    elseif flight and GetTime() - flight.start > 2 then
         local now = GetTime()
         if flight.gainedAt and now - flight.gainedAt <= SETTLE then
             land(true, flight.gainedAt)   -- control came back first: landed then
@@ -551,10 +578,10 @@ end
 
 local function startFlight(route, startedAt, resumed, early)
     local fast = frequentFlier()
-    local total, estimate
-    if route then total, estimate = lengthOf(route, fast) end
-    flight = { route = route, start = startedAt or GetTime(), total = total, estimate = estimate,
-               fast = fast, resumed = resumed, early = early }
+    local total, source
+    if route then total, source = lengthOf(route, fast) end
+    flight = { route = route, start = startedAt or GetTime(), total = total, source = source,
+               estimate = source == "estimate", fast = fast, resumed = resumed, early = early }
     if early then flight.total = nil end
     if not resumed then saveCurrent() end
     previewUntil = nil
@@ -667,8 +694,10 @@ function tooltip(_, tt)
         elseif fl.total then
             tt:AddDoubleLine("Time left", timeText(fl) .. " (of " .. clock(fl.total) .. ")",
                 LABEL[1], LABEL[2], LABEL[3], 1, 1, 1)
-            if fl.estimate then
-                tt:AddLine("Estimated from your other flights; learned exactly when you land.", 0.7, 0.7, 0.7, true)
+            if fl.source == "route" then
+                tt:AddLine("From the route's length; learned exactly when you land.", 0.7, 0.7, 0.7, true)
+            elseif fl.estimate then
+                tt:AddLine("Estimated; learned exactly when you land.", 0.7, 0.7, 0.7, true)
             end
         else
             tt:AddDoubleLine("Flown", flown, LABEL[1], LABEL[2], LABEL[3], 1, 1, 1)
@@ -690,7 +719,9 @@ local function forget()
     db().routes = nil
     API.Print("Flight: learned flight times forgotten.")
     if flight and flight.route and not flight.early then
-        flight.total, flight.estimate = lengthOf(flight.route, flight.fast)
+        local source
+        flight.total, source = lengthOf(flight.route, flight.fast)
+        flight.source, flight.estimate = source, source == "estimate"
         GlassPanel.Refresh("flight")
         paintFloat(true)
     end

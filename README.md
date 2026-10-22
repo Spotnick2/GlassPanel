@@ -35,8 +35,8 @@ for a full-width bar; `/gpanel setup` can also write an Edit Mode layout that ma
   shift-drag anywhere and scale.
 - **Combat**: "Out of Combat", or the fight's time. Zoomed, the bar says "In Combat" and a glass
   **pill** with the timer shows on the screen, only during a fight.
-- **Flight**: on a taxi, the time left (learned from your own flights: the first trip on a route
-  counts up, every later one counts down). Zoomed, a glass bar with the destination shows under
+- **Flight**: on a taxi, the time left, from the first trip (worked out from the route's length,
+  then exact once you've landed it). Zoomed, a glass bar with the destination shows under
   the XP+ bar while you fly.
 - **Gold** (what you gained or spent this session), **Bags**, **Durability** (lowest item and the
   repair cost), **GearScore** and item level, **Professions**, **Guild** (online and who),

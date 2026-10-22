@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[Flight]|r
-## Notes: A flight timer: the time left on a taxi, learned from your flights. Zoom it into a glass bar under XP+'s.
+## Notes: A flight timer: the time left on a taxi, from the route's length, then your own landings. Zoom it into a glass bar under XP+'s.
 ## Author: Spotnick
 ## Version: @project-version@
 ## Group: GlassPanel
@@ -8,4 +8,5 @@
 ## Dependencies: GlassPanel
 ## SavedVariables: GlassPanelFlightDB
 
+Routes.lua
 Flight.lua

@@ -7,11 +7,11 @@ local function F() return block("flight")._test end
 local function widget() return block("flight").widget end
 local function dbl() widget()._scripts.OnDoubleClick(widget(), "LeftButton"); WoW.tick() end
 
--- Ironforge (slot 1, node 6) -> Thorium Point (2, 74) -> Morgan's Vigil (3, 71).
+-- Three nodes with ids the client's paths (Routes.lua) don't have, so only landings time them:
 WoW.taxi.nodes = {
-    [1] = { id = 6, name = "Ironforge, Dun Morogh" },
-    [2] = { id = 74, name = "Thorium Point, Searing Gorge" },
-    [3] = { id = 71, name = "Morgan's Vigil, Burning Steppes" },
+    [1] = { id = 901, name = "Ironforge, Dun Morogh" },
+    [2] = { id = 902, name = "Thorium Point, Searing Gorge" },
+    [3] = { id = 903, name = "Morgan's Vigil, Burning Steppes" },
 }
 WoW.taxi.routes = { [2] = { 1, 2 }, [3] = { 1, 2, 3 } }
 
@@ -46,7 +46,7 @@ WoW.now = 1000
 takeOff(2)
 local fl = F().flight()
 check(fl ~= nil, "control lost right after a pick: a flight")
-eq(F().pathOf(fl.route.keys), "6>74", "keyed by node ids")
+eq(F().pathOf(fl.route.keys), "901>902", "keyed by node ids")
 eq(widget()._shown, true, "on a flight: the block shows")
 eq(textOf("flight"), "|cff999999+0:00|r", "unknown: the time flown, grey")
 eq(widget()._width, 72, "a fixed width")
@@ -57,7 +57,7 @@ WoW.now = 1090.04
 landNow()
 eq(F().flight(), nil, "landed")
 eq(widget()._shown, false, "landed: the block goes")
-eq(GlassPanelFlightDB.routes["6>74"].base, 90, "the time is learned, to a tenth")
+eq(GlassPanelFlightDB.routes["901>902"].base, 90, "the time is learned, to a tenth")
 eq(GlassPanelFlightDB.current, nil, "nothing left to resume")
 repaint()
 eq(F().ticker(), nil, "the ticker stops at its next tick")
@@ -71,10 +71,10 @@ repaint()
 eq(textOf("flight"), "1:00", "counting down")
 WoW.now = 2089.6
 landNow()
-eq(GlassPanelFlightDB.routes["6>74"].base, 89.6, "the newest landing is kept")
+eq(GlassPanelFlightDB.routes["901>902"].base, 89.6, "the newest landing is kept")
 
 -- A path never flown: the sum of its learned hops, as an estimate.
-GlassPanelFlightDB.routes["74>71"] = { base = 60 }
+GlassPanelFlightDB.routes["902>903"] = { base = 60 }
 WoW.now = 3000
 takeOff(3)
 eq(textOf("flight"), "~2:30", "estimated from its hops (89.6 + 60)")
@@ -88,7 +88,7 @@ check(tip:find("Estimated", 1, true), "...and says it's an estimate")
 GameTooltip:Hide()
 WoW.now = 3140
 landNow()
-eq(GlassPanelFlightDB.routes["6>74>71"].base, 140, "the whole path is learned on its own")
+eq(GlassPanelFlightDB.routes["901>902>903"].base, 140, "the whole path is learned on its own")
 WoW.now = 3200
 takeOff(3)
 eq(textOf("flight"), "2:20", "and is exact next time")
@@ -102,8 +102,8 @@ takeOff(2)
 eq(textOf("flight"), "~1:15", "with the perk, a time learned without it is 1.2 times shorter, estimated")
 WoW.now = 4072
 landNow()
-eq(GlassPanelFlightDB.routes["6>74"].fast, 72, "learned as its own kind")
-eq(GlassPanelFlightDB.routes["6>74"].base, 89.6, "...the other kept")
+eq(GlassPanelFlightDB.routes["901>902"].fast, 72, "learned as its own kind")
+eq(GlassPanelFlightDB.routes["901>902"].base, 89.6, "...the other kept")
 takeOff(2)
 eq(textOf("flight"), "1:12", "exact for its kind")
 landNow()
@@ -114,8 +114,8 @@ takeOff(3)
 check(textOf("flight"):find("~", 1, true), "unreadable perk: only an estimate")
 WoW.now = 5100
 landNow()
-eq(GlassPanelFlightDB.routes["6>74>71"].base, 140, "...and nothing learned")
-eq(GlassPanelFlightDB.routes["6>74>71"].fast, nil, "...of either kind")
+eq(GlassPanelFlightDB.routes["901>902>903"].base, 140, "...and nothing learned")
+eq(GlassPanelFlightDB.routes["901>902>903"].fast, nil, "...of either kind")
 WoW.frequentFlier = 0
 repaint()
 
@@ -146,7 +146,7 @@ repaint()
 eq(F().flight(), nil, "off the taxi for 3 s without control back: ended")
 
 -- A normal landing is learned whichever half the client says first (Codex on #125).
-GlassPanelFlightDB.routes["6>74"] = nil
+GlassPanelFlightDB.routes["901>902"] = nil
 -- Off the taxi first, the ticker in between, then control back.
 WoW.now = 6100
 takeOff(2)
@@ -157,9 +157,9 @@ check(F().flight() ~= nil, "off the taxi before control back: still pending")
 WoW.now = 6151
 WoW.fire("PLAYER_CONTROL_GAINED"); WoW.tick()
 eq(F().flight(), nil, "control back: landed")
-eq(GlassPanelFlightDB.routes["6>74"].base, 51, "...and learned, timed at control back")
+eq(GlassPanelFlightDB.routes["901>902"].base, 51, "...and learned, timed at control back")
 -- Control back while the taxi still reads on, then off the taxi at a later tick.
-GlassPanelFlightDB.routes["6>74"] = nil
+GlassPanelFlightDB.routes["901>902"] = nil
 WoW.now = 6200
 takeOff(2)
 WoW.now = 6260
@@ -169,8 +169,8 @@ WoW.now = 6261
 WoW.layer.taxi = false
 repaint()
 eq(F().flight(), nil, "off the taxi at the next tick: landed")
-eq(GlassPanelFlightDB.routes["6>74"].base, 60, "...and learned, timed at control back")
-GlassPanelFlightDB.routes["6>74"] = { base = 89.6 }   -- as the tests below expect
+eq(GlassPanelFlightDB.routes["901>902"].base, 60, "...and learned, timed at control back")
+GlassPanelFlightDB.routes["901>902"] = { base = 89.6 }   -- as the tests below expect
 
 -- Early landing: the time left goes, nothing learned.
 WoW.now = 7000
@@ -181,7 +181,7 @@ eq(F().flight().early, true, "marked early")
 eq(textOf("flight"), "|cff999999+0:00|r", "the time flown instead")
 WoW.now = 7050
 landNow()
-eq(GlassPanelFlightDB.routes["6>74>71"].base, 140, "an early landing teaches nothing")
+eq(GlassPanelFlightDB.routes["901>902>903"].base, 140, "an early landing teaches nothing")
 repaint()
 
 -- A /reload mid-flight resumes the saved flight from server time, learning nothing.
@@ -196,19 +196,73 @@ check(fl ~= nil and fl.resumed, "reloaded on the taxi: resumed")
 eq(textOf("flight"), "1:00", "30 s in, the right time left")
 WoW.now = 9060
 landNow()
-eq(GlassPanelFlightDB.routes["6>74"].base, 89.6, "a resumed flight teaches nothing")
+eq(GlassPanelFlightDB.routes["901>902"].base, 89.6, "a resumed flight teaches nothing")
 -- Saved too long ago, or not on a taxi: no resume.
-GlassPanelFlightDB.current = { route = { keys = { 6, 74 }, names = { "A", "B" } }, at = WoW.serverTime - 99999 }
+GlassPanelFlightDB.current = { route = { keys = { 901, 902 }, names = { "A", "B" } }, at = WoW.serverTime - 99999 }
 WoW.layer.taxi = true
 loadAddon()
 fl = F().flight()
 check(fl ~= nil and fl.route == nil, "a stale save: a flight, route unknown")
 WoW.layer.taxi = false
 WoW.fire("PLAYER_CONTROL_GAINED"); WoW.tick()
-GlassPanelFlightDB.current = { route = { keys = { 6 }, names = { "A" } }, at = WoW.serverTime }
+GlassPanelFlightDB.current = { route = { keys = { 901 }, names = { "A" } }, at = WoW.serverTime }
 loadAddon()
 eq(F().flight(), nil, "off the taxi: none")
 eq(GlassPanelFlightDB.current, nil, "...and the save is dropped")
+
+-- From the first flight: the client's path lengths (Routes.lua) at 30 yd/s.
+-- Orgrimmar (23) > Crossroads (25), 3304 yd; on to Camp Taurajo (77), 2705 yd.
+local savedTaxi = WoW.taxi.nodes
+WoW.taxi.nodes = {
+    [1] = { id = 23, name = "Orgrimmar, Durotar" },
+    [2] = { id = 25, name = "Crossroads, The Barrens" },
+    [3] = { id = 77, name = "Camp Taurajo, The Barrens" },
+}
+WoW.now = 7500
+takeOff(2)
+eq(textOf("flight"), "1:50", "never flown: the route's length gives the time (3304 / 30)")
+eq(F().flight().source, "route", "...from the client's paths")
+WoW.now = 7600
+landNow()
+eq(GlassPanelFlightDB.routes["23>25"].base, 100, "the landing is still learned")
+takeOff(2)
+eq(textOf("flight"), "1:40", "...and wins next time")
+landNow()
+takeOff(3)
+eq(textOf("flight"), "3:20", "two hops: their lengths added ((3304 + 2705) / 30)")
+landNow()
+WoW.frequentFlier = 1
+GlassPanelFlightDB.routes["23>25>77"] = nil
+takeOff(3)
+eq(textOf("flight"), "2:47", "Frequent Flier: 20% faster")
+landNow()
+WoW.frequentFlier = "secret"
+takeOff(3)
+eq(textOf("flight"), "~3:20", "an unreadable perk: the route's time is an estimate")
+landNow()
+WoW.frequentFlier = 0
+WoW.taxi.nodes = savedTaxi
+repaint()
+
+-- A moment off the taxi mid-flight doesn't shorten the real landing's wait (Codex on #125).
+GlassPanelFlightDB.routes["901>902"] = nil
+WoW.now = 7800
+takeOff(2)
+WoW.now = 7810
+WoW.layer.taxi = false
+repaint()   -- off the taxi for a moment
+WoW.now = 7811
+WoW.layer.taxi = true
+repaint()   -- back on
+WoW.now = 7870
+WoW.layer.taxi = false
+repaint()   -- the real landing: off the taxi, control back not yet
+check(F().flight() ~= nil, "the earlier moment off the taxi doesn't count: still waiting")
+WoW.now = 7871
+WoW.fire("PLAYER_CONTROL_GAINED"); WoW.tick()
+eq(GlassPanelFlightDB.routes["901>902"].base, 71, "...and the landing is learned")
+GlassPanelFlightDB.routes["901>902"] = { base = 89.6 }
+repaint()
 
 -- Zoomed: "Flying" on the bar, the glass bar on the screen only while flying.
 local claims = {}
