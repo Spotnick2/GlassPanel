@@ -17,10 +17,12 @@
 -- Lifecycle (EllesmereUI's, built on Forever): picking a node on the flight
 -- map (TakeTaxiNode, hooked, never replaced) records the route;
 -- PLAYER_CONTROL_LOST within BOARD seconds starts it (UnitOnTaxi may still
--- read false then); PLAYER_CONTROL_GAINED off the taxi lands it, the one
--- landing learned from. A flight not picked here (a quest's) is noticed a
--- second after control is lost and counts up. While a flight runs, a 1 s
--- ticker repaints and ends one found off the taxi (nothing learned).
+-- read false then); a landing is control back (PLAYER_CONTROL_GAINED) and off
+-- the taxi, in either order within SETTLE seconds (Codex on #125), the one
+-- landing learned from, timed at control back. A flight not picked here (a
+-- quest's) is noticed a second after control is lost and counts up. While a
+-- flight runs, a 1 s ticker repaints and settles landings: off the taxi for
+-- SETTLE seconds without control back ends the flight, learning nothing.
 -- TaxiRequestEarlyLanding (hooked) drops the time left. A /reload mid-flight
 -- resumes from GlassPanelFlightDB.current (server time) and learns nothing.
 --
@@ -39,6 +41,7 @@ local SCALE_MIN, SCALE_MAX, SCALE_STEP, SCALE_DEFAULT = 0.5, 2, 0.05, 1.5   -- X
 local FADE = 0.2                  -- seconds the bar takes to appear and to go
 local PREVIEW = 30                -- seconds the preview flies
 local BOARD = 5                   -- seconds from picking a node to losing control
+local SETTLE = 3                  -- seconds a landing waits for its other half (off the taxi, control back)
 local MIN_FLIGHT, MAX_FLIGHT = 5, 3600   -- a learned time outside these is noise
 local FF_FACTOR = 1.2             -- Frequent Flier's speed (EllesmereUI's figure, unmeasured)
 local LEGACY_TREE, FF_NODE = 1188, 110300
@@ -489,7 +492,16 @@ end
 local land   -- below
 
 local function tick()
-    if flight and GetTime() - flight.start > 2 and not onTaxi() then land(false) end
+    if flight and GetTime() - flight.start > 2 and not onTaxi() then
+        local now = GetTime()
+        if flight.gainedAt and now - flight.gainedAt <= SETTLE then
+            land(true, flight.gainedAt)   -- control came back first: landed then
+        elseif not flight.offAt then
+            flight.offAt = now            -- control back may still be on its way
+        elseif now - flight.offAt >= SETTLE then
+            land(false)                   -- its landing was missed
+        end
+    end
     if not (flight or previewing()) then
         if ticker then ticker:Cancel() end
         ticker = nil
@@ -552,9 +564,10 @@ local function startFlight(route, startedAt, resumed, early)
     paintFloat(true)
 end
 
-function land(learnIt)
+-- `at`: when it landed (control back), else now.
+function land(learnIt, at)
     if not flight then return end
-    local took = GetTime() - flight.start
+    local took = (at or GetTime()) - flight.start
     if learnIt then learn(flight, took) end
     lastFlight = { to = flight.route and destination(flight.route), took = took }
     flight = nil
@@ -611,7 +624,12 @@ local function onEvent(_, event)
             end))
         end
     elseif event == "PLAYER_CONTROL_GAINED" then
-        if flight and not onTaxi() then land(true) end
+        if not flight then return end
+        if onTaxi() then
+            flight.gainedAt = GetTime()   -- still reads on the taxi: the ticker lands it from this
+        else
+            land(true)
+        end
     elseif event == "PLAYER_ENTERING_WORLD" then
         resume()
     end

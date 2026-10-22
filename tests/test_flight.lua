@@ -136,11 +136,41 @@ WoW.flushTimers(); WoW.tick()
 fl = F().flight()
 check(fl ~= nil and fl.route == nil, "on the taxi a second later: a flight, route unknown")
 eq(textOf("flight"), "|cff999999+0:00|r", "counting up")
--- Its landing missed: the ticker ends it off the taxi, learning nothing.
+-- Its landing missed: off the taxi with no control back, the ticker ends it after SETTLE s.
 WoW.layer.taxi = false
 WoW.now = 6030
 repaint()
-eq(F().flight(), nil, "found off the taxi: ended")
+check(F().flight() ~= nil, "just found off the taxi: control back may still come")
+WoW.now = 6033
+repaint()
+eq(F().flight(), nil, "off the taxi for 3 s without control back: ended")
+
+-- A normal landing is learned whichever half the client says first (Codex on #125).
+GlassPanelFlightDB.routes["6>74"] = nil
+-- Off the taxi first, the ticker in between, then control back.
+WoW.now = 6100
+takeOff(2)
+WoW.now = 6150
+WoW.layer.taxi = false
+repaint()
+check(F().flight() ~= nil, "off the taxi before control back: still pending")
+WoW.now = 6151
+WoW.fire("PLAYER_CONTROL_GAINED"); WoW.tick()
+eq(F().flight(), nil, "control back: landed")
+eq(GlassPanelFlightDB.routes["6>74"].base, 51, "...and learned, timed at control back")
+-- Control back while the taxi still reads on, then off the taxi at a later tick.
+GlassPanelFlightDB.routes["6>74"] = nil
+WoW.now = 6200
+takeOff(2)
+WoW.now = 6260
+WoW.fire("PLAYER_CONTROL_GAINED"); WoW.tick()
+check(F().flight() ~= nil, "control back still on the taxi: not landed yet")
+WoW.now = 6261
+WoW.layer.taxi = false
+repaint()
+eq(F().flight(), nil, "off the taxi at the next tick: landed")
+eq(GlassPanelFlightDB.routes["6>74"].base, 60, "...and learned, timed at control back")
+GlassPanelFlightDB.routes["6>74"] = { base = 89.6 }   -- as the tests below expect
 
 -- Early landing: the time left goes, nothing learned.
 WoW.now = 7000
