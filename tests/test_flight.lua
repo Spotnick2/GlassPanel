@@ -326,6 +326,30 @@ WoW.now = WoW.now + 31
 repaint(); WoW.tick(0.3)
 eq(fb._shown, false, "...and it ends")
 
+-- Overtime: past the prediction the time counts on in orange; the bar stays at its end.
+GlassPanelFlightDB.detached = true
+WoW.now = 12500
+takeOff(2)   -- 901>902: 89.6 s learned
+WoW.now = 12500 + 89.6 + 7
+repaint()
+eq(textOf("flight"), "Flying", "zoomed: the block says Flying")
+eq(F().bar().right._text, "|cffff9900+0:07|r", "seven seconds past the prediction, in orange")
+eq(F().bar().host._value, 0, "the drained bar stays empty")
+local tipLines = {}
+F().float()._scripts.OnEnter(F().float())
+for _, l in ipairs(GameTooltip._lines) do tipLines[#tipLines + 1] = l end
+check(table.concat(tipLines, "\n"):find("Longer than predicted", 1, true), "the tooltip says so")
+GameTooltip:Hide()
+GlassPanelFlightDB.detached = nil
+GlassPanel.Refresh("flight"); WoW.tick()
+eq(textOf("flight"), "|cffff9900+0:07|r", "docked: the block shows it too")
+WoW.now = 12500 + 100
+landNow()
+eq(GlassPanelFlightDB.routes["901>902"].base, 100, "the landing teaches the longer time")
+GlassPanelFlightDB.routes["901>902"] = { base = 89.6 }
+repaint(); WoW.tick(0.3)
+GlassPanelFlightDB.detached = true
+
 -- Current(): the flight for Glass Unit Frames' cast bar, a copy, with "Changed" said.
 local changes = 0
 EventRegistry:RegisterCallback("GlassPanel.Flight.Changed", function() changes = changes + 1 end)

@@ -60,7 +60,7 @@ local FF_FACTOR = 1.2             -- Frequent Flier's speed (InFlight's and Elle
 local SPEED = 30                  -- yd/s along the path (fitted to InFlight's Classic times; Tools/taxi_routes.py)
 local LEGACY_TREE, FF_NODE = 1188, 110300
 local SPOT_LIMIT = 4096
-local GREY, GOLD = "|cff999999", "|cffffd100"
+local GREY, GOLD, LATE = "|cff999999", "|cffffd100", "|cffff9900"
 
 local function db()
     local d = rawget(_G, "GlassPanelFlightDB")
@@ -278,10 +278,16 @@ end
 
 local function elapsedOf(fl) return math.max(0, GetTime() - fl.start) end
 
--- "1:23" exact, "~1:23" estimated, grey "+0:42" flown so far when unknown.
+-- Past the time it was given: the flight runs longer than predicted.
+local function overdue(fl) return fl.total ~= nil and elapsedOf(fl) > fl.total end
+
+-- "1:23" exact, "~1:23" estimated, orange "+0:07" past the prediction (the
+-- bar stays at its end), grey "+0:42" flown so far when unknown.
 local function timeText(fl)
     if fl.total then
-        local s = clock(fl.total - elapsedOf(fl))
+        local left = fl.total - elapsedOf(fl)
+        if left < 0 then return LATE .. "+" .. clock(-left) .. "|r" end
+        local s = clock(left)
         return fl.estimate and ("~" .. s) or s
     end
     return GREY .. "+" .. clock(elapsedOf(fl)) .. "|r"
@@ -714,7 +720,9 @@ function tooltip(_, tt)
         elseif fl.total then
             tt:AddDoubleLine("Time left", timeText(fl) .. " (of " .. clock(fl.total) .. ")",
                 LABEL[1], LABEL[2], LABEL[3], 1, 1, 1)
-            if fl.source == "route" then
+            if overdue(fl) then
+                tt:AddLine("Longer than predicted: learned when you land.", 1, 0.6, 0, true)
+            elseif fl.source == "route" then
                 tt:AddLine("From the route's length; learned exactly when you land.", 0.7, 0.7, 0.7, true)
             elseif fl.estimate then
                 tt:AddLine("Estimated; learned exactly when you land.", 0.7, 0.7, 0.7, true)
