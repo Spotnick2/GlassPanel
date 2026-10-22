@@ -432,7 +432,7 @@ Its `LibTaxiTime.lua` header is the contract.
 - **Embedded like LibGlass**, in the **core's** `Libs/LibTaxiTime-1.0` (never inside a plugin folder
   `move-folders` moves: EMBEDDED-LIBRARIES section 3); the core TOC loads its XML right after LibGlass's. It starts
   nothing (no frame, hook or event) until the Flight plugin adds its store, so the core carries it idle when Flight
-  is off. `.pkgmeta` pins it (a `commit:` while its r1 PR is open, then `tag: r1`; never `latest`); deploy hands
+  is off. `.pkgmeta` pins it (`tag: r1`; never `latest`); deploy hands
   the copy to its `Tools\deploy.ps1` (`$env:LIBTAXITIME`, default `..\LibTaxiTime`); the tests load it through
   the harness's `EMBEDDED` table; CI fetches the pin (`tests/fetch_lib.sh LibTaxiTime-1.0`) and asserts the zip
   holds exactly its XML, the files it loads and LICENSE.
