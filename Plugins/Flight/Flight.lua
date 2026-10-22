@@ -6,62 +6,40 @@
 -- instead). It is a float of order 3 (API.RegisterFloat): its default slot
 -- stacks under XP+'s zoomed bar, and a drop snaps clear of the others.
 --
--- The client gives no flight duration. The time comes, best first, from:
---   * this exact path as you landed it last (GlassPanelFlightDB.routes,
---     account-wide, keyed by the node ids along the way, "6>74>71");
---   * the length of its hops (Routes.lua, generated from the client's own
---     TaxiPath tables by Tools/taxi_routes.py) at SPEED: InFlight's measured
---     Classic times give 29.96 yd/s over 266 routes, within about a second;
---   * else an estimate ("~"): the other Frequent Flier kind, scaled, or hop by
---     hop (a hop's length, else its landed time: a path newer than Routes.lua
---     mixed with known ones); with none, the time flown so far shows (grey, "+").
--- Frequent Flier (Legacy node 110300, spell 1225490: flight paths 20% faster
--- per InFlight and EllesmereUI; unmeasured here) keeps times of its own. An
--- unreadable perk learns nothing and makes the route's time an estimate.
+-- The timing is LibTaxiTime-1.0's (#127), embedded in the core's Libs/ and
+-- shared with Glass Unit Frames: the route lengths, the tracker (takeoff,
+-- landing, early landing, a /reload mid-flight), the learned times. This file
+-- is the UI. GlassPanelFlightDB is the plugin's store (lib:AddStore at our
+-- ADDON_LOADED): the library owns its `routes` and `current` keys; the rest
+-- (detached, spot, scale, fillUp) is ours. The time shows "1:23" (learned or
+-- from the route's length), "~1:23" (an estimate), an orange "+0:07" past the
+-- prediction, or a grey "+0:42" flown so far when nothing is known.
 --
--- Lifecycle (EllesmereUI's, built on Forever): picking a node on the flight
--- map (TakeTaxiNode, hooked, never replaced) records the route;
--- PLAYER_CONTROL_LOST within BOARD seconds starts it (UnitOnTaxi may still
--- read false then); a landing is control back (PLAYER_CONTROL_GAINED) and off
--- the taxi, in either order within SETTLE seconds (Codex on #125), the one
--- landing learned from, timed at control back. A flight not picked here (a
--- quest's) is noticed a second after control is lost and counts up. While a
--- flight runs, a 1 s ticker repaints and settles landings: off the taxi for
--- SETTLE seconds without control back ends the flight, learning nothing.
--- TaxiRequestEarlyLanding (hooked) drops the time left. A /reload mid-flight
--- resumes from GlassPanelFlightDB.current (server time) and learns nothing.
---
--- For Glass Unit Frames (GUF #148: the flight on its cast bar), read-only and
--- additive, GlassPanel.Flight (API 1):
---   Current() -> nil off a flight, else a fresh { to, from, start, total,
---     source, early }: names (nil when the route is unknown), start in
---     GetTime() seconds, total in seconds (nil: unknown, or landing early),
---     source "learned" | "route" | "estimate" | nil. EventRegistry
---     "GlassPanel.Flight.Changed" () says a flight started, landed, or its
---     time or destination changed.
---   Zoomed() -> true while our zoomed bar shows a flight: GUF steps aside;
---     EventRegistry "GlassPanel.Flight.ZoomedChanged" (zoomed) on a change.
+-- For Glass Unit Frames (GUF #148), read-only and additive, GlassPanel.Flight
+-- (API 1):
+--   Current() -> the library's Current(): nil off a flight, else a fresh
+--     { to, from, stops, start, total, source, early, resumed }. EventRegistry
+--     "GlassPanel.Flight.Changed" () re-fires the library's "LibTaxiTime.Changed".
+--   Zoomed() -> true while our zoomed bar shows a flight; EventRegistry
+--     "GlassPanel.Flight.ZoomedChanged" (zoomed) on a change. (GUF no longer
+--     uses them: its bar shows alongside ours.)
 -- Nothing is written to it.
 
-local _, ns = ...
+local ADDON = ...
 GlassPanel = GlassPanel or {}
 local API, Glass = GlassPanel.API, GlassPanel.Glass
-local YARDS = ns.YARDS or {}   -- Routes.lua
 local P = API.Plain
+
+local LibStub = rawget(_G, "LibStub")
+local LTT = LibStub and LibStub("LibTaxiTime-1.0", true)
 
 local WIDTH = 72                  -- the block: icon + "~12:34"
 local FLOAT_W, FLOAT_H, FLOAT_FONT = 480, 18, 12   -- XP+'s zoomed bar's, so they line up
 local SCALE_MIN, SCALE_MAX, SCALE_STEP, SCALE_DEFAULT = 0.5, 2, 0.05, 1.5   -- XP+'s zoomed bar is usually 1.5
 local FADE = 0.2                  -- seconds the bar takes to appear and to go
 local PREVIEW = 30                -- seconds the preview flies
-local BOARD = 5                   -- seconds from picking a node to losing control
-local SETTLE = 3                  -- seconds a landing waits for its other half (off the taxi, control back)
-local MIN_FLIGHT, MAX_FLIGHT = 5, 3600   -- a learned time outside these is noise
-local FF_FACTOR = 1.2             -- Frequent Flier's speed (InFlight's and EllesmereUI's figure, unmeasured)
-local SPEED = 30                  -- yd/s along the path (fitted to InFlight's Classic times; Tools/taxi_routes.py)
-local LEGACY_TREE, FF_NODE = 1188, 110300
 local SPOT_LIMIT = 4096
-local GREY, GOLD, LATE = "|cff999999", "|cffffd100", "|cffff9900"
+local GREY, LATE = "|cff999999", "|cffff9900"
 
 local function db()
     local d = rawget(_G, "GlassPanelFlightDB")
@@ -73,9 +51,7 @@ local function db()
 end
 local function detached() return db().detached == true end
 
-local pending      -- { route, clicked }: picked on the flight map, waiting for takeoff
-local flight       -- { route, start, total, estimate, fast, early, resumed }
-local lastFlight   -- { to, took }, for the tooltip
+local flight       -- the library's Current(), read again at every change
 local onScreen = false
 local float, bar, ticker, previewUntil, previewStart
 local moving, lastMoveStop = false, -1
@@ -104,172 +80,17 @@ local function clock(seconds)
     return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60)
 end
 
-local function onTaxi() return P(UnitOnTaxi("player")) == true end
-
 local function previewing() return previewUntil ~= nil and GetTime() < previewUntil end
 
---------------------------------------------------------------------------------
--- Routes and learned times
---------------------------------------------------------------------------------
-
--- A route is { keys = { node id (or name), ... }, names = { ... } }, start first.
-local function pathOf(keys, from, to)
-    local out = {}
-    for i = from or 1, to or #keys do out[#out + 1] = tostring(keys[i]) end
-    return table.concat(out, ">")
-end
-
--- Checked whole: a saved route must be one we could have made.
-local function validRoute(r)
-    if type(r) ~= "table" or type(r.keys) ~= "table" or type(r.names) ~= "table" then return false end
-    local n = #r.keys
-    if n < 2 or n > 64 or #r.names ~= n then return false end
-    for i = 1, n do
-        local k = r.keys[i]
-        if not ((type(k) == "number" or type(k) == "string") and type(r.names[i]) == "string") then return false end
-    end
-    return true
-end
-
 local function shortName(name) return name:match("^([^,]+)") or name end
-local function destination(route) return route.names[#route.names] end
-
--- The flight map's slots to node ids, when the map says (C_TaxiMap's list).
-local function nodeIds()
-    local ids = {}
-    local mapID = P(GetTaxiMapID())
-    local T = rawget(_G, "C_TaxiMap")
-    if type(mapID) ~= "number" or type(T) ~= "table" or type(T.GetAllTaxiNodes) ~= "function" then return ids end
-    local ok, nodes = pcall(T.GetAllTaxiNodes, mapID)
-    if not ok or type(nodes) ~= "table" then return ids end
-    for _, node in ipairs(nodes) do
-        local slot, id = P(node.slotIndex), P(node.nodeID)
-        if type(slot) == "number" and type(id) == "number" then ids[slot] = id end
-    end
-    return ids
-end
-
--- The route to `slot` as the flight map draws it (Blizzard's FM_FlightPathDataProvider),
--- or nil when any part of it can't be read.
-local function readRoute(slot)
-    local hops = P(GetNumRoutes(slot))
-    if type(hops) ~= "number" or hops < 1 then return nil end
-    local ids = nodeIds()
-    local route = { keys = {}, names = {} }
-    local function add(s)
-        s = P(s)
-        local name = type(s) == "number" and P(TaxiNodeName(s))
-        if type(name) ~= "string" or name == "" then return false end
-        route.keys[#route.keys + 1] = ids[s] or name
-        route.names[#route.names + 1] = name
-        return true
-    end
-    if not add(TaxiGetNodeSlot(slot, 1, true)) then return nil end
-    for hop = 1, hops do
-        if not add(TaxiGetNodeSlot(slot, hop, false)) then return nil end
-    end
-    return route
-end
-
--- Frequent Flier bought: true or false; nil when it can't be read.
-local function frequentFlier()
-    local T = rawget(_G, "C_Traits")
-    if type(T) ~= "table" or type(T.GetConfigIDByTreeID) ~= "function" or type(T.GetNodeInfo) ~= "function" then return nil end
-    local ok, config = pcall(T.GetConfigIDByTreeID, LEGACY_TREE)
-    config = ok and P(config)
-    if type(config) ~= "number" then return nil end
-    local ok2, node = pcall(T.GetNodeInfo, config, FF_NODE)
-    if not ok2 or type(node) ~= "table" or P(node.ID) ~= FF_NODE then return nil end
-    local rank = P(node.activeRank)
-    if type(rank) ~= "number" then return nil end
-    return rank > 0
-end
-
-local function routes()
-    local d = db()
-    if type(d.routes) ~= "table" then d.routes = {} end
-    return d.routes
-end
-
-local function kindOf(fast) return fast and "fast" or "base" end
-
-local function stored(path, kind)
-    local r = routes()[path]
-    local t = type(r) == "table" and finite(r[kind])
-    if t and t >= MIN_FLIGHT and t <= MAX_FLIGHT then return t end
-end
-
--- A learned time for `path` without Frequent Flier, from either kind.
-local function asBase(path)
-    local t = stored(path, "base")
-    if t then return t end
-    t = stored(path, "fast")
-    return t and t * FF_FACTOR
-end
-
--- The route's length in yards from the client's paths, or nil when a hop isn't there.
-local function yardsOf(route)
-    local yards = 0
-    for i = 1, #route.keys - 1 do
-        local y = YARDS[pathOf(route.keys, i, i + 1)]
-        if not y then return nil end
-        yards = yards + y
-    end
-    return yards
-end
-
--- The flight's length in seconds and where it comes from ("learned", "route"
--- or "estimate"), or nil.
-local function lengthOf(route, fast)
-    local path = pathOf(route.keys)
-    if fast ~= nil then
-        local t = stored(path, kindOf(fast))
-        if t then return t, "learned" end
-    end
-    local yards = yardsOf(route)
-    if yards then
-        local t = yards / SPEED
-        if fast then t = t / FF_FACTOR end
-        return t, fast == nil and "estimate" or "route"
-    end
-    local base = asBase(path)
-    if not base and #route.keys > 2 then   -- hop by hop: its length, else its landed time (a new path)
-        base = 0
-        for i = 1, #route.keys - 1 do
-            local key = pathOf(route.keys, i, i + 1)
-            local hop = (YARDS[key] and YARDS[key] / SPEED) or asBase(key)
-            if not hop then base = nil break end
-            base = base + hop
-        end
-    end
-    if not base then return nil end
-    return fast and base / FF_FACTOR or base, "estimate"
-end
-
-local function learn(fl, took)
-    if fl.early or fl.resumed or not fl.route or fl.fast == nil then return end
-    if took < MIN_FLIGHT or took > MAX_FLIGHT then return end
-    local all, path = routes(), pathOf(fl.route.keys)
-    local entry = type(all[path]) == "table" and all[path] or {}
-    entry[kindOf(fl.fast)] = math.floor(took * 10 + 0.5) / 10
-    all[path] = entry
-end
-
-local function learnedCount()
-    local n = 0
-    for _, e in pairs(routes()) do
-        if type(e) == "table" and (finite(e.base) or finite(e.fast)) then n = n + 1 end
-    end
-    return n
-end
 
 --------------------------------------------------------------------------------
 -- What shows
 --------------------------------------------------------------------------------
 
 local function previewFlight()
-    return { route = { keys = { 0, 1 }, names = { "Here", "Preview flight" } }, start = previewStart, total = PREVIEW,
-             source = "route" }
+    return { to = "Preview flight", from = "Here", stops = { "Here", "Preview flight" }, start = previewStart,
+             total = PREVIEW, source = "route" }
 end
 
 -- The flight on show: the real one, else the preview's.
@@ -290,14 +111,14 @@ local function timeText(fl)
         local left = fl.total - elapsedOf(fl)
         if left < 0 then return LATE .. "+" .. clock(-left) .. "|r" end
         local s = clock(left)
-        return fl.estimate and ("~" .. s) or s
+        return fl.source == "estimate" and ("~" .. s) or s
     end
     return GREY .. "+" .. clock(elapsedOf(fl)) .. "|r"
 end
 
 local function whereTo(fl)
     if fl.early then return "Landing at the next stop" end
-    return fl.route and shortName(destination(fl.route)) or "Flying"
+    return fl.to and shortName(fl.to) or "Flying"
 end
 
 --------------------------------------------------------------------------------
@@ -510,8 +331,6 @@ local function announce()
     trigger("GlassPanel.Flight.ZoomedChanged", now)
 end
 
-local function changed() trigger("GlassPanel.Flight.Changed") end
-
 -- Shown while zoomed and flying with the block on screen, or previewing.
 local function applyFloat()
     local want = detached() and ((flight ~= nil and onScreen) or previewing())
@@ -537,23 +356,9 @@ local function applyFloat()
     API.PlaceFloats()
 end
 
--- One ticker while a flight or the preview runs: the docked time, the bar,
--- and a flight found off the taxi ended (its landing was missed).
-local land   -- below
-
+-- One ticker while a flight or the preview runs: the docked time and the bar
+-- (the library has its own for landings).
 local function tick()
-    if flight and onTaxi() then
-        flight.offAt = nil   -- SETTLE counts time off the taxi in one go (Codex on #125)
-    elseif flight and GetTime() - flight.start > 2 then
-        local now = GetTime()
-        if flight.gainedAt and now - flight.gainedAt <= SETTLE then
-            land(true, flight.gainedAt)   -- control came back first: landed then
-        elseif not flight.offAt then
-            flight.offAt = now            -- control back may still be on its way
-        elseif now - flight.offAt >= SETTLE then
-            land(false)                   -- its landing was missed
-        end
-    end
     if not (flight or previewing()) then
         if ticker then ticker:Cancel() end
         ticker = nil
@@ -589,104 +394,37 @@ function setDetached(on)
 end
 
 --------------------------------------------------------------------------------
--- Flights
+-- The library
 --------------------------------------------------------------------------------
 
-local function saveCurrent()
-    local now = P(GetServerTime())
-    if not flight or type(now) ~= "number" then
-        db().current = nil
-        return
+-- A flight started, landed, landed early or changed its total.
+local function onChanged()
+    flight = LTT:Current()
+    if flight then
+        previewUntil = nil
+        startTicker()
     end
-    db().current = { route = flight.route, at = now - (GetTime() - flight.start), early = flight.early or nil }
-end
-
-local function startFlight(route, startedAt, resumed, early)
-    local fast = frequentFlier()
-    local total, source
-    if route then total, source = lengthOf(route, fast) end
-    flight = { route = route, start = startedAt or GetTime(), total = total, source = source,
-               estimate = source == "estimate", fast = fast, resumed = resumed, early = early }
-    if early then flight.total = nil end
-    if not resumed then saveCurrent() end
-    previewUntil = nil
-    changed()
-    startTicker()
     GlassPanel.Refresh("flight")
     applyFloat()
     paintFloat(true)
+    trigger("GlassPanel.Flight.Changed")
 end
 
--- `at`: when it landed (control back), else now.
-function land(learnIt, at)
-    if not flight then return end
-    local took = (at or GetTime()) - flight.start
-    if learnIt then learn(flight, took) end
-    lastFlight = { to = flight.route and destination(flight.route), took = took }
-    flight = nil
-    db().current = nil
-    changed()
-    GlassPanel.Refresh("flight")
-    applyFloat()
-end
-
--- After a /reload (or a login) on a taxi: the saved flight, if it is the one
--- still in the air; else a flight with nothing known about it.
-local function resume()
-    if flight then return end
-    if not onTaxi() then
-        db().current = nil
-        return
-    end
-    local c, now = db().current, P(GetServerTime())
-    local at = type(c) == "table" and finite(c.at)
-    if at and type(now) == "number" and now >= at and now - at <= MAX_FLIGHT and validRoute(c.route) then
-        startFlight(c.route, GetTime() - (now - at), true, c.early == true)
-    else
-        startFlight(nil, nil, true)
+if LTT then
+    local R = rawget(_G, "EventRegistry")
+    if type(R) == "table" and type(R.RegisterCallback) == "function" then
+        R:RegisterCallback("LibTaxiTime.Changed", guarded(onChanged), {})
     end
 end
 
-local function onTakeTaxiNode(slot)
-    pending = { route = readRoute(slot), clicked = GetTime() }
-end
-
-local function onEarlyLanding()
-    if not flight or flight.early then return end
-    flight.early, flight.total = true, nil
-    saveCurrent()
-    changed()
-    GlassPanel.Refresh("flight")
-    paintFloat(true)
-end
-
--- Hooked, never replaced (Blizzard's flight map calls them by name).
-for name, fn in pairs({ TakeTaxiNode = onTakeTaxiNode, TaxiRequestEarlyLanding = onEarlyLanding }) do
-    if type(rawget(_G, name)) == "function" then hooksecurefunc(name, guarded(fn)) end
-end
-
-local function onEvent(_, event)
-    if event == "PLAYER_CONTROL_LOST" then
-        local p = pending
-        pending = nil
-        if flight then return end
-        if p and GetTime() - p.clicked < BOARD then
-            startFlight(p.route)
-        else
-            -- Not picked here (a quest's flight), or no flight at all (a stun): a look in a moment.
-            C_Timer.After(1, guarded(function()
-                if not flight and onTaxi() then startFlight(nil) end
-            end))
+local function onEvent(_, event, name)
+    if event == "ADDON_LOADED" and name == ADDON then
+        if not LTT then
+            API.Fail("flight:library", "LibTaxiTime-1.0 isn't loaded")
+            return
         end
-    elseif event == "PLAYER_CONTROL_GAINED" then
-        if not flight then return end
-        if onTaxi() then
-            flight.gainedAt = GetTime()   -- still reads on the taxi: the ticker lands it from this
-        else
-            land(true)
-        end
-    elseif event == "PLAYER_ENTERING_WORLD" then
-        resume()
+        local ok, why = LTT:AddStore(db())   -- GlassPanelFlightDB is loaded now
+        if not ok then API.Fail("flight:store", why) end
     end
 end
 
@@ -702,17 +440,18 @@ function tooltip(_, tt)
     local fl = shownFlight()
     if not fl then
         tt:AddLine("Not on a flight.", 0.7, 0.7, 0.7)
-        if lastFlight then
-            tt:AddDoubleLine("Last flight", (lastFlight.to and (shortName(lastFlight.to) .. ", ") or "")
-                .. clock(lastFlight.took), LABEL[1], LABEL[2], LABEL[3], WHITE[1], WHITE[2], WHITE[3])
+        local last = LTT and LTT:Last()
+        if last then
+            tt:AddDoubleLine("Last flight", (last.to and (shortName(last.to) .. ", ") or "") .. clock(last.took),
+                LABEL[1], LABEL[2], LABEL[3], WHITE[1], WHITE[2], WHITE[3])
         end
     else
-        local r = fl.route
-        if r then
-            tt:AddDoubleLine("To", destination(r), LABEL[1], LABEL[2], LABEL[3], 1, 1, 1)
-            tt:AddDoubleLine("From", r.names[1], LABEL[1], LABEL[2], LABEL[3], 1, 1, 1)
-            for i = 2, #r.names - 1 do
-                tt:AddDoubleLine(i == 2 and "Via" or " ", r.names[i], LABEL[1], LABEL[2], LABEL[3], 0.8, 0.8, 0.8)
+        local stops = fl.stops
+        if stops then
+            tt:AddDoubleLine("To", fl.to, LABEL[1], LABEL[2], LABEL[3], 1, 1, 1)
+            tt:AddDoubleLine("From", fl.from, LABEL[1], LABEL[2], LABEL[3], 1, 1, 1)
+            for i = 2, #stops - 1 do
+                tt:AddDoubleLine(i == 2 and "Via" or " ", stops[i], LABEL[1], LABEL[2], LABEL[3], 0.8, 0.8, 0.8)
             end
         end
         local flown = clock(elapsedOf(fl))
@@ -726,36 +465,29 @@ function tooltip(_, tt)
                 tt:AddLine("Longer than predicted: learned when you land.", 1, 0.6, 0, true)
             elseif fl.source == "route" then
                 tt:AddLine("From the route's length; learned exactly when you land.", 0.7, 0.7, 0.7, true)
-            elseif fl.estimate then
+            elseif fl.source == "estimate" then
                 tt:AddLine("Estimated; learned exactly when you land.", 0.7, 0.7, 0.7, true)
             end
         else
             tt:AddDoubleLine("Flown", flown, LABEL[1], LABEL[2], LABEL[3], 1, 1, 1)
-            if fl.resumed and not r then
+            if fl.resumed and not stops then
                 tt:AddLine("This flight started before the UI loaded: its route is unknown.", 0.7, 0.7, 0.7, true)
-            elseif r then
+            elseif stops then
                 tt:AddLine("First time on this route: its time is learned when you land.", 0.7, 0.7, 0.7, true)
             else
                 tt:AddLine("A flight not picked on the flight map: its route is unknown.", 0.7, 0.7, 0.7, true)
             end
         end
     end
-    local n = learnedCount()
+    local n = LTT and LTT:LearnedCount() or 0
     tt:AddLine(n == 1 and "1 route learned." or (n .. " routes learned."), 0.7, 0.7, 0.7)
     tt:AddLine("Double-click the icon to zoom: a glass bar on the screen while you fly.", 0.7, 0.7, 0.7, true)
 end
 
 local function forget()
-    db().routes = nil
+    if not LTT then return end
+    LTT:Forget()   -- every store's; "Changed" repaints
     API.Print("Flight: learned flight times forgotten.")
-    if flight and flight.route and not flight.early then
-        local source
-        flight.total, source = lengthOf(flight.route, flight.fast)
-        flight.source, flight.estimate = source, source == "estimate"
-        changed()
-        GlassPanel.Refresh("flight")
-        paintFloat(true)
-    end
 end
 
 local block = GlassPanel.RegisterBlock({
@@ -764,7 +496,7 @@ local block = GlassPanel.RegisterBlock({
     icon = "Interface\\Minimap\\Tracking\\FlightMaster",   -- as EllesmereUI's flight timer on Forever
     order = 26,   -- left lane, after Combat
     width = function() return WIDTH end,
-    events = { "PLAYER_ENTERING_WORLD", "PLAYER_CONTROL_LOST", "PLAYER_CONTROL_GAINED" },
+    events = { "ADDON_LOADED" },
     onEvent = onEvent,
     -- Only on a flight; zoomed, the bar on the screen has the time.
     text = function()
@@ -797,20 +529,14 @@ local block = GlassPanel.RegisterBlock({
     end,
 })
 
--- For Glass Unit Frames (see the header): a copy each call, never our own table.
-local function current()
-    if not flight then return nil end
-    local r = flight.route
-    return { to = r and destination(r), from = r and r.names[1], start = flight.start,
-             total = (not flight.early) and flight.total or nil, source = flight.source,
-             early = flight.early == true }
-end
-GlassPanel.Flight = { API = 1, Zoomed = function() return claimed end, Current = current }
+-- For Glass Unit Frames (see the header): the library's fresh copy.
+GlassPanel.Flight = { API = 1, Zoomed = function() return claimed end,
+                      Current = function() return LTT and LTT:Current() or nil end }
 
 if block then
     block._test = { clock = clock, float = function() return float end, bar = function() return bar end,
-                    flight = function() return flight end, pending = function() return pending end,
+                    flight = function() return flight end, lib = LTT,
                     setDetached = setDetached, setPreview = setPreview, setScale = setScale,
                     floatScale = floatScale, resetSpot = resetSpot, forget = forget,
-                    ticker = function() return ticker end, lengthOf = lengthOf, pathOf = pathOf }
+                    ticker = function() return ticker end }
 end

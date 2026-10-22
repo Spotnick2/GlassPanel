@@ -48,6 +48,12 @@ try {
         if ($warning) { Write-Host "WARNING: $warning (CI tests the pin)" -ForegroundColor Yellow }
         else { Write-Host "LibGlass: $libGlass at the pin ($(Get-LibPin $RepoRoot 'LibGlass-1.0'))" -ForegroundColor DarkGray }
     }
+    $libTaxiTime = if ($env:LIBTAXITIME) { $env:LIBTAXITIME } else { Join-Path (Split-Path -Parent $RepoRoot) "LibTaxiTime" }
+    if (Test-Path -LiteralPath $libTaxiTime) {
+        $warning = Test-LibPin $RepoRoot "LibTaxiTime-1.0" $libTaxiTime
+        if ($warning) { Write-Host "WARNING: $warning (CI tests the pin)" -ForegroundColor Yellow }
+        else { Write-Host "LibTaxiTime: $libTaxiTime at the pin ($(Get-LibPin $RepoRoot 'LibTaxiTime-1.0'))" -ForegroundColor DarkGray }
+    }
 
     # Without the API dump the tests accept every event name and skip the
     # method check, and still pass: say so locally (CI has no dump, by design).

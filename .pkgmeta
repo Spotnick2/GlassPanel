@@ -44,6 +44,11 @@ externals:
   Libs/LibGlass-1.0:
     url: https://github.com/Spotnick2/LibGlass
     tag: r11
+  # Flight times (#127), shared with Glass Unit Frames. In the core's Libs/,
+  # never in a plugin folder move-folders moves (EMBEDDED-LIBRARIES section 3).
+  Libs/LibTaxiTime-1.0:
+    url: https://github.com/Spotnick2/LibTaxiTime
+    commit: d94cc15a761c3400d1c97fc98e33e4f64c802952
 
 # YAML list, not markdown bullets. Every pattern matches the WHOLE path from
 # the package root, so the top-level names below never reach inside Libs/.
@@ -66,3 +71,9 @@ ignore:
   - Libs/LibGlass-1.0/AGENTS.md
   - Libs/LibGlass-1.0/CLAUDE.md
   - Libs/LibGlass-1.0/README.md
+  - Libs/LibTaxiTime-1.0/tests
+  - Libs/LibTaxiTime-1.0/docs
+  - Libs/LibTaxiTime-1.0/Tools
+  - Libs/LibTaxiTime-1.0/AGENTS.md
+  - Libs/LibTaxiTime-1.0/CLAUDE.md
+  - Libs/LibTaxiTime-1.0/README.md

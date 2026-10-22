@@ -64,8 +64,10 @@ end
 -- checkout fails the run loudly; a silently skipped library would test nothing.
 -- Keyed by the core TOC's XML line.
 LIBGLASS_XML = "Libs\\LibGlass-1.0\\LibGlass-1.0.xml"
+LIBTAXITIME_XML = "Libs\\LibTaxiTime-1.0\\LibTaxiTime-1.0.xml"
 EMBEDDED = {
     [LIBGLASS_XML] = { name = "LibGlass", env = "LIBGLASS", xml = "LibGlass-1.0.xml" },
+    [LIBTAXITIME_XML] = { name = "LibTaxiTime", env = "LIBTAXITIME", xml = "LibTaxiTime-1.0.xml" },
 }
 
 function libRoot(line)

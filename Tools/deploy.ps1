@@ -76,6 +76,11 @@ if (-not (Test-Path -LiteralPath (Join-Path $LibGlass "Tools\deploy.ps1"))) {
     Write-Error "LibGlass checkout not found at $LibGlass (clone github.com/Spotnick2/LibGlass there, or set `$env:LIBGLASS)"
     exit 1
 }
+$LibTaxiTime = if ($env:LIBTAXITIME) { $env:LIBTAXITIME } else { Join-Path (Split-Path -Parent $RepoRoot) "LibTaxiTime" }
+if (-not (Test-Path -LiteralPath (Join-Path $LibTaxiTime "Tools\deploy.ps1"))) {
+    Write-Error "LibTaxiTime checkout not found at $LibTaxiTime (clone github.com/Spotnick2/LibTaxiTime there, or set `$env:LIBTAXITIME)"
+    exit 1
+}
 
 # The pin check, shared with tests\run.ps1.
 . (Join-Path $PSScriptRoot "LibPin.ps1")
@@ -116,6 +121,10 @@ if ($warning) { Write-Host "  WARNING: $warning" -ForegroundColor Yellow }
 # that never arrived loads no bar at all).
 & pwsh -NoProfile -File (Join-Path $LibGlass "Tools\deploy.ps1") -Addon GlassPanel -AddOnsPath $AddOnsPath
 if ($LASTEXITCODE -ne 0) { Write-Error "LibGlass deploy refused; GlassPanel was not touched"; exit 1 }
+$warning = Test-LibPin $RepoRoot "LibTaxiTime-1.0" $LibTaxiTime
+if ($warning) { Write-Host "  WARNING: $warning" -ForegroundColor Yellow }
+& pwsh -NoProfile -File (Join-Path $LibTaxiTime "Tools\deploy.ps1") -Addon GlassPanel -AddOnsPath $AddOnsPath
+if ($LASTEXITCODE -ne 0) { Write-Error "LibTaxiTime deploy refused; GlassPanel was not touched"; exit 1 }
 Deploy-Toc $RepoRoot "GlassPanel.toc" $core
 # The textures now ship inside Libs\LibGlass-1.0\Media; the old folder is dead weight.
 $oldMedia = Join-Path $core "Media"
