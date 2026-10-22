@@ -8,5 +8,4 @@
 ## Dependencies: GlassPanel
 ## SavedVariables: GlassPanelFlightDB
 
-Routes.lua
 Flight.lua

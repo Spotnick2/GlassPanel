@@ -10,6 +10,7 @@
 ## SavedVariables: GlassPanelDB
 
 Libs\LibGlass-1.0\LibGlass-1.0.xml
+Libs\LibTaxiTime-1.0\LibTaxiTime-1.0.xml
 Compat.lua
 Suite.lua
 Glass.lua

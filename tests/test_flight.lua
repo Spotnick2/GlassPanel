@@ -46,7 +46,7 @@ WoW.now = 1000
 takeOff(2)
 local fl = F().flight()
 check(fl ~= nil, "control lost right after a pick: a flight")
-eq(F().pathOf(fl.route.keys), "901>902", "keyed by node ids")
+eq(table.concat(GlassPanelFlightDB.current.route.keys, ">"), "901>902", "keyed by node ids (the library saves it in our store)")
 eq(widget()._shown, true, "on a flight: the block shows")
 eq(textOf("flight"), "|cff999999+0:00|r", "unknown: the time flown, grey")
 eq(widget()._width, 72, "a fixed width")
@@ -134,7 +134,7 @@ WoW.fire("PLAYER_CONTROL_LOST"); WoW.tick()
 WoW.layer.taxi = true
 WoW.flushTimers(); WoW.tick()
 fl = F().flight()
-check(fl ~= nil and fl.route == nil, "on the taxi a second later: a flight, route unknown")
+check(fl ~= nil and fl.to == nil, "on the taxi a second later: a flight, route unknown")
 eq(textOf("flight"), "|cff999999+0:00|r", "counting up")
 -- Its landing missed: off the taxi with no control back, the ticker ends it after SETTLE s.
 WoW.layer.taxi = false
@@ -188,7 +188,8 @@ repaint()
 WoW.now, WoW.serverTime = 8000, 500000
 takeOff(2)
 eq(GlassPanelFlightDB.current.at, 500000, "the flight is saved for a reload")
-F().ticker():Cancel()   -- the old session's (a test-only leftover)
+F().ticker():Cancel()   -- the old session's (test-only leftovers: its UI ticker and its library's)
+F().lib.state.ticker:Cancel()
 WoW.now, WoW.serverTime = 9000, 500030
 loadAddon()
 fl = F().flight()
@@ -202,7 +203,7 @@ GlassPanelFlightDB.current = { route = { keys = { 901, 902 }, names = { "A", "B"
 WoW.layer.taxi = true
 loadAddon()
 fl = F().flight()
-check(fl ~= nil and fl.route == nil, "a stale save: a flight, route unknown")
+check(fl ~= nil and fl.to == nil, "a stale save: a flight, route unknown")
 WoW.layer.taxi = false
 WoW.fire("PLAYER_CONTROL_GAINED"); WoW.tick()
 GlassPanelFlightDB.current = { route = { keys = { 901 }, names = { "A" } }, at = WoW.serverTime }
@@ -361,8 +362,9 @@ local changes = 0
 EventRegistry:RegisterCallback("GlassPanel.Flight.Changed", function() changes = changes + 1 end)
 eq(GlassPanel.Flight.Current(), nil, "off a flight: nil")
 WoW.now = 13000
+local before = changes
 takeOff(3)
-eq(changes, 1, "takeoff is said")
+check(changes > before, "takeoff is said")
 local cur = GlassPanel.Flight.Current()
 eq(cur.to, "Morgan's Vigil, Burning Steppes", "the destination")
 eq(cur.from, "Ironforge, Dun Morogh", "where from")
@@ -372,8 +374,8 @@ eq(cur.source, "learned", "where the total comes from")
 eq(cur.early, false, "not landing early")
 cur.total = 1
 eq(GlassPanel.Flight.Current().total, 140, "a copy: changing it changes nothing here")
--- (Dead test sessions keep their hooks on the global, so the count may run over.)
-local before = changes
+-- (Dead test sessions keep their callbacks, so the count may run over.)
+before = changes
 TaxiRequestEarlyLanding(); WoW.tick()
 check(changes > before, "an early landing is said")
 cur = GlassPanel.Flight.Current()
@@ -421,7 +423,7 @@ PLUGINS = { "GlassPanelFlight" }
 
 -- Forgetting.
 F().forget()
-eq(GlassPanelFlightDB.routes, nil, "forgotten")
+eq(next(GlassPanelFlightDB.routes), nil, "forgotten")
 
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_flight")
