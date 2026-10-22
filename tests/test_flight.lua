@@ -288,6 +288,17 @@ eq(fb._alpha, 1, "faded in")
 WoW.now = 10045
 repaint()
 eq(F().bar().right._text, "0:45", "the ticker repaints it")
+local host = F().bar().host
+eq(host._max, 89.6, "the bar spans the flight")
+check(math.abs(host._value - 44.6) < 1e-6, "by default it empties as you fly, like a channel")
+local fillOpt
+for _, o in ipairs(block("flight").options) do if o.label:find("fills up", 1, true) then fillOpt = o end end
+eq(fillOpt.get(), false, "the fill-up option is off by default")
+fillOpt.set(true)
+eq(host._value, 45, "on: it fills up instead, at once")
+eq(GlassPanelFlightDB.fillUp, true, "...saved")
+fillOpt.set(false)
+eq(GlassPanelFlightDB.fillUp, nil, "off is stored as nothing")
 WoW.now = 10089.6
 landNow()
 WoW.tick(0.3)
@@ -314,6 +325,34 @@ eq(GlassPanel.Flight.Zoomed(), false, "a preview claims nothing")
 WoW.now = WoW.now + 31
 repaint(); WoW.tick(0.3)
 eq(fb._shown, false, "...and it ends")
+
+-- Current(): the flight for Glass Unit Frames' cast bar, a copy, with "Changed" said.
+local changes = 0
+EventRegistry:RegisterCallback("GlassPanel.Flight.Changed", function() changes = changes + 1 end)
+eq(GlassPanel.Flight.Current(), nil, "off a flight: nil")
+WoW.now = 13000
+takeOff(3)
+eq(changes, 1, "takeoff is said")
+local cur = GlassPanel.Flight.Current()
+eq(cur.to, "Morgan's Vigil, Burning Steppes", "the destination")
+eq(cur.from, "Ironforge, Dun Morogh", "where from")
+eq(cur.start, 13000, "start in GetTime() seconds")
+eq(cur.total, 140, "the total")
+eq(cur.source, "learned", "where the total comes from")
+eq(cur.early, false, "not landing early")
+cur.total = 1
+eq(GlassPanel.Flight.Current().total, 140, "a copy: changing it changes nothing here")
+-- (Dead test sessions keep their hooks on the global, so the count may run over.)
+local before = changes
+TaxiRequestEarlyLanding(); WoW.tick()
+check(changes > before, "an early landing is said")
+cur = GlassPanel.Flight.Current()
+check(cur.early and cur.total == nil, "landing early: no total")
+before = changes
+landNow()
+check(changes > before, "the landing is said")
+eq(GlassPanel.Flight.Current(), nil, "landed: nil")
+repaint()
 
 -- Moving: shift-drag, saved in screen units; the slider; reset.
 F().setPreview()

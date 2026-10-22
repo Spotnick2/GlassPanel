@@ -2,7 +2,8 @@
 -- taxi: the flight master's icon and the time left. Zoomed (left
 -- double-click, as XP+ and Combat): the bar says "Flying" and a glass bar
 -- floats on the screen while you fly, with the destination, the time left and
--- a fill. It is a float of order 3 (API.RegisterFloat): its default slot
+-- a bar that empties as you fly, like a channel's (an option fills it up
+-- instead). It is a float of order 3 (API.RegisterFloat): its default slot
 -- stacks under XP+'s zoomed bar, and a drop snaps clear of the others.
 --
 -- The client gives no flight duration. The time comes, best first, from:
@@ -29,10 +30,17 @@
 -- TaxiRequestEarlyLanding (hooked) drops the time left. A /reload mid-flight
 -- resumes from GlassPanelFlightDB.current (server time) and learns nothing.
 --
--- Glass Unit Frames has no flight timer; should it get one, it can step aside
--- while ours floats: GlassPanel.Flight.Zoomed() is true while the zoomed bar
--- shows a flight, and EventRegistry "GlassPanel.Flight.ZoomedChanged"
--- (zoomed) says when that changes. Nothing is written to it.
+-- For Glass Unit Frames (GUF #148: the flight on its cast bar), read-only and
+-- additive, GlassPanel.Flight (API 1):
+--   Current() -> nil off a flight, else a fresh { to, from, start, total,
+--     source, early }: names (nil when the route is unknown), start in
+--     GetTime() seconds, total in seconds (nil: unknown, or landing early),
+--     source "learned" | "route" | "estimate" | nil. EventRegistry
+--     "GlassPanel.Flight.Changed" () says a flight started, landed, or its
+--     time or destination changed.
+--   Zoomed() -> true while our zoomed bar shows a flight: GUF steps aside;
+--     EventRegistry "GlassPanel.Flight.ZoomedChanged" (zoomed) on a change.
+-- Nothing is written to it.
 
 local _, ns = ...
 GlassPanel = GlassPanel or {}
@@ -356,7 +364,9 @@ local function paintFloat(snap)
     bar.left:SetText(whereTo(fl))
     bar.right:SetText(timeText(fl))
     if fl.total and not fl.early then
-        Glass.SetBar(bar.host, fl.total, math.min(elapsedOf(fl), fl.total), snap)
+        -- A channel's bar by default: full at takeoff, empty on landing; or filling up (the option).
+        local flown = math.min(elapsedOf(fl), fl.total)
+        Glass.SetBar(bar.host, fl.total, db().fillUp == true and flown or fl.total - flown, snap)
     else
         Glass.SetBar(bar.host, 1, 0, true)
     end
@@ -476,16 +486,23 @@ local function fadeTo(target)
     end))
 end
 
+-- EventRegistry, when the client has it; a throw from a listener is recorded.
+local function trigger(event, ...)
+    local R = rawget(_G, "EventRegistry")
+    if type(R) == "table" and type(R.TriggerEvent) == "function" then
+        local ok, err = pcall(R.TriggerEvent, R, event, ...)
+        if not ok then API.Fail("flight:announce", err) end
+    end
+end
+
 local function announce()
     local now = flight ~= nil and onScreen and detached()
     if now == claimed then return end
     claimed = now
-    local R = rawget(_G, "EventRegistry")
-    if type(R) == "table" and type(R.TriggerEvent) == "function" then
-        local ok, err = pcall(R.TriggerEvent, R, "GlassPanel.Flight.ZoomedChanged", now)
-        if not ok then API.Fail("flight:announce", err) end
-    end
+    trigger("GlassPanel.Flight.ZoomedChanged", now)
 end
+
+local function changed() trigger("GlassPanel.Flight.Changed") end
 
 -- Shown while zoomed and flying with the block on screen, or previewing.
 local function applyFloat()
@@ -585,6 +602,7 @@ local function startFlight(route, startedAt, resumed, early)
     if early then flight.total = nil end
     if not resumed then saveCurrent() end
     previewUntil = nil
+    changed()
     startTicker()
     GlassPanel.Refresh("flight")
     applyFloat()
@@ -599,6 +617,7 @@ function land(learnIt, at)
     lastFlight = { to = flight.route and destination(flight.route), took = took }
     flight = nil
     db().current = nil
+    changed()
     GlassPanel.Refresh("flight")
     applyFloat()
 end
@@ -628,6 +647,7 @@ local function onEarlyLanding()
     if not flight or flight.early then return end
     flight.early, flight.total = true, nil
     saveCurrent()
+    changed()
     GlassPanel.Refresh("flight")
     paintFloat(true)
 end
@@ -722,6 +742,7 @@ local function forget()
         local source
         flight.total, source = lengthOf(flight.route, flight.fast)
         flight.source, flight.estimate = source, source == "estimate"
+        changed()
         GlassPanel.Refresh("flight")
         paintFloat(true)
     end
@@ -754,6 +775,10 @@ local block = GlassPanel.RegisterBlock({
           get = floatScale, set = setScale },
         { label = "Preview the bar for 30 s (to place it)", run = setPreview },
         { label = "Reset the bar's position", run = resetSpot },
+        { label = "The bar fills up as you fly",
+          note = "Off: it starts full and empties as you fly, like a channelled spell's bar.",
+          get = function() return db().fillUp == true end,
+          set = function(on) db().fillUp = on and true or nil; paintFloat(true) end },
         { label = "Forget learned flight times", run = forget },
     },
     -- On the bar, or on the icon left while zoomed: zoom in or out.
@@ -762,9 +787,15 @@ local block = GlassPanel.RegisterBlock({
     end,
 })
 
--- For Glass Unit Frames (and anything else with a flight timer of its own):
--- true while our zoomed bar shows a flight. Read-only; additive.
-GlassPanel.Flight = { API = 1, Zoomed = function() return claimed end }
+-- For Glass Unit Frames (see the header): a copy each call, never our own table.
+local function current()
+    if not flight then return nil end
+    local r = flight.route
+    return { to = r and destination(r), from = r and r.names[1], start = flight.start,
+             total = (not flight.early) and flight.total or nil, source = flight.source,
+             early = flight.early == true }
+end
+GlassPanel.Flight = { API = 1, Zoomed = function() return claimed end, Current = current }
 
 if block then
     block._test = { clock = clock, float = function() return float end, bar = function() return bar end,
