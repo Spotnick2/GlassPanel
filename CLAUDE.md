@@ -585,3 +585,22 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`) and the Li
   need a fixed width), not before.
 - **Measured beats reasoned.** If a claim about the client can be checked in game, check it.
 - Match the surrounding code's idiom. Keep pure refactors in their own commit.
+
+## Consulting Codex
+
+The shared `codex-consult` skill (user level) has the invocation and the gotchas. For this repo:
+
+For GlassPanel, good things to hand Codex:
+- anything that reads a number the client may return secret (`GetMoney`, stats), or that does
+  arithmetic, comparison or string work near one;
+- changes to the block contract (`Engine.lua`, `docs/PLUGINS.md`): plugins depend on it;
+- the repaint scheduling (events, dirty flush, interval clock) and its per-frame cost;
+- any plan that grows scope back toward full Titan Panel.
+
+**Always hand it `CLAUDE.md` alongside the diff or plan**, plus
+`C:/Projects/WoW/References/Docs/PORTING-TBC-TO-FOREVER.md` and any `docs/` probe results. Those findings
+were measured on the live client. Without them, a cold reviewer argues from Classic-era or Retail
+behaviour that doesn't hold here: that some numbers (money, stats) are secret, that secure
+snippets and state drivers are broken, that `GetCoinTextureString` is gone.
+`C:/Projects/WoW/References/Forever/api/forever-api-<version>.<build>.md` (take the highest build) is the full API surface when a question
+turns on whether something exists. Titan (`C:/Program Files (x86)/World of Warcraft/_anniversary_/Interface/AddOns/Titan*`) is the data reference only.
