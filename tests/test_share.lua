@@ -273,5 +273,149 @@ eq(win._shown, false, "closed after import")
 check(deepEq(S().Current(), before), "imported through the window")
 check((WoW.chat[1] or ""):find("setup imported", 1, true), "one line in chat")
 
+
+--------------------------------------------------------------------------------
+-- Audit (#131): the parser against a hostile paste. The number edge pinned
+-- (G5), a raw-length bound (G2), a seeded malformed-input sweep (G3), and the
+-- two places an import's content reached the player unescaped or untrue (G1,
+-- G7). docs/AUDIT.md has the trace.
+--------------------------------------------------------------------------------
+
+-- G5: the number pattern can't match what tonumber would turn into NaN, inf or
+-- a hex value, and 1 and 1.0 are one key.
+rejected(T.PREFIX .. T.b64encode("nnan;"), "nan", "bad number")
+rejected(T.PREFIX .. T.b64encode("ninf;"), "inf", "bad number")
+rejected(T.PREFIX .. T.b64encode("n0x10;"), "hex", "bad number")
+rejected(T.PREFIX .. T.b64encode("n-;"), "a lone sign", "bad number")
+rejected(T.PREFIX .. T.b64encode("tn1;Tn1.0;Te"), "1 and 1.0 as keys", "repeated")
+
+-- G2: a paste padded with whitespace past twice the cap is refused by its raw
+-- length, before the whitespace strip walks it (the box caps raw text at
+-- MAX_INPUT; ordinary line wrapping of a full-size export stays under twice).
+rejected(exported .. string.rep(" ", 2 * T.MAX_INPUT + 1), "whitespace past twice the cap", "too long")
+
+-- G3: a seeded sweep (its own generator, so every platform tries the same
+-- inputs). Decode never throws, and whatever it accepts satisfies Clean's
+-- invariants. A sweep, not a witness: it pins "no crash", nothing else.
+do
+    local seed = 20261031
+    local function rnd(n) seed = (seed * 48271) % 2147483647; return seed % n + 1 end
+    local alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+    local function pick(t) return t[rnd(#t)] end
+    local function mutate(s)
+        local kind, i = rnd(5), rnd(#s)
+        if kind == 1 then return s:sub(1, i - 1) .. s:sub(i + 1) end
+        if kind == 2 then local c = rnd(65); return s:sub(1, i) .. alphabet:sub(c, c) .. s:sub(i + 1) end
+        if kind == 3 then return s:sub(1, i - 1) .. string.char(rnd(256) - 1) .. s:sub(i + 1) end
+        if kind == 4 then return s:sub(1, i) end
+        return s:sub(1, i) .. s:sub(i, i + 7) .. s:sub(i + 1)
+    end
+    local KEYS = { "font", "room", "glass", "glassTint", "windowGlass", "shown", "labels", "hidden", "labelsFor",
+                   "iconsFor", "layout", "x", "ids", 1, 2, 3, "" }
+    local STRINGS = { "arial", "friz", "gold", "", "|T", "auto", "clear", "class", "reflective", "x" }
+    local function randomValue(depth)
+        local k = rnd(depth > 3 and 3 or 4)
+        if k == 1 then return pick(STRINGS) end
+        if k == 2 then return (rnd(7) - 4) * 0.5 end
+        if k == 3 then return rnd(2) == 1 end
+        local t = {}
+        for _ = 1, rnd(4) do t[pick(KEYS)] = randomValue(depth + 1) end
+        return t
+    end
+    local function sound(setup)
+        local Bar, Settings = GlassPanel.Bar, GlassPanel.Settings
+        if not GlassPanel.Glass.FONTS[setup.font] or (setup.room ~= "auto" and setup.room ~= "full")
+            or not Bar.GLASS[setup.glass] or not Bar.GLASS_TINTS[setup.glassTint]
+            or not Settings.WINDOW_GLASS[setup.windowGlass]
+            or type(setup.shown) ~= "boolean" or type(setup.labels) ~= "boolean" then return false end
+        for id, v in pairs(setup.hidden) do if type(id) ~= "string" or id == "" or v ~= true then return false end end
+        for id, v in pairs(setup.labelsFor) do if type(id) ~= "string" or id == "" or type(v) ~= "boolean" then return false end end
+        for id, v in pairs(setup.iconsFor) do if type(id) ~= "string" or id == "" or v ~= false then return false end end
+        local seen = {}
+        for _, lane in ipairs(setup.layout) do
+            if type(lane.x) ~= "number" or lane.x < 0 or lane.x > 1 or #lane.ids == 0 then return false end
+            for _, id in ipairs(lane.ids) do
+                if type(id) ~= "string" or id == "" or seen[id] then return false end
+                seen[id] = true
+            end
+        end
+        return true
+    end
+    local inputs = {}
+    for _ = 1, 300 do inputs[#inputs + 1] = mutate(exported) end
+    for _ = 1, 150 do
+        local bytes = {}
+        for i = 1, rnd(64) do bytes[i] = string.char(rnd(256) - 1) end
+        inputs[#inputs + 1] = T.PREFIX .. T.b64encode(table.concat(bytes))
+    end
+    for _ = 1, 150 do inputs[#inputs + 1] = pack(randomValue(0)) end
+    local throws, unsound, accepted, first = 0, 0, 0
+    for _, input in ipairs(inputs) do
+        local ok, setup, why = pcall(S().Decode, input)
+        if not ok then throws = throws + 1; first = first or tostring(setup)
+        elseif setup then
+            accepted = accepted + 1
+            if not sound(setup) then unsound = unsound + 1 end
+        elseif type(why) ~= "string" or why == "" then throws = throws + 1; first = first or "no reason" end
+    end
+    eq(throws, 0, "sweep: Decode never throws and always says why (" .. #inputs .. " inputs; first: " .. tostring(first) .. ")")
+    eq(unsound, 0, "sweep: every accepted setup satisfies Clean's invariants (" .. accepted .. " accepted)")
+    check(accepted > 0, "sweep: the random structures do hit accepted setups")
+end
+
+-- G1: an imported id carrying chat markup is escaped wherever /gpanel list
+-- prints an id, so a pasted setup can't paint chat with textures, links or
+-- colours. Ids stay any string (what the core exports, it imports); a loaded
+-- block's odd id is a plugin's choice and is escaped the same way.
+do
+    local evil = "|TInterface\\Icons\\INV_Misc_QuestionMark:16|t evil"
+    GlassPanelDB = nil
+    loadAddon()
+    T = S()._test
+    local s = S().Decode(pack({ font = "arial", hidden = { [evil] = true },
+                                layout = { { x = 0, ids = { evil, "bags" } } } }))
+    check(s ~= nil, "G1: the id imports")
+    S().Apply(s)
+    GlassPanel.RegisterBlock({ id = "odd|cff00ff00id", label = "Odd", text = function() return "1" end })
+    WoW.tick()
+    WoW.chat = {}
+    slash("list")
+    local all = table.concat(WoW.chat, "\n")
+    check(all:find("||TInterface", 1, true), "G1: the unloaded id is escaped")
+    check(all:find("odd||cff00ff00id", 1, true), "G1: a loaded id is escaped")
+    local bare = all:gsub("||", "")
+    eq(bare:find("|T", 1, true), nil, "G1: no bare texture escape reaches chat")
+    eq(bare:find("|cff00ff00", 1, true), nil, "G1: no bare colour escape reaches chat")
+end
+
+-- G7: following Glass UI, the import keeps our glass, tint and window glass
+-- (Settings.ApplyAll, #96): the preview and the chat line say so instead of
+-- reporting the imported ones as applied. Describe itself, which also labels
+-- an export, is unchanged.
+do
+    GlassUI = { Suite = { API = 1, Theme = function() return { name = "pearl", preset = "pearl" } end,
+                          Report = function() end } }
+    GlassPanelDB = nil
+    loadAddon()
+    T = S()._test
+    eq(GlassPanel.Suite.Following(), true, "G7: following Glass UI")
+    slash("import")
+    local w = T.window()
+    w.edit:SetText(exported)   -- smoked glass, class tint, smoked windows
+    w.edit._scripts.OnTextChanged(w.edit, true)
+    check(w.status._text:find("kept", 1, true) and w.status._text:find("Glass UI", 1, true),
+        "G7: the preview says glass, tint and window glass are kept (got " .. tostring(w.status._text) .. ")")
+    WoW.chat = {}
+    w.action._scripts.OnClick(w.action)
+    WoW.tick()
+    check((WoW.chat[1] or ""):find("kept", 1, true), "G7: the chat line says so too")
+    eq(GlassPanelDB.glass, "clear", "G7: our glass kept")
+    eq(GlassPanelDB.glassTint, "neutral", "G7: our tint kept")
+    eq(GlassPanelDB.windowGlass, "reflective", "G7: our window glass kept")
+    eq(GlassPanelDB.font, "friz", "G7: the rest of the setup applied")
+    check(not S().Describe(S().Decode(exported)):find("kept", 1, true), "G7: Describe itself unchanged")
+    GlassUI = nil
+end
+
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_share")
