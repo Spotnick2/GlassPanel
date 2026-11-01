@@ -342,7 +342,11 @@ core's `ADDON_LOADED`.
   decoded again before it's shown, so an oversized setup says so instead of handing out a string
   the import would refuse. The window is a glass frame with a multi-line EditBox (selected for
   Ctrl+C: addons have no clipboard), in `UISpecialFrames` for Escape; Import is enabled only for a
-  string that parses, and previews what it holds.
+  string that parses, and previews what it holds. **Audited (#131, `docs/AUDIT.md`):** `Decode` never
+  throws (a seeded sweep in `test_share`), the raw length is checked before the whitespace strip, ids
+  are any string so the one place they're printed, `/gpanel list`, escapes `|`, and while following
+  Glass UI the import preview and chat line say the glass, tint and window glass are kept (`Describe`
+  alone labels an export).
 - **`Setup.lua`** (#10): the **opt-in** full-width alternative to Room: `/gpanel setup` (or the
   panel's "Make room in Edit Mode...") shows a plan, then writes an Edit Mode layout. Designed from
   the forever UI source and a Codex review: copies the **active** layout whole (keeps

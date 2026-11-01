@@ -98,18 +98,21 @@ local function slash(msg)
     local db = GlassPanelDB
     if cmd == "list" then
         say("drag a block to move it; shift-drag to move its whole lane")
+        -- An id is any string a plugin registered or a setup imported (#131):
+        -- its chat markup is escaped, so a pasted setup can't paint chat.
+        local function shown(id) return (id:gsub("|", "||")) end
         for _, lane in ipairs(Layout.Lanes()) do
             local names = {}
             for _, id in ipairs(lane.ids) do
                 local block = Engine.byId[id]
                 if not block then
-                    names[#names + 1] = "|cff888888" .. id .. " (not loaded)|r"
+                    names[#names + 1] = "|cff888888" .. shown(id) .. " (not loaded)|r"
                 elseif Bar.ReplacedBy(block) then
-                    names[#names + 1] = "|cff888888" .. id .. " (replaced by " .. Bar.ReplacedBy(block).id .. ")|r"
+                    names[#names + 1] = "|cff888888" .. shown(id) .. " (replaced by " .. shown(Bar.ReplacedBy(block).id) .. ")|r"
                 elseif Bar.IsHidden(block) then
-                    names[#names + 1] = "|cff888888" .. id .. " (hidden)|r"
+                    names[#names + 1] = "|cff888888" .. shown(id) .. " (hidden)|r"
                 else
-                    names[#names + 1] = id
+                    names[#names + 1] = shown(id)
                 end
             end
             say(string.format("lane at %d%%: %s", math.floor(lane.x * 100 + 0.5), table.concat(names, ", ")))

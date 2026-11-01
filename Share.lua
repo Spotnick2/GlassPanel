@@ -204,7 +204,8 @@ end
 
 -- The ids GlassPanel.RegisterBlock accepts: any non-empty string (the
 -- decoder already caps its length). Anything the core can export, it must
--- be able to import; ids are only ever table keys, never shown or run.
+-- be able to import. Ids are table keys, never run; the one place they're
+-- printed, /gpanel list, escapes their chat markup (#131).
 local function validId(id)
     return type(id) == "string" and id ~= ""
 end
@@ -305,6 +306,8 @@ end
 -- A pasted string -> a setup, or nil and why (for the user).
 function Share.Decode(text)
     if type(text) ~= "string" then return nil, "nothing to import" end
+    -- The raw length first: the strip below walks the whole string (#131).
+    if #text > 2 * MAX_INPUT then return nil, "too long to be a GlassPanel setup" end
     text = text:gsub("%s+", "")
     if text == "" then return nil, "nothing to import" end
     if #text > MAX_INPUT then return nil, "too long to be a GlassPanel setup" end
@@ -329,6 +332,16 @@ function Share.Describe(setup)
         #setup.layout, hidden, setup.font, setup.room, setup.glass, setup.glassTint, setup.shown and "" or ", bar hidden")
 end
 
+-- What an import will do, for the preview and the chat line: Describe, plus
+-- what Settings.ApplyAll keeps while following Glass UI (#96), so the preview
+-- never reports as applied what won't be (#131). Describe alone labels an
+-- export, where those values are the exported ones.
+local function describeImport(setup)
+    local s = Share.Describe(setup)
+    if GlassPanel.Suite.Following() then s = s .. " (glass, tint and window glass kept: set in Glass UI)" end
+    return s
+end
+
 -- Replace the setup with `setup` (from Share.Clean): through Settings, like
 -- every other change.
 function Share.Apply(setup) Settings.ApplyAll(setup) end
@@ -351,7 +364,7 @@ local function preview()
     local setup, why = Share.Decode(text)
     win.pending = setup
     if setup then
-        win.status:SetText("|cff40ff40Ready:|r " .. Share.Describe(setup))
+        win.status:SetText("|cff40ff40Ready:|r " .. describeImport(setup))
         win.action:Enable()
     else
         win.status:SetText("|cffff6060" .. why .. "|r")
@@ -398,7 +411,7 @@ local function build()
     win.action = API.Button(win, "Import", 90, function()
         if not win.pending then return end
         Share.Apply(win.pending)
-        API.Print("setup imported: " .. Share.Describe(win.pending))
+        API.Print("setup imported: " .. describeImport(win.pending))
         win:Hide()
     end)
     win.action:SetPoint("RIGHT", win.close, "LEFT", -8, 0)
