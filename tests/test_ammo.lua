@@ -330,6 +330,17 @@ do
     eq(#WoW.warnings, n, "raised thresholds: nothing said")
     count(900)
     eq(#WoW.warnings, n, "and no alert for the level already shown")
+    -- The first crossing after a save is said (the baseline is the save's own
+    -- reading, not the next count change).
+    count(2000)
+    win.low:SetText("2000"); win.critical:SetText("100")
+    check(block("ammo")._test.save(), "thresholds saved at the count")
+    WoW.tick()
+    eq(#WoW.warnings, n, "2,000 at low 2,000: fine")
+    count(1999)
+    eq(WoW.warnings[n + 1] and WoW.warnings[n + 1].text, "Ammo low: 1,999 arrows left.",
+        "the first crossing after a save is said")
+    n = #WoW.warnings
     GlassPanelAmmoDB.thresholds.HUNTER = nil
     -- Another weapon (another kind) starts a new baseline too.
     setup("HUNTER", GUN, BULLETS, 1000); refresh()

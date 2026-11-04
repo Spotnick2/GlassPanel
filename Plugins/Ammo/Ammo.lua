@@ -114,6 +114,11 @@ local function validate(lowText, critText)
     return low, crit
 end
 
+-- The cache, rebuilt at most once per repaint after an event (a bag walk).
+-- kind: "arrow" | "bullet" | "thrown" | nil (no block). count: nil = unknown.
+local state = { kind = nil }
+local stale = true
+
 local alert = API.LevelAlert("ammo", function()
     local d = rawget(_G, "GlassPanelAmmoDB")
     return type(d) == "table" and d.alert == true
@@ -122,7 +127,11 @@ end)
 local function setThresholds(class, low, crit)
     if low == nil then db().thresholds[class] = nil
     else db().thresholds[class] = { low = low, critical = crit } end
-    alert.Reset()   -- new thresholds aren't the count running low
+    -- New thresholds aren't the count running low: a new baseline, taken from
+    -- a fresh scan on this repaint (not the next count change, which would
+    -- then be swallowed as the baseline).
+    alert.Reset()
+    stale = true
     GlassPanel.Refresh("ammo")
 end
 
@@ -133,11 +142,6 @@ local function levelOf(count, class)
     if count < low then return 1 end
     return 0
 end
-
--- The cache, rebuilt at most once per repaint after an event (a bag walk).
--- kind: "arrow" | "bullet" | "thrown" | nil (no block). count: nil = unknown.
-local state = { kind = nil }
-local stale = true
 
 --------------------------------------------------------------------------------
 -- Item data loads late: an unresolved id is requested while the client says
