@@ -113,6 +113,46 @@ check(GlassPanel.API.Returned(WoW.Secret("x")), "secret: returned")
 check(GlassPanel.API.Returned(0), "plain value: returned")
 check(not GlassPanel.API.Returned(nil), "nil: not returned")
 
+-- The alert (#130): off by default; on, once at 25% and once when one breaks.
+do
+    local opt = block("durability").options[1]
+    local function wear(cur) WoW.gear = { [5] = { cur = cur, max = 100, cost = 0 } }
+        WoW.fire("UPDATE_INVENTORY_DURABILITY"); WoW.tick() end
+    eq(opt.get(), false, "alert: off by default")
+    wear(20)
+    eq(#WoW.warnings, 0, "off: nothing said")
+    wear(100)
+    opt.set(true)
+    eq(GlassPanelDurabilityDB.alert, true, "saved in the plugin's own SavedVariables")
+    wear(26)
+    eq(#WoW.warnings, 0, "26%: fine")
+    wear(25)
+    eq(#WoW.warnings, 1, "25%: said")
+    eq(WoW.warnings[1].text, "Durability low: 25%.", "low message")
+    wear(10)
+    eq(#WoW.warnings, 1, "lower but still yellow: said once")
+    wear(0)
+    eq(WoW.warnings[2] and WoW.warnings[2].text, "Durability critical: an item is broken.", "broken: said")
+    wear(100); wear(20)
+    eq(#WoW.warnings, 3, "a repair arms it again")
+    -- An unreadable item: the lowest may be lower, nothing is said either way.
+    wear(100)
+    WoW.gear[7] = { cur = "secret", max = 100 }
+    WoW.gear[5].cur = 0
+    WoW.fire("UPDATE_INVENTORY_DURABILITY"); WoW.tick()
+    eq(#WoW.warnings, 3, "unsure reading: nothing said")
+    -- In combat: said when it ends.
+    wear(100)
+    WoW.combat = true
+    wear(0)
+    eq(#WoW.warnings, 3, "in combat: held")
+    WoW.combat = false
+    WoW.fire("PLAYER_REGEN_ENABLED")
+    eq(#WoW.warnings, 4, "said after combat")
+    opt.set(false)
+    eq(GlassPanelDurabilityDB.alert, nil, "off is stored as nothing")
+end
+
 -- Nothing with durability equipped: the block hides.
 WoW.gear = {}
 WoW.fire("PLAYER_EQUIPMENT_CHANGED", 5, false); WoW.tick()

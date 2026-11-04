@@ -36,6 +36,12 @@
 -- No ammo equipped, or the wrong kind for the weapon: the matching
 -- projectiles in the bags are counted, with a red "!" (you can't shoot until
 -- you equip them). Every number through API.Plain: unknown is a grey "?".
+--
+-- The alert (#130, the plugin option, off by default): once when the count
+-- turns yellow and once when it turns red, after combat, through
+-- API.LevelAlert; a restock arms it again. Only a sure count is heard (an
+-- unsure one may be short); a new kind (another weapon) or new thresholds
+-- start a new baseline.
 
 GlassPanel = GlassPanel or {}
 local API, Glass = GlassPanel.API, GlassPanel.Glass
@@ -58,6 +64,7 @@ local KIND_OF_WEAPON = {
 }
 local KIND_OF_PROJECTILE = { [ARROW] = "arrow", [BULLET] = "bullet" }
 local KIND_NAME = { arrow = "Arrows", bullet = "Bullets", thrown = "Thrown" }
+local KIND_NOUN = { arrow = "arrows", bullet = "bullets", thrown = "throwing weapons" }
 
 -- Who carries ammo, and when the figure turns yellow (low) and red (critical).
 local DEFAULTS = {
@@ -107,10 +114,24 @@ local function validate(lowText, critText)
     return low, crit
 end
 
+local alert = API.LevelAlert("ammo", function()
+    local d = rawget(_G, "GlassPanelAmmoDB")
+    return type(d) == "table" and d.alert == true
+end)
+
 local function setThresholds(class, low, crit)
     if low == nil then db().thresholds[class] = nil
     else db().thresholds[class] = { low = low, critical = crit } end
+    alert.Reset()   -- new thresholds aren't the count running low
     GlassPanel.Refresh("ammo")
+end
+
+-- Fine (0), low (1: yellow) or critical (2: red), strictly below each.
+local function levelOf(count, class)
+    local low, crit = thresholds(class)
+    if count < crit then return 2 end
+    if count < low then return 1 end
+    return 0
 end
 
 -- The cache, rebuilt at most once per repaint after an event (a bag walk).
@@ -300,6 +321,19 @@ local function build()
     return s
 end
 
+-- After a fresh scan: the alert hears a sure count only.
+local alertKind
+local function report(s)
+    if s.kind ~= alertKind then
+        alertKind = s.kind
+        alert.Reset()
+    end
+    if not s.kind or s.count == nil or s.unsure then return end
+    local l = levelOf(s.count, s.class)
+    alert.Set(l, "Ammo " .. (l == 2 and "critical" or "low") .. ": "
+        .. BreakUpLargeNumbers(s.count) .. " " .. KIND_NOUN[s.kind] .. " left.")
+end
+
 -- A scan that throws keeps the last good state and stays stale (tried again
 -- on the next repaint), as Durability's does.
 local function current()
@@ -307,6 +341,7 @@ local function current()
         local ok, s = pcall(build)
         if ok then
             state, stale = s, false
+            report(s)
         else
             API.Fail("ammo:scan", s)
         end
@@ -314,12 +349,8 @@ local function current()
     return state
 end
 
-local function colour(count, class)
-    local low, crit = thresholds(class)
-    if count < crit then return "ff4040" end
-    if count < low then return "ffd200" end
-    return "ffffff"
-end
+local COLOUR = { [0] = "ffffff", [1] = "ffd200", [2] = "ff4040" }
+local function colour(count, class) return COLOUR[levelOf(count, class)] end
 
 local UNSURE = "|cff888888?|r"
 local WARN = "|cffff4040!|r"
@@ -466,6 +497,10 @@ local block = GlassPanel.RegisterBlock({
     options = {
         { label = "Set ammo warnings...", run = openWindow,
           note = "When the count turns yellow and red, for your class." },
+        { label = "Alert when it runs low",
+          note = "Once, with a sound, when the count turns yellow and when it turns red; after combat.",
+          get = function() return db().alert == true end,
+          set = function(on) db().alert = on and true or nil end },
     },
 })
 

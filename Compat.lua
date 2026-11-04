@@ -352,3 +352,83 @@ function API.Window(name, width, height)
     end
     return win
 end
+
+-- A one-time alert when a readout runs low (#130): Durability and Ammo, at the
+-- levels where their figure turns yellow (1, low) and red (2, critical); 0 is fine.
+--   local alert = API.LevelAlert(owner, enabled)  -- enabled(): the plugin's own option
+--   alert.Set(level, message)  -- after each fresh reading; nil (unknown, unsure) is ignored
+--   alert.Reset()              -- the next reading is a new baseline (thresholds or kind changed)
+-- Once per crossing: said when the level gets worse than the worst one said
+-- since it last improved, so a repair or a restock arms it again. The first
+-- reading of a session is the baseline: a /reload while low says nothing. Never
+-- in combat: a crossing in a fight is said when it ends, with the latest
+-- message, if it's still worse. Switched off, it follows quietly, so switching
+-- it on says nothing about what the bar already shows. Said as centre-screen
+-- text (RaidWarningFrame, Blizzard_RaidWarning's AddMessage(text, colorInfo)),
+-- a chat line and the raid-warning sound, each feature-detected, under pcall.
+local RAID_WARNING_SOUND = 8959   -- SOUNDKIT.RAID_WARNING (SoundKitConstants.lua)
+local ALERT_COLOUR = { [1] = { r = 1, g = 0.82, b = 0, hex = "ffd200" },
+                       [2] = { r = 1, g = 0.25, b = 0.25, hex = "ff4040" } }
+local held = {}   -- trackers with a crossing held until combat ends
+local alertWaiter
+
+local function sayAlert(owner, level, message)
+    local c = ALERT_COLOUR[level] or ALERT_COLOUR[2]
+    local rw = rawget(_G, "RaidWarningFrame")
+    if type(rw) == "table" and type(rw.AddMessage) == "function" then
+        local ok, err = pcall(rw.AddMessage, rw, message, { r = c.r, g = c.g, b = c.b })
+        if not ok then API.Fail(owner .. ":alert", err) end
+    end
+    API.Print("|cff" .. c.hex .. message .. "|r")
+    local play = rawget(_G, "PlaySound")
+    if type(play) == "function" then
+        local kits = rawget(_G, "SOUNDKIT")
+        local id = type(kits) == "table" and type(kits.RAID_WARNING) == "number" and kits.RAID_WARNING
+            or RAID_WARNING_SOUND
+        pcall(play, id)
+    end
+end
+
+local function holdUntilCombatEnds(tracker, owner)
+    held[tracker] = true
+    if not alertWaiter then
+        alertWaiter = CreateFrame("Frame")
+        alertWaiter:SetScript("OnEvent", function(self, event)
+            self:UnregisterEvent(event)
+            local list = {}
+            for t in pairs(held) do list[#list + 1] = t end
+            for _, t in ipairs(list) do
+                held[t] = nil
+                t.try()
+            end
+        end)
+    end
+    API.RegisterEvent(alertWaiter, "PLAYER_REGEN_ENABLED", owner)
+end
+
+function API.LevelAlert(owner, enabled)
+    local a = {}
+    local said, current, message   -- said nil: no baseline yet
+    function a.try()
+        if said == nil or current == nil or current <= said then return end
+        local ok, on = pcall(enabled)
+        if not (ok and on == true) then said = current; return end
+        if API.Plain(InCombatLockdown()) ~= false then
+            holdUntilCombatEnds(a, owner)
+            return
+        end
+        said = current
+        sayAlert(owner, current, message)
+    end
+    function a.Set(level, text)
+        if type(level) ~= "number" or type(text) ~= "string" then return end
+        current, message = level, text
+        if said == nil or level < said then said = level end
+        a.try()
+    end
+    function a.Reset()
+        said, current, message = nil, nil, nil
+        held[a] = nil
+    end
+    return a
+end

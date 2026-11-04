@@ -66,7 +66,12 @@ core's `ADDON_LOADED`.
   speaks only in a **development copy** (`API.IsDevelopmentCopy`: version `dev` from deploy, or the
   raw `@project-version@`), never in a release (Priestly #76: what flags an addon out of date is the
   TOC's Interface, not this notice), and **once per new build** (`GlassPanelDB.notedBuild`), not at
-  every login.
+  every login. `API.LevelAlert(owner, enabled)` (#130) is the one low-readout alert (Durability, Ammo):
+  `Set(level 0|1|2, message)` after a fresh, **sure** reading (nil ignored), said once per crossing (a
+  level worse than the worst said since it improved) as `RaidWarningFrame:AddMessage` + a chat line +
+  `PlaySound` 8959 (each feature-detected, under pcall); the session's first reading is a baseline, a
+  crossing in combat waits for `PLAYER_REGEN_ENABLED` (said if still worse, latest message), off
+  follows quietly, `Reset()` starts a new baseline.
 - **`Suite.lua`** (#96): Glass UI's suite theme (`GlassUI\docs\SUITE.md`; Glass UI is optional, `## OptionalDeps: GlassUI`). Asked **once per session**, by `Glass.lua` at file scope before any glass is built: `rawget(_G, "GlassUI")`, `Suite` a table with `API == 1` exactly and `Theme`/`Report` functions (anything else is absent), then `pcall(Suite.Theme, "GlassPanel")`; a table with `preset == "pearl"` means **following** (opt-in, on Glass UI's page). Following suspends `glass` (the bar's body: the built look shows), `glassTint` (#102: painted neutral) and `windowGlass` (windows are Reflective): both stay saved untouched, `Settings.SetGlass`/`SetGlassTint`/`SetWindowGlass` refuse, `/gpanel glass|tint|window` say "set in Glass UI", an import keeps them, the options radios are greyed with a note and an "Open Glass UI" button (`Suite.Open`, feature-detected with `rawget`, called under pcall). Still local: the font. **The accent** (#106): the stock UI's gold text (bar captions, window titles) goes through `Suite.Accented(fs)`: Blizzard's gold, or `Suite.Accent()` (feature-detected, under pcall, three plain numbers 0-1 else gold) while following, repainted live on `EventRegistry` `GlassUI.Suite.LookChanged` (registered only when following). Status colours (yellow low counts, "waiting") are not accent. `Suite.Report` (under pcall, `suite:report`) tells Glass UI `{ api = 1, built, reason, minor, options }`: `built = "pearl"` only when following and built, `reason` `"library-too-old"`/`"build-failed"` when it was following and couldn't. Never reads or writes Glass UI's data.
 - **`Glass.lua`**: `GlassPanel.Glass` is this addon's instance of
   the material (#57; see "The glass material" below), built **Pearl** (LibGlass r11's preset, our own default look and the suite's, #96) with `{ preset = "pearl" }`; a library older than r11 (checked by MINOR) or a `New` that errors falls back to the earlier look (`lib:New()`), recorded as `glass:pearl` and reported. No retry: LibGlass never restyles a built instance. `GlassPanel.CleanGlass()` (public, #78): a
@@ -315,6 +320,8 @@ core's `ADDON_LOADED`.
   scan runs under pcall (Durability's pattern: `ammo:scan` recorded, still stale). Yellow under low, red under critical (strictly below), per class in
   `GlassPanelAmmoDB.thresholds[CLASS]` (defaults hunter 600/200, warrior and rogue 100/40; a
   corrupt pair falls back), set in a small window (left-click or the plugin option button).
+  **Alert** (#130, option, `GlassPanelAmmoDB.alert`, off by default): `API.LevelAlert` on a sure count
+  only (not `unsure`); new thresholds or another kind reset its baseline.
   **Measured (70338, hunter):** the ammo slot's count totals that ammo across the bags (1,100 =
   six quiver stacks), as in Vanilla. **Unmeasured:** `UnitUsesAmmo` for warriors and rogues; the thrown count, and whether it includes the same weapon
   in the bags (the tooltip would count those twice). stubs/ammo.lua wraps `C_Item.GetItemInfoInstant`
@@ -326,6 +333,8 @@ core's `ADDON_LOADED`.
   `C_TooltipInfo.GetInventoryItem(...).repairCost` (TitanRepair's Retail path, not in the dump:
   unknown is shown as unknown). Secret numbers keep type `"number"` on the client, so
   `type(x) == "number"` is no secrecy check: `API.Plain` first.
+  **Alert** (#130, option, `GlassPanelDurabilityDB.alert`, off by default): `API.LevelAlert` at 25%
+  and broken, only with no unreadable item.
 - **`Settings.lua`**: `GlassPanelDB`'s defaults (`EnsureDefaults`) and **the one place a setting
   is changed and applied** (`SetFont`, `SetShown`, `SetRoom`, `SetGlass`, `SetGlassTint`, `SetLabels`, `SetLabelFor`,
   `SetIconFor`, `SetHidden`, `ResetLayout`, and `ApplyAll` for a whole imported setup, with one

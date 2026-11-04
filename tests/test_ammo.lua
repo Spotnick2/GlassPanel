@@ -295,6 +295,59 @@ eq(textOf("ammo"), ICON(2001) .. "|cffffffff900|r", "last good state kept")
 C_Container.GetContainerNumSlots = realSlots
 WoW.invCount[0] = 300
 eq(block("ammo")._test.state().count, 300, "still stale: the next read scans again")
+-- The alert (#130): off by default; on, once when the count turns yellow and
+-- once when it turns red; a restock arms it again.
+do
+    local opt = block("ammo").options[2]
+    local function count(n) WoW.invCount[0] = n; refresh() end
+    setup("HUNTER", BOW, ARROWS, 1000); refresh()
+    eq(opt.get(), false, "alert: off by default")
+    count(500)
+    eq(#WoW.warnings, 0, "off: nothing said")
+    count(1000)
+    opt.set(true)
+    eq(GlassPanelAmmoDB.alert, true, "saved")
+    count(600)
+    eq(#WoW.warnings, 0, "600: not low")
+    count(599)
+    eq(WoW.warnings[1] and WoW.warnings[1].text, "Ammo low: 599 arrows left.", "low: said")
+    count(300)
+    eq(#WoW.warnings, 1, "still low: said once")
+    count(199)
+    eq(WoW.warnings[2] and WoW.warnings[2].text, "Ammo critical: 199 arrows left.", "critical: said")
+    count(1200)
+    count(400)
+    eq(#WoW.warnings, 3, "a restock arms it again")
+    -- New thresholds start a new baseline: raising them isn't running low.
+    count(1000)
+    local n = #WoW.warnings
+    block("ammo").options[1].run()
+    local win = block("ammo")._test.window()
+    win.low:SetText("1500"); win.critical:SetText("100")
+    check(block("ammo")._test.save(), "thresholds saved")
+    WoW.tick()
+    check(textOf("ammo"):find("ffd200", 1, true), "1,000 is yellow now")
+    eq(#WoW.warnings, n, "raised thresholds: nothing said")
+    count(900)
+    eq(#WoW.warnings, n, "and no alert for the level already shown")
+    GlassPanelAmmoDB.thresholds.HUNTER = nil
+    -- Another weapon (another kind) starts a new baseline too.
+    setup("HUNTER", GUN, BULLETS, 1000); refresh()
+    setup("HUNTER", BOW, ARROWS, 50); refresh()
+    eq(#WoW.warnings, n, "back to the bow with few arrows: a new baseline, nothing said")
+    -- An unsure count (a bag item not loaded yet) is not heard.
+    setup("HUNTER", BOW, nil, nil, { [0] = { slots = 1, free = 0, family = 0, items = { { id = ARROWS, count = 1000 } } } })
+    refresh()
+    local LATE = 299   -- never seen this session (item classes are cached)
+    WoW.items[LATE] = { classID = 6, subClassID = 2, icon = 2099, name = "Late Arrow", pending = true }
+    WoW.bags[0] = { slots = 2, free = 0, family = 0, items = { { id = ARROWS, count = 10 }, { id = LATE, count = 900 } } }
+    refresh()
+    check(block("ammo")._test.state().unsure, "the count is unsure")
+    eq(#WoW.warnings, n, "unsure count: nothing said")
+    opt.set(false)
+    eq(GlassPanelAmmoDB.alert, nil, "off is stored as nothing")
+end
+
 -- Like Bags: its own icon and the gold caption "Ammo: ".
 check(block("ammo").icon ~= nil, "ammo: a block icon")
 eq(GlassPanel.Bar.ShowsCaption(block("ammo")), true, "ammo: the caption shows by default")
