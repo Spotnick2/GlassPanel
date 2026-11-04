@@ -84,6 +84,9 @@ function WoW.reset()
     for _, fn in ipairs(WoW.resetHooks) do fn() end
     WoW.frames = {}
     WoW.chat = {}
+    WoW.warnings = {}       -- RaidWarningFrame:AddMessage calls: { text, r, g, b }
+    WoW.sounds = {}         -- PlaySound ids
+    WoW.noRaidWarning = false
     WoW.methodsCalled = {}
     WoW.addonVersion = "v1.0.0"
     -- Other addons installed and enabled. Like the client, loadAddon skips a
@@ -375,6 +378,15 @@ function print(...)
     for i = 1, select("#", ...) do parts[#parts + 1] = tostring((select(i, ...))) end
     table.insert(WoW.chat, table.concat(parts, " "))
 end
+
+-- Blizzard_RaidWarning's frame (RaidWarningFrameMixin:AddMessage(text,
+-- colorInfo, displayTime, messageType)) and PlaySound (global walk; the
+-- SoundKitConstants id): both recorded. WoW.noRaidWarning: an older client.
+RaidWarningFrame = { AddMessage = function(_, text, c)
+    if WoW.noRaidWarning then error("no raid warning frame") end
+    table.insert(WoW.warnings, { text = text, r = c.r, g = c.g, b = c.b })
+end }
+function PlaySound(id) table.insert(WoW.sounds, id); return true end
 
 SlashCmdList = {}
 Enum = { UITextureSliceMode = { Stretched = 0, Tiled = 1 },

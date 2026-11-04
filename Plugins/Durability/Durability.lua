@@ -17,6 +17,10 @@
 -- - Tooltip data is heavy, and one equipment-set swap fires a dozen events:
 --   events only mark the cache stale, and it is rebuilt at most once per
 --   repaint (from text/tooltip), asking tooltip data only for damaged items.
+-- - The alert (#130, the plugin option, off by default): once when the lowest
+--   item drops to 25% (yellow) and once when one breaks (red), after combat,
+--   through API.LevelAlert; a repair arms it again. Only a sure reading counts:
+--   with an item unreadable the lowest may be lower, so nothing is said.
 
 GlassPanel = GlassPanel or {}
 local API = GlassPanel.API
@@ -38,6 +42,17 @@ local SLOTS = {
 -- total repair cost in copper, nil when any part of it is unknown.
 local state = { items = {}, lowest = nil, unreadable = 0, cost = nil }
 local stale = true
+
+-- GlassPanelDurabilityDB.alert: true, or nothing (off).
+local function alertOn()
+    local d = rawget(_G, "GlassPanelDurabilityDB")
+    return type(d) == "table" and d.alert == true
+end
+local function setAlert(on)
+    if type(rawget(_G, "GlassPanelDurabilityDB")) ~= "table" then GlassPanelDurabilityDB = {} end
+    GlassPanelDurabilityDB.alert = on and true or nil
+end
+local alert = API.LevelAlert("durability", alertOn)
 
 local function slotLabel(s)
     local name = rawget(_G, s[2])
@@ -83,21 +98,15 @@ local function scan()
     state.cost = known and total or nil
 end
 
--- A scan that throws leaves the cache stale (tried again on the next
--- repaint) and is recorded, rather than leaving an old cache marked fresh.
-local function ensure()
-    if not stale then return end
-    local ok, err = pcall(scan)
-    if ok then stale = false else API.Fail("durability:scan", err) end
+-- Fine (0), damaged (1: <= 25%, where Blizzard's armour figure turns yellow)
+-- or broken (2): green, yellow, red.
+local function level(f)
+    if f <= 0 then return 2 end
+    if f <= 0.25 then return 1 end
+    return 0
 end
-
--- Green while fine, yellow when an item is damaged (<= 25%, where Blizzard's
--- armour figure turns yellow), red when one is broken.
-local function colour(f)
-    if f <= 0 then return "ff4040" end
-    if f <= 0.25 then return "ffd200" end
-    return "40ff40"
-end
+local COLOUR = { [0] = "40ff40", [1] = "ffd200", [2] = "ff4040" }
+local function colour(f) return COLOUR[level(f)] end
 
 -- Rounded DOWN: 99.5% isn't "100%" while it costs to repair; and anything
 -- above zero is "<1%", never the broken "0%".
@@ -105,6 +114,27 @@ local function pct(f)
     local p = math.floor(f * 100)
     if p == 0 and f > 0 then return "<1%" end
     return p .. "%"
+end
+
+-- After a fresh scan: the alert hears a sure reading only.
+local function report()
+    if not state.lowest or state.unreadable > 0 then return end
+    local l = level(state.lowest)
+    alert.Set(l, l == 2 and "Durability critical: an item is broken."
+        or "Durability low: " .. pct(state.lowest) .. ".")
+end
+
+-- A scan that throws leaves the cache stale (tried again on the next
+-- repaint) and is recorded, rather than leaving an old cache marked fresh.
+local function ensure()
+    if not stale then return end
+    local ok, err = pcall(scan)
+    if ok then
+        stale = false
+        report()
+    else
+        API.Fail("durability:scan", err)
+    end
 end
 
 local UNSURE = "|cff888888?|r"
@@ -159,4 +189,9 @@ GlassPanel.RegisterBlock({
             tt:AddLine("Repair cost unknown here.", 0.7, 0.7, 0.7)
         end
     end,
+    options = {
+        { label = "Alert when it runs low",
+          note = "Once, with a sound, when an item drops to 25% and when one breaks; after combat.",
+          get = alertOn, set = setAlert },
+    },
 })

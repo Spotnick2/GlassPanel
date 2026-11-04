@@ -139,6 +139,16 @@ standard push button, and `Window(name, width, height)` a glass dialog like Glas
 `Plain(v)` returns `v`, or `nil` when it's secret: use it at every read before comparing or doing
 arithmetic.
 
+`LevelAlert(owner, enabled)` (#130) makes a one-time alert for a readout that runs low. Call
+`a.Set(level, message)` after each fresh reading, with level `0` fine, `1` low (yellow) or `2`
+critical (red), or `nil` when the reading is unknown or unsure (ignored). It speaks once per crossing
+(centre-screen text, a chat line and the raid-warning sound) when the level gets worse than the worst
+one it said since the level last improved, so a repair or a restock arms it again. The session's first
+reading is the baseline, nothing is said in combat (a crossing then is said when the fight ends, if
+it's still worse), and while `enabled()` (your own option) isn't `true` it follows quietly.
+`a.Reset()` makes the next reading a new baseline (Ammo's new thresholds or another weapon). Durability
+and Ammo use it. Additive: `API_VERSION` is unchanged.
+
 `GlassPanel.Glass` is the material (`Apply`, `Bar`, `Font`, …) for a block that draws more than
 text, such as the XP bar. It's GlassPanel's instance of the embedded library LibGlass-1.0
 (github.com/Spotnick2/LibGlass; its `CLAUDE.md` is the contract and `docs/GLASS-MATERIAL.md` the

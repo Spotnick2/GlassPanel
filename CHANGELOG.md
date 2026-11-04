@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Durability and Ammo can tell you when they run low: switch on "Alert when it runs low" in each plugin's options. You then get one message in the middle of the screen (and in chat) with the raid-warning sound when the figure turns yellow, and another when it turns red. Never during a fight: it waits until the fight is over. A repair or a restock sets it up again.
 - Share: a pasted setup can't paint your chat. Block names that come from an imported setup are shown as plain text by `/gpanel list`, and while you follow Glass UI the import preview says that your glass, tint and window choices stay as Glass UI sets them.
 - New plugin **Flight**: a flight timer. On a taxi the bar shows the flight master icon and the time left, from your very first flight: it's worked out from the length of the route the taxi flies (the game's own flight paths), and after you land it knows that route to the second, on every character. A flight that runs longer than predicted counts on in orange (`+0:07`). Double-click the icon to zoom it: a glass bar with the destination and the time left then appears on the screen while you fly, right under the zoomed XP+ bar; it empties as you fly, like a channelled spell (an option makes it fill up instead) (shift-drag to move it; Options > Plugin options > Flight has a preview, a scale and "Forget learned flight times"). A `/reload` mid-flight picks the flight back up. Glass Unit Frames can show the same flight on its cast bar (from Glass Panel's times); it steps aside while this one is zoomed.
 
