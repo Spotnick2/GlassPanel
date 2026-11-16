@@ -16,7 +16,7 @@
 
 WoW = {}
 -- The one default dump path: test_methods reads it as WoW.DUMP.
-local DUMP = os.getenv("GLASSPANEL_API_DUMP") or "C:/Projects/WoW/References/Forever/api/forever-api-1.60.1.70338.md"
+local DUMP = os.getenv("GLASSPANEL_API_DUMP") or "C:/Projects/WoW/References/Forever/api/forever-api-1.60.1.70938.md"
 WoW.DUMP = DUMP
 
 --------------------------------------------------------------------------------
@@ -468,7 +468,7 @@ function Ambiguate(fullName, context)
     if context == "none" then return fullName end
     return (fullName:gsub("%-.*$", ""))
 end
-function GetBuildInfo() return "1.60.1", "70338", "Oct  9 2026", 16001 end
+function GetBuildInfo() return "1.60.1", "70938", "Nov 12 2026", 16001 end
 -- Only "Version" is read. A release-shaped version by default; a test sets
 -- WoW.addonVersion = "dev" to run as a deployed development copy.
 C_AddOns = { GetAddOnMetadata = function(name, key)
