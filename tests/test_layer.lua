@@ -264,5 +264,31 @@ eq(GlassPanelLayerDB.realms.Soulseeker[1429][150], WoW.serverTime, "saved under 
 eq(GlassPanelLayerDB.realms.Doomhowl[1429][150], nil, "not under ours")
 WoW.realm = "Doomhowl"
 
+-- Codex review on #139: the same creatures seen again keep a layer fresh...
+WoW.fire("ZONE_CHANGED_NEW_AREA")
+WoW.units = {}
+seen(9100)
+check(textOf("layer") ~= GREY_Q, "baseline: known")
+local t0 = WoW.serverTime
+WoW.serverTime = t0 + 7000
+WoW.fire("PLAYER_TARGET_CHANGED"); WoW.tick()   -- the very same target
+eq(DB()[1429][9100], t0 + 7000, "a creature that already voted still refreshes the sighting")
+WoW.serverTime = t0 + 7300
+GlassPanel.Refresh("layer"); WoW.tick()
+check(textOf("layer") ~= GREY_Q, "still known 2 h after the first sighting")
+-- ...and creatures that voted before a move stay the old layer's for STALE
+-- seconds, even with no unit token at the move (their nameplates come back).
+WoW.fire("ZONE_CHANGED_NEW_AREA")
+WoW.units = {}
+local g1, g2 = npc(9200), npc(9200)
+plate(1, g1); plate(2, g2)
+check(textOf("layer") ~= GREY_Q, "baseline: known from two nameplates")
+WoW.units, WoW.timers = {}, {}
+WoW.fire("SHARD_TRANSFER"); WoW.tick()
+WoW.now = WoW.now + 1
+plate(1, g1); plate(2, g2)
+eq(textOf("layer"), GREY_Q, "old nameplates back after the move: no vote")
+WoW.units, WoW.timers = {}, {}
+
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_layer")

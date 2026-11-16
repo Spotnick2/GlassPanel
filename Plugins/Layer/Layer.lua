@@ -183,11 +183,14 @@ local function see(unit)
     if stale.untilAt and GetTime() < stale.untilAt and stale.guid[guid] then return end
     -- Another zone than the votes were cast in: they were about that zone.
     if votesMap ~= map then forget(); votesMap = map end
+    -- A sighting of the current layer keeps it fresh, even from a creature
+    -- that already voted (else a layer seen all along would expire).
+    if currentLayer(map) == id then file(map, id, t) end
     if voted[guid] then return end
     voted[guid] = true
     votes[#votes + 1] = id
     if #votes > VOTES then table.remove(votes, 1) end
-    if currentLayer(map) == id then file(map, id, t) return end
+    if currentLayer(map) == id then return end
     local count = 0
     for _, v in ipairs(votes) do if v == id then count = count + 1 end end
     if count >= (current.layer and 3 or 2) then
@@ -206,8 +209,11 @@ end
 -- The game moved us: unknown, the creatures in view are the old layer's for
 -- STALE seconds, and what's on screen is read again a few times.
 local function moved()
-    forget()
+    -- Every creature that voted before the move is the old layer's too, even
+    -- one with no unit token right now (its nameplate may come back).
     local guids = {}
+    for guid in pairs(voted) do guids[guid] = true end
+    forget()
     local function add(unit)
         local guid = P(UnitGUID(unit))
         if type(guid) == "string" then guids[guid] = true end
