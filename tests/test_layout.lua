@@ -172,6 +172,15 @@ eq(lanes(), "0:xp,gold | 1:clock", "lane snapped to the right edge")
 WoW.chat = {}
 GlassPanel._test.slash("move gold")
 check(WoW.chat[1] and WoW.chat[1]:find("usage"), "usage shown")
+-- Its alternatives print as "|" in game: "||" in the text (#151; done() fails on a single one).
+check(WoW.chat[1] and WoW.chat[1]:find("left||center||right||<0-100>", 1, true), "usage: every | doubled")
+-- So does the help (/gpanel alone): every command line, "on|off" included.
+WoW.chat = {}
+GlassPanel._test.slash("")
+local help = table.concat(WoW.chat, "\n")
+check(help:find("/gpanel move <id> left||center||right||<0-100> [n]", 1, true), "help: move's | doubled")
+check(help:find("/gpanel labels on||off", 1, true), "help: labels' | doubled")
+check(#WoW.chat > 10, "help: every command printed (" .. #WoW.chat .. " lines)")
 
 -- Second /code-review round on #8.
 loadAddon()
@@ -256,12 +265,4 @@ GlassPanel._test.slash("move gold right")
 check(L.Current() ~= c1, "rebuilt after a move")
 
 check(next(GlassPanel.failures) == nil, "no failures")
--- FINDING: #151: /gpanel move's usage line prints single "|" (left|center|right), which the
--- client reads as escapes. Exactly that line is accepted until the addon doubles them; any
--- other stray "|" still fails done().
-for i = #WoW.strays, 1, -1 do
-    if WoW.strays[i]:find("usage: /gpanel move <id> left|center|right|<0-100> [position]", 1, true) then
-        table.remove(WoW.strays, i)
-    end
-end
 done("test_layout")

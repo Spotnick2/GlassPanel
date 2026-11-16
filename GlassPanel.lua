@@ -118,7 +118,8 @@ local function slash(msg)
             say(string.format("lane at %d%%: %s", math.floor(lane.x * 100 + 0.5), table.concat(names, ", ")))
         end
     elseif cmd == "move" then
-        local usage = "usage: /gpanel move <id> left|center|right|<0-100> [position]"
+        -- "||" prints one "|": the chat reads a single one as an escape (#151).
+        local usage = "usage: /gpanel move <id> left||center||right||<0-100> [position]"
         local id, where, n = arg:match("^(%S+)%s+(%S+)%s*(%d*)$")
         if not id then say(usage) return end
         local block = findBlock(id)
@@ -220,7 +221,10 @@ local function slash(msg)
         if n == 0 then say("no failures recorded") end
     else
         say("commands:")
-        for _, c in ipairs(COMMANDS) do say("  /gpanel " .. c[1] .. " - " .. c[2]) end
+        -- The table reads "on|off"; the chat needs "||" to print one "|" (#151).
+        for _, c in ipairs(COMMANDS) do
+            say("  /gpanel " .. (c[1]:gsub("|", "||")) .. " - " .. (c[2]:gsub("|", "||")))
+        end
     end
 end
 
