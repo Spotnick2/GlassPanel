@@ -1,8 +1,8 @@
 # Glass Panel
 
 A liquid-glass info bar for **World of Warcraft: Forever**: one slim strip across the top of the
-screen with only the readouts you actually use, and a glass XP bar and combat timer you can pull
-out onto the screen.
+screen with only the readouts you actually use, and a glass XP bar, combat timer and flight timer
+you can pull out onto the screen.
 
 ![The Glass Panel bar across the top with the XP+ bar zoomed under it and the combat pill between them](https://raw.githubusercontent.com/Spotnick2/GlassPanel/main/docs/screenshots/bar.png)
 
@@ -41,9 +41,12 @@ for a full-width bar; `/gpanel setup` can also write an Edit Mode layout that ma
 - **Gold** (what you gained or spent this session), **Bags**, **Durability** (lowest item and the
   repair cost), **GearScore** and item level, **Professions**, **Guild** (online and who),
   **Currencies** (the ones you pick), **Reagents** (your class's, the ones you pick), **Ammo**,
-  **PvP** (flag and its countdown), **Role**, **Layer**, **Clock**, **Warlock** (soul shards,
-  Healthstone, Soulstone) and **AltStable** (your alts' gold, needs
-  [AltStable](https://www.curseforge.com/wow/addons/altstable)).
+  **PvP** (flag and its countdown), **Role**, **Layer** (read from the NPCs around you),
+  **Clock**, **Warlock** (soul shards, Healthstone, Soulstone) and **AltStable** (your alts' gold,
+  needs [AltStable](https://www.curseforge.com/wow/addons/altstable)).
+- **Durability** and **Ammo** can warn you when they run low: a message in the middle of the
+  screen with the raid-warning sound, once when the figure turns yellow and once when it turns
+  red, never during a fight. Switch it on in each plugin's options.
 
 XP+ docked on the bar, and zoomed out onto the screen with the combat timer idle:
 
@@ -86,6 +89,9 @@ titles then follow it.
 
 - Forever is Vanilla content on the modern client, so some readouts are honest about what the
   game won't tell an addon: a number the client hides shows as `?`, never a made-up figure.
+- The game doesn't tell addons which layer you're on, so **Layer** reads it from the NPCs around
+  you (two must agree) and numbers the layers you've seen in your zone. Another player may number
+  the same layer differently.
 - The glass is [LibGlass](https://github.com/Spotnick2/LibGlass), shared with the other Glass
   addons. The newest copy among them runs, so a library fix reaches you through whichever Glass
   addon updated last.
@@ -113,4 +119,5 @@ repository. Tests run with `pwsh tests\run.ps1` (Lua 5.1).
 
 ## License
 
-MIT, see [LICENSE](LICENSE). The bundled LibGlass-1.0 keeps its own MIT license.
+MIT, see [LICENSE](LICENSE). The bundled LibGlass-1.0 and LibTaxiTime-1.0 keep their own MIT
+licenses.

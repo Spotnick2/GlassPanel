@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.0.1
 
 - Layer: much more reliable. It now reads the part of an NPC's ID that actually tells layers apart (two players on one layer used to see different numbers, and a layer could count as several), waits for two NPCs to agree, notices when the game moves you to another layer, and keeps your layer inside caves and buildings. Layers seen before this version are forgotten once.
 - Durability and Ammo can tell you when they run low: switch on "Alert when it runs low" in each plugin's options. You then get one message in the middle of the screen (and in chat) with the raid-warning sound when the figure turns yellow, and another when it turns red. Never during a fight: it waits until the fight is over. A repair or a restock sets it up again.
