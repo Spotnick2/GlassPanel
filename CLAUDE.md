@@ -235,7 +235,7 @@ core's `ADDON_LOADED`.
   unknown, the units in view then don't vote for 10 s (the old layer's), read again at 2, 5 and 12 s; a group
   change alone resets nothing. Reads target, mouseover and nameplates again on entering the world, combat end, taxi end
   and a zone change (`ZONE_CHANGED[_INDOORS]`). The current layer holds only while the live zone is the one it was
-  seen in (checked at every read). Zone and player phase changes make it unknown. No NWB listener (#26).
+  seen in (checked at every read). Zone and player phase changes make it unknown. No NWB listener (#26, closed: NWB doesn't track layers on Forever).
   Left-click forgets the current zone's layers.
 - **`Plugins\GearScore`** (#16): TitanGearScore's per-item formula on a fixed 200-point bracket
   scale (not derived from `GetBuildInfo`), plus Blizzard's `GetAverageItemLevel()` equipped value.

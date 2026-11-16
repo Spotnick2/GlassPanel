@@ -61,8 +61,8 @@ overlap.
 Merged, unreleased: **Flight** (#124, zoomable bar under XP+'s; times from the client's path lengths, then landings). Its timing moves to the shared embedded library **LibTaxiTime-1.0** (#127, with Glass Unit Frames).
 
 Issues: **#74** share the picker window between Currencies and Reagents (and the item-name
-loader with GearScore); **#45** Gold without AltStable (postponed); **#26** Layer from
-NovaWorldBuffs guild messages (postponed).
+loader with GearScore); **#45** Gold without AltStable (postponed). (#26, Layer from
+NovaWorldBuffs guild messages, closed: NWB doesn't track layers on Forever.)
 
 Not measured yet:
 - Build 70938 is what the code and the offline stubs are checked against
