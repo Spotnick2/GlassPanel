@@ -1,22 +1,5 @@
--- harness.lua: assertions and the addon loader. dofile it after wow_stubs.lua.
-
-local passed, failed = 0, 0
-
-function check(cond, msg)
-    if cond then passed = passed + 1 else
-        failed = failed + 1
-        io.write("  FAIL: " .. tostring(msg) .. "\n")
-    end
-end
-
-function eq(actual, expected, msg)
-    check(actual == expected, string.format("%s: expected %s, got %s", msg, tostring(expected), tostring(actual)))
-end
-
-function done(name)
-    io.write(string.format("%s: %d passed, %d failed\n", name, passed, failed))
-    os.exit(failed == 0 and 0 or 1)
-end
+-- harness.lua: the addon loader. dofile it after wow_stubs.lua. The
+-- assertions (check, eq, done) are WowTestKit's (#134).
 
 -- Every folder under Plugins\, in name order: { name, folder, dir, toc }.
 -- The TOC's base name is the addon name, as deploy and the packager make it;
@@ -38,26 +21,11 @@ end
 
 -- Lua files listed in a TOC (default: the core's), in load order, as paths
 -- from the repo root.
-function tocFiles(toc, dir)
-    toc, dir = toc or "GlassPanel.toc", dir or ""
-    local files = {}
-    for line in io.lines(dir .. toc) do
-        line = line:gsub("\r", "")
-        if line:match("%.lua$") and not line:match("^#") then files[#files + 1] = dir .. (line:gsub("\\", "/")) end
-    end
-    return files
-end
+function tocFiles(toc, dir) return Kit.tocFiles(toc or "GlassPanel.toc", dir or "") end
 
 -- Every file line of the core's TOC, in load order (our .lua files and the
 -- embedded library's .xml).
-function tocLines()
-    local lines = {}
-    for line in io.lines("GlassPanel.toc") do
-        line = line:gsub("\r", "")
-        if line ~= "" and not line:match("^#") then lines[#lines + 1] = line end
-    end
-    return lines
-end
+function tocLines() return Kit.tocLines("GlassPanel.toc") end
 
 -- The embedded libraries come from checkouts, not from Libs\ (gitignored,
 -- filled by the packager): each one's env var, else the sibling folder. No
@@ -134,6 +102,14 @@ function loadAddon(opts)
     -- LibStub too: a kept one would skip the library's load and hand out the
     -- dead session's copy.
     GlassPanel, GlassPanelDB, LibStub = nil, nil, nil
+    -- The dead session's frames leave their parents' children too (UIParent's),
+    -- as the kit's WoW.reset does, so its show / hide walk doesn't reach them.
+    for _, w in ipairs(WoW.frames) do
+        local siblings = w._parent and w._parent._children
+        for i, c in ipairs(siblings or {}) do
+            if c == w then table.remove(siblings, i); break end
+        end
+    end
     WoW.frames, WoW.chat, WoW.timers = {}, {}, {}   -- a dead session's timers die with it
     local ns = {}
     for _, line in ipairs(tocLines()) do

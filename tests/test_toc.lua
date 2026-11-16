@@ -3,6 +3,9 @@ dofile("tests/wow_stubs.lua")
 dofile("tests/harness.lua")
 
 local toc = io.open("GlassPanel.toc"):read("*a")
+-- WowTestKit's checks every TOC gets (interface, version token, each listed
+-- .lua file exists and is listed once); ours follow (#134).
+Kit.checkToc("GlassPanel.toc")
 check(toc:find("## Interface: 16001", 1, true), "interface 16001 (1.60.1; 11601 is the transposed-digit bug)")
 check(toc:find("## Version: @project-version@", 1, true), "packager version token kept")
 check(toc:find("## SavedVariables: GlassPanelDB", 1, true), "saved variables declared")
@@ -75,6 +78,7 @@ for _, p in ipairs(list) do
   if p.toc then
     local t = io.open(p.dir .. p.toc):read("*a")
     local name = p.name
+    Kit.checkToc(p.toc, { dir = p.dir })
     check(name:match("^GlassPanel%u"), name .. ": AltStable-style name GlassPanel<Name>")
     check(t:find("## Interface: 16001", 1, true), name .. ": interface 16001")
     check(t:find("## Version: @project-version@", 1, true), name .. ": version token")

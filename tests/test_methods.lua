@@ -1,25 +1,9 @@
--- Every widget method the addon calls must exist on this client.
---
--- The stub answers any method call (a no-op for ones it does not implement),
--- so a call to a method Forever lacks would otherwise pass silently. This
--- checks each recorded "Type:Method" against the API dump's widget-method walk.
+-- Every widget method the addon calls must exist on this client, for that
+-- widget type, in the build tests/kit.pin names (WowTestKit's Kit.checkMethods,
+-- #134). Exercise the addon as widely as is cheap first: every block, XP+'s
+-- zoomed bar, the slash commands, the windows and the options panel.
 dofile("tests/wow_stubs.lua")
 dofile("tests/harness.lua")
-
-local DUMP = WoW.DUMP
-local f = io.open(DUMP, "r")
-if not f then
-    io.write("test_methods: SKIPPED (no API dump at " .. DUMP .. ")\n")
-    os.exit(0)
-end
-local widget, documented = {}, {}
-for line in f:lines() do
-    local wm = line:match("^(%a+:%a+)%s*$")
-    if wm then widget[wm] = true end
-    local fn = line:match("^([%a_]+)%(")
-    if fn then documented[fn] = true end
-end
-f:close()
 
 -- Exercise everything so every method is recorded.
 loadAddon()
@@ -89,14 +73,8 @@ GlassPanel._test.slash("setup")
 GlassPanel._test.slash("setup back")
 WoW.tick(1.1); WoW.tick()
 
-local ANIMATION_TYPES = { Animation = true, Alpha = true, Translation = true, Scale = true, Rotation = true }
-local n = 0
-for name in pairs(WoW.methodsCalled) do
-    n = n + 1
-    local wtype, method = name:match("^(%a+):(%a+)$")
-    -- The dump's widget walk has no animation subtypes (Alpha:SetToAlpha,
-    -- Translation:SetOffset): for those alone, a documented function will do.
-    check(widget[name] or (ANIMATION_TYPES[wtype] and documented[method]), "method exists on Forever: " .. name)
-end
-check(n > 25, "recorded a realistic number of methods (" .. n .. ")")
+-- The floor is what loading plus the exercise records today, rounded down:
+-- it keeps the exercise from quietly shrinking.
+local recorded = Kit.checkMethods()
+check(recorded >= 160, "the exercise reached the windows (" .. recorded .. " recorded)")
 done("test_methods")

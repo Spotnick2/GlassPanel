@@ -46,8 +46,8 @@ eq(textOf("combat"), "Out of Combat", "back to idle")
 -- The engine's clock alone moves the docked time (a retained idle deadline must not delay it).
 WoW.now = 6000
 enter()
-WoW.now = 6003
-WoW.tick(1.0); WoW.tick()
+WoW.now = 6002
+WoW.tick(1.0); WoW.tick()   -- the clock moves with the frame (WowTestKit #9): 6003.02
 eq(textOf("combat"), "00:03", "the clock repaints the time within a second of the fight starting")
 leave()
 local tipLines = {}

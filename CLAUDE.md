@@ -505,7 +505,7 @@ There's no build system. The Lua 5.1 toolchain is at `C:\Program Files (x86)\Lua
 (`lua.exe`, `luac.exe`). Use it, not a newer Lua that may be first on `PATH`.
 
 ```powershell
-pwsh tests\run.ps1                                                 # luac -p on every TOC's .lua files (core + plugins) + every tests\test_*.lua
+pwsh tests\run.ps1                                                 # WowTestKit at the pin: luac -p on every TOC's .lua files (core + plugins) + every tests\test_*.lua
 & 'C:\Program Files (x86)\Lua\5.1\lua.exe' tests\test_engine.lua  # one test, run from the repo root
 pwsh Tools\deploy.ps1                                              # LibGlass -> AddOns\GlassPanel\Libs, core -> AddOns\GlassPanel, each Plugins\X -> AddOns\<toc name>
 pwsh Tools\deploy.ps1 -Probe                                       # ...and ForeverProbe + each Tools\<X>Probe (-ProbeOnly: just those)
@@ -548,18 +548,38 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`) and the Li
 
 ## Testing
 
-`tests\` follows GlassUnitFrames': plain Lua 5.1, `tests\wow_stubs.lua` (driven through `WoW`),
-`tests\harness.lua` (`check` / `eq` / `loadAddon` / `block` / `textOf`), and `tests\run.ps1`.
+Plain Lua 5.1: `tests\wow_stubs.lua` (driven through `WoW`), `tests\harness.lua` (`loadAddon` /
+`block` / `textOf`), and `tests\run.ps1`.
 
+The test scaffolding is WowTestKit (`C:\Projects\WoW\WowTestKit`; its README is the reference)
+at the commit and client build `tests\kit.pin` names (#134). `tests\run.ps1` puts that commit in
+`%LOCALAPPDATA%\WowTestKit\<sha>` and hands off to the kit's runner; CI fetches it with
+`tests\fetch_kit.sh`. `tests\kit.lua`, `kit.ps1` and `fetch_kit.sh` are the kit's bootstrap
+copies: never edit them here. A kit need is an issue on the kit, worked around in
+`tests\wow_stubs.lua` with a `-- WowTestKit #N:` comment meanwhile. `tests\run.ps1 -KitDev`
+runs against the `..\WowTestKit` working copy instead of the pin.
+
+- **The kit is the mechanics**: `check` / `eq` / `done`, strict globals, secrets, widgets, timers,
+  `print`, `hooksecurefunc`, `WoW.fire` / `WoW.tick`. `done()` also fails on a stray `|` in any
+  printed line and on a secret error a `pcall` swallowed. **`WoW.tick(dt)` moves the clock
+  (`WoW.now`) by dt** (default 0.02 s), as the client's frames do: a test that asserts an exact
+  time sets `WoW.now` before the tick, or allows a frame. A widget answers only the methods its
+  type has on the pinned build (else nil, so a wrong call fails where it's made), and
+  `OnShow` / `OnHide` follow the parents' visibility: hide a frame with `Hide()`, never by writing
+  `_shown`.
+- **`wow_stubs.lua` is GlassPanel's own**: the client APIs it calls, the methods the kit's core
+  doesn't have (the bar's rect, tooltips, moving, `GetStringWidth`) and its state, in a
+  `WoW.onReset` function.
 - **Each plugin's stubs live in `tests\stubs\<plugin>.lua`**, loaded automatically, with a
-  `WoW.resetHooks` entry for per-session state, so plugins built in parallel don't all edit
-  `wow_stubs.lua`.
+  `WoW.resetHooks` entry (the kit's `WoW.onReset`) for per-session state, so plugins built in
+  parallel don't all edit `wow_stubs.lua`.
 - **The stub is an allowlist**, with strict globals. Before stubbing a global, confirm it's in
   the dump and copy its signature. Defining something Forever lacks lets a broken call pass.
-- Event names are validated against the dump. `test_methods.lua` checks every widget method
-  called against the dump's widget-method list. Without the dump (CI: it's local only) every
-  event name is accepted and `test_methods` skips; a test that needs an unknown name marks it
-  (`WoW.KNOWN_EVENTS.X = false`).
+- Event names are validated against the kit's list for the pinned build, locally and on CI; a
+  test that needs an unknown name marks it (`WoW.KNOWN_EVENTS.X = false`). `test_methods.lua`
+  exercises the addon, then `Kit.checkMethods` checks every `Type:Method` called against the
+  build, with a floor on how many the exercise records. `test_toc` runs `Kit.checkToc` on every
+  TOC before its own checks.
 - The tests run on Windows and on CI's Linux: list folders through `WoW.list(dir, ext)`, never a
   bare `dir` or `ls`, and match file names' case exactly.
 - `loadAddon()` expands the core TOC's LibGlass XML line from the checkout (`libScripts`, the `EMBEDDED` table) and
