@@ -302,7 +302,8 @@ local fillOpt
 for _, o in ipairs(block("flight").options) do if o.label:find("fills up", 1, true) then fillOpt = o end end
 eq(fillOpt.get(), false, "the fill-up option is off by default")
 fillOpt.set(true)
-eq(host._value, 45, "on: it fills up instead, at once")
+-- The repaint's frame moved the clock 0.02 s (WowTestKit #9): 45 s flown, to within a frame.
+check(math.abs(host._value - 45) < 0.05, "on: it fills up instead, at once (" .. tostring(host._value) .. ")")
 eq(GlassPanelFlightDB.fillUp, true, "...saved")
 fillOpt.set(false)
 eq(GlassPanelFlightDB.fillUp, nil, "off is stored as nothing")

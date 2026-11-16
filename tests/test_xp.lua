@@ -227,7 +227,7 @@ WoW.flushTimers()
 check(hider.IsHidden(), "re-hidden on the next frame")
 -- Edit Mode: given back while it's open (to be seen and moved there), never
 -- hidden while open, hidden again once it closes.
-local em = CreateFrame("Frame", "EditModeManagerFrame", UIParent); em._shown = false
+local em = CreateFrame("Frame", "EditModeManagerFrame", UIParent); em:Hide()
 hider.request()   -- (in game EditModeManagerFrame exists from login; here the next check hooks it)
 WoW.flushTimers()
 check(hider.IsHidden(), "(hidden, Edit Mode closed)")

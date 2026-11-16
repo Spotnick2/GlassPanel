@@ -62,6 +62,12 @@ jobs:
           bash tests/fetch_lib.sh LibTaxiTime-1.0 "$RUNNER_TEMP/LibTaxiTime"
           echo "LIBTAXITIME=$RUNNER_TEMP/LibTaxiTime" >> "$GITHUB_ENV"
 
+      # The test scaffolding (#134): WowTestKit at the commit tests/kit.pin names.
+      - name: Fetch WowTestKit at its pin
+        run: |
+          bash tests/fetch_kit.sh "$RUNNER_TEMP/WowTestKit"
+          echo "WOWTESTKIT=$RUNNER_TEMP/WowTestKit" >> "$GITHUB_ENV"
+
       # WoW runs Lua 5.1, so the tests do too. tests/run.ps1 is the Windows
       # entry point for the same files. Our own files only: the library is
       # checked in its repo.
@@ -72,8 +78,8 @@ jobs:
           echo "checking $count files"
           find . -name '*.lua' -not -path './.git/*' -print0 | xargs -0 luac5.1 -p
 
-      # Without the API dump (local only), test_methods skips the method check
-      # and the stub accepts every event name.
+      # Event names and widget methods are checked against the kit's lists for
+      # the build tests/kit.pin names, here as locally.
       - name: Unit tests
         env:
           FOREVERPROBE_OPTIONAL: "1"   # ForeverProbe is private and local: probe tests run locally
