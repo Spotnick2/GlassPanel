@@ -65,8 +65,8 @@ loader with GearScore); **#45** Gold without AltStable (postponed); **#26** Laye
 NovaWorldBuffs guild messages (postponed).
 
 Not measured yet:
-- Build 70338 is what the code and the offline stubs were checked against
-  (`API.MEASURED_ON_BUILD`); the newest API dump is higher (up to 70532).
+- Build 70938 is what the code and the offline stubs are checked against
+  (`API.MEASURED_ON_BUILD`, #145); the owner plays and tests on it.
 - Ammo for warriors and rogues (`UnitUsesAmmo`) and the thrown count; the Well Rested cap at
   5/5 (XP+ rested lines).
 - Flight (#124): `UnitOnTaxi` at `PLAYER_CONTROL_LOST` (EllesmereUI found it false at takeoff),

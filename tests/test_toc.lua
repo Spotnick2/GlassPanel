@@ -120,7 +120,7 @@ eq(#WoW.chat, 1, "core alone: and no lanes")
 local function said() return table.concat(WoW.chat, " | ") end
 WoW.chat = {}
 WoW.addonVersion = "dev"
-local MEASURED = "1.60.1.70338"
+local MEASURED = "1.60.1.70938"
 loadAddon()
 eq(GlassPanel.MEASURED_ON_BUILD, MEASURED, "MEASURED_ON_BUILD")
 eq(GlassPanel.API.ClientBuild(), GlassPanel.MEASURED_ON_BUILD, "stub GetBuildInfo matches MEASURED_ON_BUILD")
