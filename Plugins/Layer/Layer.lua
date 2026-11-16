@@ -1,6 +1,7 @@
 -- Plugins/Layer/Layer.lua: which layer of the realm you're on (#17), read
 -- from the GUIDs of the creatures around you (without TitanLayer's
--- NovaWorldBuffs listener, #26, and without the chat announce).
+-- NovaWorldBuffs listener: NWB doesn't track layers on Forever, #26; and
+-- without the chat announce).
 --
 -- Forever notes (#138; measured on live Forever by LayerSwap, 9 Nov 2026,
 -- References\Addons\Miscellaneous\LayerSwap; LayerETA reads it the same way):
@@ -25,8 +26,9 @@
 --   id among the ids seen in the SAME zone, ascending: "2" means the
 --   second-lowest id seen here. The numbers are local: nothing on the client
 --   says how many layers exist, so a newly seen lower id renumbers yours, and
---   another player's "2" may be your "1" (#26, sharing sightings, would fix
---   that). Known ids live in GlassPanelLayerDB.realms[realm][zoneMap][id] =
+--   another player's "2" may be your "1" (NovaWorldBuffs, which shares
+--   sightings on Classic, doesn't track layers on Forever: #26, closed).
+--   Known ids live in GlassPanelLayerDB.realms[realm][zoneMap][id] =
 --   GetServerTime() of the last sighting, forgotten after 2 hours.
 -- - The current layer holds only while the player is in the zone it was seen
 --   in (checked at every read: a zone change may come with ZONE_CHANGED /
