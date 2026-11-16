@@ -149,6 +149,17 @@ it's still worse), and while `enabled()` (your own option) isn't `true` it follo
 `a.Reset()` makes the next reading a new baseline (Ammo's new thresholds or another weapon). Durability
 and Ammo use it. Additive: `API_VERSION` is unchanged.
 
+`ItemLoader(owner, onLoaded)` (#74) loads item data the client doesn't have yet (a name, a level, an
+item class). `l.Request(id)` asks once, only while `C_Item.IsItemDataCachedByID` says it isn't cached,
+and never again once the client answered, loaded or failed: a request that's answered without the data
+would otherwise loop. Pass `l.Request(id, true)` to ask even though the client says it's cached (the
+data was missing anyway). `onLoaded(id, success)` runs for each answer (`success` is `false` for a failed
+load, `nil` when unreadable), under pcall, recorded as `<owner>:itemload`; refresh your block from it.
+`l.State(id)` is `"pending"`, `"failed"`, `"loaded"` or `nil` (never asked), and `l.Reset()` forgets
+every id (GearScore's new gear). The load events fire for every item the client loads, so the loader
+listens only while one of its ids is pending. GearScore, Reagents and Ammo use it. Additive:
+`API_VERSION` is unchanged.
+
 `GlassPanel.Glass` is the material (`Apply`, `Bar`, `Font`, …) for a block that draws more than
 text, such as the XP bar. It's GlassPanel's instance of the embedded library LibGlass-1.0
 (github.com/Spotnick2/LibGlass; its `CLAUDE.md` is the contract and `docs/GLASS-MATERIAL.md` the

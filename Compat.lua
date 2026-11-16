@@ -432,3 +432,70 @@ function API.LevelAlert(owner, enabled)
     end
     return a
 end
+
+-- Item data that loads late (#74): one loader per plugin, shared code. GearScore,
+-- Reagents and Ammo each had their own copy, already drifting (one lost the
+-- failed-load guard and looped). Rules, from those copies and their reviews:
+-- - Request(id) asks once, only while the client says the item isn't cached
+--   (evenIfCached: skip that check, for data missing although it says it's
+--   cached), and never again once answered, loaded or failed: an answer that
+--   leaves the data missing would otherwise loop (request, load, repaint,
+--   request).
+-- - ITEM_DATA_LOAD_RESULT / GET_ITEM_INFO_RECEIVED fire for every item the
+--   client loads, so they're registered on the loader's own frame only while
+--   one of its ids is pending.
+-- - onLoaded(id, success) runs for each of its answers, under pcall (a throw is
+--   recorded as "<owner>:itemload"); success is false for a failed load, nil
+--   when unreadable.
+-- - State(id): "pending", "failed" (answered with a failure), "loaded"
+--   (answered), or nil (never asked). Reset() forgets every id (GearScore's
+--   new gear); an answer to an id asked before is then ignored.
+local ITEM_LOAD_EVENTS = { "ITEM_DATA_LOAD_RESULT", "GET_ITEM_INFO_RECEIVED" }
+function API.ItemLoader(owner, onLoaded)
+    local L = { pending = {}, answered = {}, failed = {} }
+    local frame = CreateFrame("Frame")
+    local listening = false
+    local function listen(on)
+        if on == listening then return end
+        listening = on
+        for _, e in ipairs(ITEM_LOAD_EVENTS) do
+            if on then API.RegisterEvent(frame, e, owner) else frame:UnregisterEvent(e) end
+        end
+    end
+    frame:SetScript("OnEvent", function(_, _, rawId, rawSuccess)
+        local id = API.Plain(rawId)
+        if id and L.pending[id] then
+            L.pending[id] = nil
+            L.answered[id] = true
+            local success = API.Plain(rawSuccess)
+            if success == false then L.failed[id] = true end
+            if onLoaded then
+                local ok, err = pcall(onLoaded, id, success)
+                if not ok then API.Fail(owner .. ":itemload", err) end
+            end
+        end
+        if next(L.pending) == nil then listen(false) end
+    end)
+    function L.Request(id, evenIfCached)
+        if id == nil or L.pending[id] or L.answered[id] then return end
+        if not evenIfCached then
+            local ok, cached = pcall(C_Item.IsItemDataCachedByID, id)
+            if ok and API.Plain(cached) == true then return end   -- loaded: nothing more will come
+        end
+        L.pending[id] = true
+        C_Item.RequestLoadItemDataByID(id)
+        listen(true)
+    end
+    function L.State(id)
+        if L.pending[id] then return "pending" end
+        if L.failed[id] then return "failed" end
+        if L.answered[id] then return "loaded" end
+        return nil
+    end
+    function L.Reset()
+        L.pending, L.answered, L.failed = {}, {}, {}
+        listen(false)
+    end
+    function L.Listening() return listening end
+    return L
+end

@@ -71,7 +71,12 @@ core's `ADDON_LOADED`.
   level worse than the worst said since it improved) as `RaidWarningFrame:AddMessage` + a chat line +
   `PlaySound` 8959 (each feature-detected, under pcall); the session's first reading is a baseline, a
   crossing in combat waits for `PLAYER_REGEN_ENABLED` (said if still worse, latest message), off
-  follows quietly, `Reset()` starts a new baseline.
+  follows quietly, `Reset()` starts a new baseline. `API.ItemLoader(owner, onLoaded)` (#74) is the one
+  loader for item data that arrives late (GearScore, Reagents, Ammo): `Request(id[, evenIfCached])` asks
+  once, only while `IsItemDataCachedByID` says not cached, and **never again once answered** (loaded or
+  failed: no request loop); the two load events fire for every item, so they're registered on the
+  loader's own frame only while one of its ids is pending; `onLoaded(id, success)` runs under pcall
+  (`<owner>:itemload`); `State(id)` is `pending`/`failed`/`loaded`/nil; `Reset()` forgets every id.
 - **`Suite.lua`** (#96): Glass UI's suite theme (`GlassUI\docs\SUITE.md`; Glass UI is optional, `## OptionalDeps: GlassUI`). Asked **once per session**, by `Glass.lua` at file scope before any glass is built: `rawget(_G, "GlassUI")`, `Suite` a table with `API == 1` exactly and `Theme`/`Report` functions (anything else is absent), then `pcall(Suite.Theme, "GlassPanel")`; a table with `preset == "pearl"` means **following** (opt-in, on Glass UI's page). Following suspends `glass` (the bar's body: the built look shows), `glassTint` (#102: painted neutral) and `windowGlass` (windows are Reflective): both stay saved untouched, `Settings.SetGlass`/`SetGlassTint`/`SetWindowGlass` refuse, `/gpanel glass|tint|window` say "set in Glass UI", an import keeps them, the options radios are greyed with a note and an "Open Glass UI" button (`Suite.Open`, feature-detected with `rawget`, called under pcall). Still local: the font. **The accent** (#106): the stock UI's gold text (bar captions, window titles) goes through `Suite.Accented(fs)`: Blizzard's gold, or `Suite.Accent()` (feature-detected, under pcall, three plain numbers 0-1 else gold) while following, repainted live on `EventRegistry` `GlassUI.Suite.LookChanged` (registered only when following). Status colours (yellow low counts, "waiting") are not accent. `Suite.Report` (under pcall, `suite:report`) tells Glass UI `{ api = 1, built, reason, minor, options }`: `built = "pearl"` only when following and built, `reason` `"library-too-old"`/`"build-failed"` when it was following and couldn't. Never reads or writes Glass UI's data.
 - **`Glass.lua`**: `GlassPanel.Glass` is this addon's instance of
   the material (#57; see "The glass material" below), built **Pearl** (LibGlass r11's preset, our own default look and the suite's, #96) with `{ preset = "pearl" }`; a library older than r11 (checked by MINOR) or a `New` that errors falls back to the earlier look (`lib:New()`), recorded as `glass:pearl` and reported. No retry: LibGlass never restyles a built instance. `GlassPanel.CleanGlass()` (public, #78): a
@@ -242,7 +247,7 @@ core's `ADDON_LOADED`.
   Items via `GetInventoryItemID`/`Link` and `C_Item.GetItemInfo` (the global `GetItemInfo` is
   absent), looked up by id. An uncached item is requested once, left out and flagged with a grey
   `?`; `ITEM_DATA_LOAD_RESULT`/`GET_ITEM_INFO_RECEIVED` fire for every item the client loads, so
-  they're registered on the plugin's own frame only while one of ours is pending (a failed load
+  they're registered (`API.ItemLoader`, #74) only while one of ours is pending (a failed load
   makes it unreadable until the next gear change). Score `nil` until known.
   `PLAYER_AVG_ITEM_LEVEL_UPDATE` repaints without a rescan. No click.
 - **`Plugins\Currencies`** (#47): the currencies the player picks, in their order (icon + amount),
@@ -269,7 +274,7 @@ core's `ADDON_LOADED`.
   not cached, once, and listened for on the plugin's own frame only while pending (GearScore's
   pattern); an **answered** id (loaded or failed) is never re-requested (a nameless load would loop
   through the open tooltip), and a missing name only costs the name: a grey `item <id>`, icon and
-  count kept. Sharing the chooser with Currencies and the loader with GearScore: #74. **No ammo, soul shards,
+  count kept. The loader is `API.ItemLoader` (#74); sharing the chooser with Currencies is #74's other half. **No ammo, soul shards,
   healthstones or soulstones** (their own plugins, #66/#67). Hunters and warriors have no list, so
   no block (not registered when `UnitClass` reads plainly at load; a class unreadable then gets the
   block, hidden and offering nothing while it stays unreadable). Picks per character
@@ -318,7 +323,7 @@ core's `ADDON_LOADED`.
   the count can't be read (an unreadable thrown stack: its bags, with a grey `?`); none equipped or
   the wrong kind: the matching projectiles in the bags with a red `!`. `GetItemInfoInstant` may
   return nothing for an item the client hasn't seen: that item is **pending**, never definite (#73).
-  Its data is requested (Reagents'/GearScore's loader: `IsItemDataCachedByID` guard, load events on
+  Its data is requested (`API.ItemLoader`, #74: `IsItemDataCachedByID` guard, load events on
   the plugin's own frame only while one is pending, an `answered` id never asked again) and the
   block rescans on arrival. Meanwhile an unresolved weapon shows no block, an unresolved bag item
   makes the count unsure (grey `?`), and equipped ammo of unknown kind is counted (the slot) with a
