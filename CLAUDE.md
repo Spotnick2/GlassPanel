@@ -596,6 +596,10 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`) and the Li
   the tag's notes) and `wago` (the same zip to Wago project `n6VYw3Nd`, the TOC's `X-Wago-ID`, with the
   `WAGO_API_TOKEN` secret). `alpha`/`beta` tags are pre-releases. `workflow_dispatch` (tag, both|github|wago)
   publishes an existing tag again.
+- **A release tag (`vX.Y.Z`, not an alpha or beta) updates both READMEs in its prep PR** (RELEASING.md §3):
+  `README.md` and the untracked `README.curseforge.md` describe what the release does, and nothing it no
+  longer does. The PR says whether `README.curseforge.md` changed: the owner pastes it into CurseForge and
+  Wago's Description tab after the release (§4).
 
 ## Conventions
 
