@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.0.2
 
 - Flight: the predicted times follow the current game build's flight paths (Undercity to Kargath is a few seconds shorter, for one).
 
