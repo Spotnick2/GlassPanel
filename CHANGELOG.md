@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Flight: the predicted times follow the current game build's flight paths (Undercity to Kargath is a few seconds shorter, for one).
+
 ## v1.0.1
 
 - Text on Russian, Korean and Chinese clients uses the game's own font for those letters, instead of showing empty boxes.
