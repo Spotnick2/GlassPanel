@@ -43,7 +43,7 @@ manual-changelog:
 externals:
   Libs/LibGlass-1.0:
     url: https://github.com/Spotnick2/LibGlass
-    tag: r11
+    tag: r12
   # Flight times (#127), shared with Glass Unit Frames. In the core's Libs/,
   # never in a plugin folder move-folders moves (EMBEDDED-LIBRARIES section 3).
   Libs/LibTaxiTime-1.0:
