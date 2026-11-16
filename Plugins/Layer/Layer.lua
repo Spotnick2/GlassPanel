@@ -54,8 +54,8 @@ local current = { layer = nil, map = nil }
 -- The last VOTES layer ids read, the GUIDs that voted (once each), and the
 -- zone map they were read in.
 local votes, voted, votesMap = {}, {}, nil
--- GUIDs in view at a move: they don't vote until untilAt (GetTime()).
-local stale = { untilAt = nil, guid = {} }
+-- Creatures of a layer just left: [guid] = GetTime() until which they don't vote.
+local stale = {}
 -- The sorted, unexpired ids of one zone, kept until something changes.
 local cache = { realm = nil, map = nil, list = nil, validUntil = nil }
 
@@ -180,7 +180,7 @@ local function see(unit)
     local id, guid = layerOf(unit)
     local map, t = liveMap(), now()
     if not id or not map or not t then return end
-    if stale.untilAt and GetTime() < stale.untilAt and stale.guid[guid] then return end
+    if stale[guid] and GetTime() < stale[guid] then return end
     -- Another zone than the votes were cast in: they were about that zone.
     if votesMap ~= map then forget(); votesMap = map end
     -- A sighting of the current layer keeps it fresh, even from a creature
@@ -210,18 +210,21 @@ end
 -- STALE seconds, and what's on screen is read again a few times.
 local function moved()
     -- Every creature that voted before the move is the old layer's too, even
-    -- one with no unit token right now (its nameplate may come back).
-    local guids = {}
-    for guid in pairs(voted) do guids[guid] = true end
+    -- one with no unit token right now (its nameplate may come back). Those
+    -- set aside by an earlier move keep their own expiry (#140).
+    local t = GetTime()
+    for guid, untilAt in pairs(stale) do
+        if untilAt <= t then stale[guid] = nil end
+    end
+    for guid in pairs(voted) do stale[guid] = t + STALE end
     forget()
     local function add(unit)
         local guid = P(UnitGUID(unit))
-        if type(guid) == "string" then guids[guid] = true end
+        if type(guid) == "string" then stale[guid] = t + STALE end
     end
     add("target")
     add("mouseover")
     for i = 1, PLATES do add("nameplate" .. i) end
-    stale.untilAt, stale.guid = GetTime() + STALE, guids
     for _, s in ipairs(AFTER_MOVE) do
         C_Timer.After(s, function()
             rescan()
