@@ -208,144 +208,24 @@ local function name(c)
 end
 
 --------------------------------------------------------------------------------
--- The chooser window: the class's reagents, a checkbox to show each, Up/Down
--- to order the shown ones. (A copy of Currencies' chooser; sharing it, and
--- the name loader with GearScore and Ammo, is #74: API.ItemLoader.)
+-- The chooser window (API.Picker, #74): the class's reagents, a checkbox to
+-- show each, Up/Down to order the shown ones; the unpicked ones in the
+-- class's order.
 --------------------------------------------------------------------------------
 
-local win, rows = nil, {}
-local ROW_W, ROW_H = 340, 26
-
--- The rows: the shown ones first, in order (only those the client resolves),
--- then the rest in the class's order. `shown` is that first part, as ids;
--- `unresolved` the saved ids the client doesn't resolve right now.
-local function entries()
-    local avail = available()
-    local byId = {}
-    for _, c in ipairs(avail) do byId[c.id] = c end
-    local list, shown, used, unresolved = {}, {}, {}, {}
-    for _, id in ipairs(picks()) do
-        local c = byId[id] or info(id, true)
-        if c then
-            list[#list + 1] = c
-            shown[#shown + 1] = id
-            used[id] = true
-        else
-            unresolved[#unresolved + 1] = id
-        end
-    end
-    for _, c in ipairs(avail) do
-        if not used[c.id] then list[#list + 1] = c end
-    end
-    return list, shown, used, unresolved
-end
-
-local refreshWindow
-
--- Write `shown` (the visible order) back, keeping the unresolved saved ids
--- at the end, untouched.
-local function saveShown(shown, unresolved)
-    local keep = {}
-    for _, id in ipairs(shown) do keep[#keep + 1] = id end
-    for _, id in ipairs(unresolved) do keep[#keep + 1] = id end
-    setPicks(keep)
-    refreshWindow()
-end
-
-local function move(id, step)
-    local _, shown, _, unresolved = entries()
-    for i, v in ipairs(shown) do
-        if v == id then
-            local j = i + step
-            if j >= 1 and j <= #shown then shown[i], shown[j] = shown[j], shown[i] end
-            break
-        end
-    end
-    saveShown(shown, unresolved)
-end
-
-local function toggle(id, on)
-    local _, shown, _, unresolved = entries()
-    local out = {}
-    for _, v in ipairs(shown) do
-        if v ~= id then out[#out + 1] = v end
-    end
-    if on then out[#out + 1] = id end
-    saveShown(out, unresolved)
-end
-
-local function row(i)
-    if rows[i] then return rows[i] end
-    local r = CreateFrame("Frame", nil, win.content)
-    r:SetSize(ROW_W, ROW_H)
-    r:SetPoint("TOPLEFT", win.content, "TOPLEFT", 0, -(i - 1) * ROW_H)
-    r.check = CreateFrame("CheckButton", nil, r, "UICheckButtonTemplate")
-    r.check:SetSize(24, 24)
-    r.check:SetPoint("LEFT", r, "LEFT", 0, 0)
-    r.check:SetScript("OnClick", function(self) toggle(r.id, self:GetChecked() and true or false) end)
-    r.text = Glass.Font(r, 12, "LEFT")
-    r.text:SetPoint("LEFT", r.check, "RIGHT", 4, 0)
-    r.up = API.Button(r, "Up", 44, function() move(r.id, -1) end)
-    r.up:SetPoint("RIGHT", r, "RIGHT", -52, 0)
-    r.down = API.Button(r, "Down", 48, function() move(r.id, 1) end)
-    r.down:SetPoint("RIGHT", r, "RIGHT", -2, 0)
-    rows[i] = r
-    return r
-end
-
-refreshWindow = function()
-    if not win then return end
-    local list, shown, used = entries()
-    local pos = {}
-    for i, id in ipairs(shown) do pos[id] = i end
-    for i, c in ipairs(list) do
-        local r = row(i)
-        r.id = c.id
-        r.check:SetChecked(used[c.id] == true)
-        r.text:SetText(icon(c, 16) .. " " .. name(c) .. "  |cffaaaaaa" .. amount(c) .. "|r")
-        r.up:SetShown(used[c.id] == true)
-        r.down:SetShown(used[c.id] == true)
-        r.up:SetEnabled(pos[c.id] ~= nil and pos[c.id] > 1)
-        r.down:SetEnabled(pos[c.id] ~= nil and pos[c.id] < #shown)
-        r:Show()
-    end
-    for i = #list + 1, #rows do rows[i]:Hide() end
-    win.content:SetHeight(math.max(#list, 1) * ROW_H)
-    win.empty:SetShown(#list == 0)
-end
-
--- Bag and item-load events come in bursts: one refresh per frame.
-local refreshQueued = false
-refreshWindowSoon = function()
-    if refreshQueued or not (win and win:IsShown()) then return end
-    refreshQueued = true
-    C_Timer.After(0, function()
-        refreshQueued = false
-        if win and win:IsShown() then refreshWindow() end
-    end)
-end
-
-local function openWindow()
-    if not win then
-        win = API.Window("GlassPanelReagentsWindow", 400, 320)
-        win.title:SetText("Reagents on the bar")
-        win.hint:SetText("Tick to show, Up/Down to order. Counts are what your bags hold.")
-        local scroll = CreateFrame("ScrollFrame", nil, win, "UIPanelScrollFrameTemplate")
-        scroll:SetPoint("TOPLEFT", win.hint, "BOTTOMLEFT", 0, -8)
-        scroll:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -30, 42)
-        win.content = CreateFrame("Frame", nil, scroll)
-        win.content:SetSize(ROW_W, ROW_H)
-        scroll:SetScrollChild(win.content)
-        API.AutoHideScrollBar(scroll)
-        win.empty = Glass.Font(win.content, 12, "LEFT")
-        win.empty:SetPoint("TOPLEFT", win.content, "TOPLEFT", 4, -4)
-        win.empty:SetText("|cffaaaaaaNo class reagents for this character.|r")
-        local close = API.Button(win, "Close", 90, function() win:Hide() end)
-        close:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -12, 10)
-    end
-    refreshWindow()
-    win:Show()
-end
+local picker = API.Picker({
+    name = "GlassPanelReagentsWindow",
+    title = "Reagents on the bar",
+    hint = "Tick to show, Up/Down to order. Counts are what your bags hold.",
+    empty = "|cffaaaaaaNo class reagents for this character.|r",
+    items = available,
+    picks = function() return picks() end,
+    resolve = function(id) return info(id, true) end,
+    save = setPicks,
+    label = function(c) return icon(c, 16) .. " " .. name(c) .. "  |cffaaaaaa" .. amount(c) .. "|r" end,
+})
+refreshWindowSoon = picker.RefreshSoon
+local openWindow = picker.Open
 
 --------------------------------------------------------------------------------
 -- The block
@@ -389,7 +269,7 @@ local block = GlassPanel.RegisterBlock({
 })
 
 if block then
-    block._test = { CLASS = CLASS, available = available, picks = picks, rows = rows,
-                    window = function() return win end, pending = function() return loader.pending end,
+    block._test = { CLASS = CLASS, available = available, picks = picks, rows = picker.rows,
+                    window = picker.Window, pending = function() return loader.pending end,
                     answered = function() return loader.answered end, failed = function() return failed end }
 end

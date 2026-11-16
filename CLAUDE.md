@@ -77,6 +77,10 @@ core's `ADDON_LOADED`.
   failed: no request loop); the two load events fire for every item, so they're registered on the
   loader's own frame only while one of its ids is pending; `onLoaded(id, success)` runs under pcall
   (`<owner>:itemload`); `State(id)` is `pending`/`failed`/`loaded`/nil; `Reset()` forgets every id.
+  `API.Picker(spec)` (#74) is the one chooser window (Currencies, Reagents): a checkbox per entry,
+  Up/Down on the shown ones, saved ids the client can't resolve right now kept at the end untouched;
+  the plugin gives `items()`, `picks(items)`, `resolve(id)`, `save(order)`, `label(entry)` and the
+  texts; `RefreshSoon()` refreshes once per frame, only while it's shown.
 - **`Suite.lua`** (#96): Glass UI's suite theme (`GlassUI\docs\SUITE.md`; Glass UI is optional, `## OptionalDeps: GlassUI`). Asked **once per session**, by `Glass.lua` at file scope before any glass is built: `rawget(_G, "GlassUI")`, `Suite` a table with `API == 1` exactly and `Theme`/`Report` functions (anything else is absent), then `pcall(Suite.Theme, "GlassPanel")`; a table with `preset == "pearl"` means **following** (opt-in, on Glass UI's page). Following suspends `glass` (the bar's body: the built look shows), `glassTint` (#102: painted neutral) and `windowGlass` (windows are Reflective): both stay saved untouched, `Settings.SetGlass`/`SetGlassTint`/`SetWindowGlass` refuse, `/gpanel glass|tint|window` say "set in Glass UI", an import keeps them, the options radios are greyed with a note and an "Open Glass UI" button (`Suite.Open`, feature-detected with `rawget`, called under pcall). Still local: the font. **The accent** (#106): the stock UI's gold text (bar captions, window titles) goes through `Suite.Accented(fs)`: Blizzard's gold, or `Suite.Accent()` (feature-detected, under pcall, three plain numbers 0-1 else gold) while following, repainted live on `EventRegistry` `GlassUI.Suite.LookChanged` (registered only when following). Status colours (yellow low counts, "waiting") are not accent. `Suite.Report` (under pcall, `suite:report`) tells Glass UI `{ api = 1, built, reason, minor, options }`: `built = "pearl"` only when following and built, `reason` `"library-too-old"`/`"build-failed"` when it was following and couldn't. Never reads or writes Glass UI's data.
 - **`Glass.lua`**: `GlassPanel.Glass` is this addon's instance of
   the material (#57; see "The glass material" below), built **Pearl** (LibGlass r11's preset, our own default look and the suite's, #96) with `{ preset = "pearl" }`; a library older than r11 (checked by MINOR) or a `New` that errors falls back to the earlier look (`lib:New()`), recorded as `glass:pearl` and reported. No retry: LibGlass never restyles a built instance. `GlassPanel.CleanGlass()` (public, #78): a
@@ -274,7 +278,7 @@ core's `ADDON_LOADED`.
   not cached, once, and listened for on the plugin's own frame only while pending (GearScore's
   pattern); an **answered** id (loaded or failed) is never re-requested (a nameless load would loop
   through the open tooltip), and a missing name only costs the name: a grey `item <id>`, icon and
-  count kept. The loader is `API.ItemLoader` (#74); sharing the chooser with Currencies is #74's other half. **No ammo, soul shards,
+  count kept. The loader is `API.ItemLoader` and the chooser `API.Picker` (#74, shared with GearScore and Ammo, and with Currencies). **No ammo, soul shards,
   healthstones or soulstones** (their own plugins, #66/#67). Hunters and warriors have no list, so
   no block (not registered when `UnitClass` reads plainly at load; a class unreadable then gets the
   block, hidden and offering nothing while it stays unreadable). Picks per character

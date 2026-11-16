@@ -112,143 +112,23 @@ local function amount(c)
 end
 
 --------------------------------------------------------------------------------
--- The chooser window: every currency, a checkbox to show it, Up/Down to
--- order the shown ones.
+-- The chooser window (API.Picker, #74): every currency, a checkbox to show
+-- it, Up/Down to order the shown ones; the unpicked ones by name.
 --------------------------------------------------------------------------------
 
-local win, rows = nil, {}
-local ROW_W, ROW_H = 340, 26
-
--- The rows: the shown ones first, in order (only those the client resolves),
--- then the rest by name. `shown` is that first part, as ids.
-local function entries()
-    local avail = available()
-    local byId = {}
-    for _, c in ipairs(avail) do byId[c.id] = c end
-    local list, shown, used = {}, {}, {}
-    for _, id in ipairs(picks(avail)) do
-        local c = byId[id] or info(id)
-        if c then
-            list[#list + 1] = c
-            shown[#shown + 1] = id
-            used[id] = true
-        end
-    end
-    for _, c in ipairs(avail) do
-        if not used[c.id] then list[#list + 1] = c end
-    end
-    return list, shown, used
-end
-
-local refreshWindow
-
--- Write `shown` (the visible order) back, keeping saved ids the client
--- doesn't resolve right now at the end, untouched.
-local function saveShown(shown)
-    local keep, inShown = {}, {}
-    for _, id in ipairs(shown) do inShown[id] = true; keep[#keep + 1] = id end
-    for _, id in ipairs(picks()) do
-        if not inShown[id] and not info(id) then keep[#keep + 1] = id end
-    end
-    setPicks(keep)
-    refreshWindow()
-end
-
-local function move(id, step)
-    local _, shown = entries()
-    for i, v in ipairs(shown) do
-        if v == id then
-            local j = i + step
-            if j >= 1 and j <= #shown then shown[i], shown[j] = shown[j], shown[i] end
-            break
-        end
-    end
-    saveShown(shown)
-end
-
-local function toggle(id, on)
-    local _, shown = entries()
-    local out = {}
-    for _, v in ipairs(shown) do
-        if v ~= id then out[#out + 1] = v end
-    end
-    if on then out[#out + 1] = id end
-    saveShown(out)
-end
-
-local function row(i)
-    if rows[i] then return rows[i] end
-    local r = CreateFrame("Frame", nil, win.content)
-    r:SetSize(ROW_W, ROW_H)
-    r:SetPoint("TOPLEFT", win.content, "TOPLEFT", 0, -(i - 1) * ROW_H)
-    r.check = CreateFrame("CheckButton", nil, r, "UICheckButtonTemplate")
-    r.check:SetSize(24, 24)
-    r.check:SetPoint("LEFT", r, "LEFT", 0, 0)
-    r.check:SetScript("OnClick", function(self) toggle(r.id, self:GetChecked() and true or false) end)
-    r.text = Glass.Font(r, 12, "LEFT")
-    r.text:SetPoint("LEFT", r.check, "RIGHT", 4, 0)
-    r.up = API.Button(r, "Up", 44, function() move(r.id, -1) end)
-    r.up:SetPoint("RIGHT", r, "RIGHT", -52, 0)
-    r.down = API.Button(r, "Down", 48, function() move(r.id, 1) end)
-    r.down:SetPoint("RIGHT", r, "RIGHT", -2, 0)
-    rows[i] = r
-    return r
-end
-
-refreshWindow = function()
-    if not win then return end
-    local list, shown, used = entries()
-    local pos = {}
-    for i, id in ipairs(shown) do pos[id] = i end
-    for i, c in ipairs(list) do
-        local r = row(i)
-        r.id = c.id
-        r.check:SetChecked(used[c.id] == true)
-        r.text:SetText(icon(c, 16) .. " " .. c.name .. "  |cffaaaaaa" .. amount(c) .. "|r")
-        r.up:SetShown(used[c.id] == true)
-        r.down:SetShown(used[c.id] == true)
-        r.up:SetEnabled(pos[c.id] ~= nil and pos[c.id] > 1)
-        r.down:SetEnabled(pos[c.id] ~= nil and pos[c.id] < #shown)
-        r:Show()
-    end
-    for i = #list + 1, #rows do rows[i]:Hide() end
-    win.content:SetHeight(math.max(#list, 1) * ROW_H)
-    win.empty:SetShown(#list == 0)
-end
-
--- Currency events come in bursts (login, loot): one refresh per frame.
-local refreshQueued = false
-local function queueRefresh()
-    if refreshQueued then return end
-    refreshQueued = true
-    C_Timer.After(0, function()
-        refreshQueued = false
-        if win and win:IsShown() then refreshWindow() end
-    end)
-end
-
-local function openWindow()
-    if not win then
-        win = API.Window("GlassPanelCurrenciesWindow", 400, 320)
-        win.title:SetText("Currencies on the bar")
-        win.hint:SetText("Tick to show, Up/Down to order. Expanded a header in the currency tab? Reopen this"
-            .. " window to see what it holds.")
-        local scroll = CreateFrame("ScrollFrame", nil, win, "UIPanelScrollFrameTemplate")
-        scroll:SetPoint("TOPLEFT", win.hint, "BOTTOMLEFT", 0, -8)
-        scroll:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -30, 42)
-        win.content = CreateFrame("Frame", nil, scroll)
-        win.content:SetSize(ROW_W, ROW_H)
-        scroll:SetScrollChild(win.content)
-        API.AutoHideScrollBar(scroll)
-        win.empty = Glass.Font(win.content, 12, "LEFT")
-        win.empty:SetPoint("TOPLEFT", win.content, "TOPLEFT", 4, -4)
-        win.empty:SetText("|cffaaaaaaNo currencies yet on this character.|r")
-        local close = API.Button(win, "Close", 90, function() win:Hide() end)
-        close:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -12, 10)
-    end
-    refreshWindow()
-    win:Show()
-end
+local picker = API.Picker({
+    name = "GlassPanelCurrenciesWindow",
+    title = "Currencies on the bar",
+    hint = "Tick to show, Up/Down to order. Expanded a header in the currency tab? Reopen this"
+        .. " window to see what it holds.",
+    empty = "|cffaaaaaaNo currencies yet on this character.|r",
+    items = available,
+    picks = picks,
+    resolve = info,
+    save = setPicks,
+    label = function(c) return icon(c, 16) .. " " .. c.name .. "  |cffaaaaaa" .. amount(c) .. "|r" end,
+})
+local openWindow = picker.Open
 
 --------------------------------------------------------------------------------
 -- The block
@@ -261,7 +141,7 @@ local block = GlassPanel.RegisterBlock({
     side = "right",
     order = 120,
     events = { "PLAYER_ENTERING_WORLD", "CURRENCY_DISPLAY_UPDATE" },
-    onEvent = function() if win and win:IsShown() then queueRefresh() end end,
+    onEvent = function() picker.RefreshSoon() end,
     -- nil hides the block: nothing picked.
     text = function()
         local parts = {}
@@ -296,5 +176,5 @@ local block = GlassPanel.RegisterBlock({
 })
 
 if block then
-    block._test = { available = available, picks = picks, window = function() return win end, rows = rows }
+    block._test = { available = available, picks = picks, window = picker.Window, rows = picker.rows }
 end
