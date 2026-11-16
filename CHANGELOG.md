@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `/gpanel` (the list of commands) and `/gpanel move`'s usage line show their choices, like `on|off` and `left|center|right`, correctly: the separators were swallowed and the text came out garbled.
+
 ## v1.0.2
 
 - Flight: the predicted times follow the current game build's flight paths (Undercity to Kargath is a few seconds shorter, for one).
