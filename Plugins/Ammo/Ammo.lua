@@ -150,36 +150,12 @@ end
 -- (the load events fire for every item). An arrival rescans.
 --------------------------------------------------------------------------------
 
-local pending, answered = {}, {}
-local LOAD_EVENTS = { "ITEM_DATA_LOAD_RESULT", "GET_ITEM_INFO_RECEIVED" }
-local loader = CreateFrame("Frame")
-local listening = false
-local function listen(on)
-    if on == listening then return end
-    listening = on
-    for _, e in ipairs(LOAD_EVENTS) do
-        if on then API.RegisterEvent(loader, e, "Ammo") else loader:UnregisterEvent(e) end
-    end
-end
-loader:SetScript("OnEvent", function(_, _, rawId)
-    local id = P(rawId)
-    if id and pending[id] then
-        pending[id] = nil
-        answered[id] = true
-        stale = true
-        GlassPanel.Refresh("ammo")
-    end
-    if next(pending) == nil then listen(false) end
+-- The shared loader (API.ItemLoader, #74). An answer rescans.
+local loader = API.ItemLoader("Ammo", function()
+    stale = true
+    GlassPanel.Refresh("ammo")
 end)
-
-local function request(id)
-    if pending[id] or answered[id] then return end
-    local ok, cached = pcall(C_Item.IsItemDataCachedByID, id)
-    if ok and P(cached) == true then return end   -- loaded: nothing more will come
-    pending[id] = true
-    C_Item.RequestLoadItemDataByID(id)
-    listen(true)
-end
+local request = loader.Request
 
 --------------------------------------------------------------------------------
 -- Reading the client
@@ -511,5 +487,5 @@ local block = GlassPanel.RegisterBlock({
 if block then
     block._test = { validate = validate, thresholds = thresholds, window = function() return win end,
                     state = current, save = save,
-                    pending = function() return pending end, answered = function() return answered end }
+                    pending = function() return loader.pending end, answered = function() return loader.answered end }
 end

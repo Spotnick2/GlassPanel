@@ -85,39 +85,17 @@ end
 -- too, and `failed` holds the ids whose load failed with still no icon.
 --------------------------------------------------------------------------------
 
-local pending, answered, failed = {}, {}, {}
+-- The shared loader (API.ItemLoader, #74). `failed`: Reagents' own rule, the
+-- ids whose load failed with still no icon.
+local failed = {}
 local knownIcon
-local LOAD_EVENTS = { "ITEM_DATA_LOAD_RESULT", "GET_ITEM_INFO_RECEIVED" }
-local loader = CreateFrame("Frame")
-local listening = false
 local refreshWindowSoon
-local function listen(on)
-    if on == listening then return end
-    listening = on
-    for _, e in ipairs(LOAD_EVENTS) do
-        if on then API.RegisterEvent(loader, e, "Reagents") else loader:UnregisterEvent(e) end
-    end
-end
-loader:SetScript("OnEvent", function(_, _, rawId, success)
-    local id = P(rawId)
-    if id and pending[id] then
-        pending[id] = nil
-        answered[id] = true
-        if P(success) == false and not knownIcon(id) then failed[id] = true end
-        GlassPanel.Refresh("reagents")
-        refreshWindowSoon()
-    end
-    if next(pending) == nil then listen(false) end
+local loader = API.ItemLoader("Reagents", function(id, success)
+    if success == false and not knownIcon(id) then failed[id] = true end
+    GlassPanel.Refresh("reagents")
+    refreshWindowSoon()
 end)
-
-local function request(id)
-    if pending[id] or answered[id] then return end
-    local ok, cached = pcall(C_Item.IsItemDataCachedByID, id)
-    if ok and P(cached) == true then return end   -- loaded: a missing name won't come
-    pending[id] = true
-    C_Item.RequestLoadItemDataByID(id)
-    listen(true)
-end
+local request = loader.Request
 
 -- The id's icon, or nil while the client has none for it: GetItemInfoInstant
 -- needs no item data, GetItemIconByID may.
@@ -232,7 +210,7 @@ end
 --------------------------------------------------------------------------------
 -- The chooser window: the class's reagents, a checkbox to show each, Up/Down
 -- to order the shown ones. (A copy of Currencies' chooser; sharing it, and
--- the name loader with GearScore, is #74.)
+-- the name loader with GearScore and Ammo, is #74: API.ItemLoader.)
 --------------------------------------------------------------------------------
 
 local win, rows = nil, {}
@@ -412,6 +390,6 @@ local block = GlassPanel.RegisterBlock({
 
 if block then
     block._test = { CLASS = CLASS, available = available, picks = picks, rows = rows,
-                    window = function() return win end, pending = function() return pending end,
-                    answered = function() return answered end, failed = function() return failed end }
+                    window = function() return win end, pending = function() return loader.pending end,
+                    answered = function() return loader.answered end, failed = function() return failed end }
 end

@@ -154,49 +154,26 @@ end
 -- items; score = their total (nil: not known, never a made-up 0);
 -- loading / unreadable = items left out; unscored = equipped items the
 -- formula has no score for (their quality has none).
--- pending: item ids asked for and not answered; failed: ids whose load failed.
+-- loader: the item ids asked for (API.ItemLoader, #74); one whose load failed
+-- reads unreadable until the gear changes.
 local state = { items = {}, score = nil, loading = 0, unreadable = 0, unscored = 0 }
-local pending, failed = {}, {}
 local stale = true
 
--- The load events, on our own frame, only while something of ours loads.
-local LOAD_EVENTS = { "ITEM_DATA_LOAD_RESULT", "GET_ITEM_INFO_RECEIVED" }
-local loader = CreateFrame("Frame")
-local listening = false
-local function listen(on)
-    if on == listening then return end
-    listening = on
-    for _, e in ipairs(LOAD_EVENTS) do
-        if on then API.RegisterEvent(loader, e, "GearScore") else loader:UnregisterEvent(e) end
-    end
-end
-loader:SetScript("OnEvent", function(_, _, rawId, success)
-    local id = P(rawId)
-    if id and pending[id] then
-        pending[id] = nil
-        if P(success) == false then failed[id] = true end
-        stale = true
-        GlassPanel.Refresh("gearscore")
-    end
-    if next(pending) == nil then listen(false) end
+-- An answer rescans.
+local loader = API.ItemLoader("GearScore", function()
+    stale = true
+    GlassPanel.Refresh("gearscore")
 end)
-
--- Ask for an item once; its answer rescans.
-local function request(id)
-    if pending[id] then return end
-    pending[id] = true
-    C_Item.RequestLoadItemDataByID(id)
-    listen(true)
-end
 
 -- One slot: "empty", "loading" (requested), "unreadable", or the item.
 local function readSlot(slot)
     local rawId = GetInventoryItemID("player", slot)
     local id = P(rawId)
     if not id then return API.Returned(rawId) and "unreadable" or "empty" end
-    if failed[id] then return "unreadable" end
-    if pending[id] or P(C_Item.IsItemDataCachedByID(id)) ~= true then
-        request(id)
+    local loading = loader.State(id)
+    if loading == "failed" then return "unreadable" end
+    if loading == "pending" or P(C_Item.IsItemDataCachedByID(id)) ~= true then
+        loader.Request(id)
         return "loading"
     end
     local link = P(GetInventoryItemLink("player", slot))
@@ -207,7 +184,7 @@ local function readSlot(slot)
     local quality, level = P(rawQuality), P(rawLevel)
     if API.IsSecret(rawQuality) or API.IsSecret(rawLevel) then return "unreadable" end
     if type(quality) ~= "number" or type(level) ~= "number" then
-        request(id)   -- evicted since the cache check
+        loader.Request(id, true)   -- evicted since the cache check
         return "loading"
     end
     local _, _, _, rawLoc = C_Item.GetItemInfoInstant(id)
@@ -293,7 +270,7 @@ GlassPanel.RegisterBlock({
         if event == "PLAYER_AVG_ITEM_LEVEL_UPDATE" then return end
         -- Gear changed: rescan, and ask again for what didn't load before.
         stale = true
-        pending, failed = {}, {}
+        loader.Reset()
     end,
     text = function()
         ensure()
