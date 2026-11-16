@@ -289,6 +289,24 @@ WoW.now = WoW.now + 1
 plate(1, g1); plate(2, g2)
 eq(textOf("layer"), GREY_Q, "old nameplates back after the move: no vote")
 WoW.units, WoW.timers = {}, {}
+-- A second move within the 10 s keeps the first move's creatures out until
+-- their own 10 s are up, even when they're out of view at the second (#140).
+WoW.fire("ZONE_CHANGED_NEW_AREA")
+local o1, o2 = npc(9300), npc(9300)
+plate(1, o1); plate(2, o2)
+check(textOf("layer") ~= GREY_Q, "baseline: known")
+WoW.units = {}
+local t1 = WoW.now
+WoW.fire("SHARD_TRANSFER")
+WoW.now = t1 + 3
+WoW.fire("SHARD_TRANSFER"); WoW.tick()
+WoW.now = t1 + 4
+plate(1, o1); plate(2, o2)
+eq(textOf("layer"), GREY_Q, "4 s after the first move: its creatures still don't vote")
+WoW.now = t1 + 11
+plate(1, o1); plate(2, o2)
+check(textOf("layer") ~= GREY_Q, "11 s after the first move: they vote again")
+WoW.units, WoW.timers = {}, {}
 
 check(next(GlassPanel.failures) == nil, "no failures")
 done("test_layer")
