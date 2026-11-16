@@ -1,53 +1,62 @@
 -- Plugins/Layer/Layer.lua: which layer of the realm you're on (#17), read
--- from the GUIDs of the creatures around you, like TitanLayer (without its
+-- from the GUIDs of the creatures around you (without TitanLayer's
 -- NovaWorldBuffs listener, #26, and without the chat announce).
 --
--- Forever notes:
--- - A creature's GUID is "Creature-0-<server>-<instance>-<zone>-<npc>-<spawn>";
---   the zone field tells the layers apart (measured on 70009:
---   Creature-0-4621-0-76067-5624-0008392ED7). Players and pets aren't
---   "Creature", so they never count.
--- - Seen from the target, the mouseover and nameplates. A GUID may come back
---   secret (UnitGUID takes a PvP-restricted token): API.Plain plus the type
---   check skip it, so readable GUIDs still count in combat. Not on a taxi or
---   in an instance (those creatures aren't on your layer).
--- - A creature's own map can't be read, only the player's, and a nameplate
---   or mouseover may be across a zone border. So a zone id is filed under
---   the player's map only from the target or mouseover (you're pointing at
---   it), never when that id is already known on another map (zone ids are
---   per zone); nameplates only confirm an id already known on this map.
--- - The number is the rank of your zone id among the ids seen on the SAME map
---   (C_Map.GetBestMapForUnit), sorted ascending: "2" means the second-lowest
---   id seen here. TitanLayer ranked across every zone, which made it
---   meaningless. The numbers are local: nothing on the client says how many
---   layers exist, so a newly seen lower id renumbers yours, and another
---   player's "2" may be your "1" (#26, sharing sightings, would fix that).
---   Known ids live in GlassPanelLayerDB.realms[realm][uiMapID][zoneId] =
+-- Forever notes (#138; measured on live Forever by LayerSwap, 9 Nov 2026,
+-- References\Addons\Miscellaneous\LayerSwap; LayerETA reads it the same way):
+-- - A creature's GUID is "Creature-0-<server>-<instance>-<zoneUID>-<npc>-<spawn>";
+--   the layer is the <server> field. The zoneUID (which #17 keyed on) differs
+--   between two players on one layer and changes when the world refreshes.
+--   Players and pets aren't "Creature"; totems and guardians are, but carry
+--   the place they were summoned (UnitPlayerControlled), so they never count.
+-- - One creature isn't proof: each GUID votes once, and of the last VOTES
+--   votes 2 must agree to set a layer, 3 to change a known one (a pair of
+--   patrols from the next zone mustn't flip it). Target, mouseover and
+--   nameplates all vote. A GUID may come back secret (UnitGUID takes a
+--   PvP-restricted token): API.Plain plus the type check skip it, so readable
+--   GUIDs still count in combat. Not on a taxi or in an instance.
+-- - The game moves a player with SHARD_TRANSFER (a group join on another
+--   layer, a world refresh). The units in view then still carry the old layer
+--   for a few seconds (LayerSwap: 17 s of the old layer from nameplates read
+--   0.3 s after a move), so they don't vote for STALE seconds, and what's on
+--   screen is read again a few times.
+-- - Layers are a zone's: they're filed under the zone-level map (a cave or a
+--   building has a uiMapID of its own). The number is the rank of your layer
+--   id among the ids seen in the SAME zone, ascending: "2" means the
+--   second-lowest id seen here. The numbers are local: nothing on the client
+--   says how many layers exist, so a newly seen lower id renumbers yours, and
+--   another player's "2" may be your "1" (#26, sharing sightings, would fix
+--   that). Known ids live in GlassPanelLayerDB.realms[realm][zoneMap][id] =
 --   GetServerTime() of the last sighting, forgotten after 2 hours.
--- - The current layer holds only while C_Map.GetBestMapForUnit("player") is
---   the map it was seen on (checked at every read: a uiMapID change may come
---   with ZONE_CHANGED / ZONE_CHANGED_INDOORS rather than ZONE_CHANGED_NEW_AREA).
--- - A group change, a new map or a phase change may move you: the current
---   layer is unknown again until the next creature is seen. After a group
---   change the hop comes a little later with no event, so the target and
---   nameplates are read again a few times. They're also read again when you
---   log in or reload, leave combat and land from a taxi.
+-- - The current layer holds only while the player is in the zone it was seen
+--   in (checked at every read: a zone change may come with ZONE_CHANGED /
+--   ZONE_CHANGED_INDOORS rather than ZONE_CHANGED_NEW_AREA).
 
 GlassPanel = GlassPanel or {}
 local API = GlassPanel.API
 local P = API.Plain
 
 local ADDON = "GlassPanelLayer"
+local FORMAT = 2            -- GlassPanelLayerDB.v: 2 = server ids (#138); older saves held zoneUIDs
 local EXPIRE = 7200         -- layers are reshuffled on restarts; a sighting counts for 2 h
-local REGROUP = { 5, 15, 30 }  -- seconds after a group change to look again
+local VOTES = 5             -- the last votes kept
+local STALE = 10            -- seconds the units in view at a move don't vote
+local AFTER_MOVE = { 2, 5, STALE + 2 }  -- seconds after a move to read what's on screen again
 local PLATES = 40
+local ZONE_TYPE = 3         -- Enum.UIMapType.Zone (MapConstantsDocumentation.lua)
+local MAP_DEPTH = 6
 
--- realms[realm][uiMapID][zoneId] = server time last seen. A session table
+-- realms[realm][zoneMap][layerId] = server time last seen. A session table
 -- until our SavedVariables load (ADDON_LOADED), then GlassPanelLayerDB.realms.
 local realms = {}
--- The current layer: its zone id and the map it was seen on (nil: unknown).
-local current = { zone = nil, map = nil }
--- The sorted, unexpired ids of one map, kept until something changes.
+-- The current layer: its id and the zone map it was seen in (nil: unknown).
+local current = { layer = nil, map = nil }
+-- The last VOTES layer ids read, the GUIDs that voted (once each), and the
+-- zone map they were read in.
+local votes, voted, votesMap = {}, {}, nil
+-- GUIDs in view at a move: they don't vote until untilAt (GetTime()).
+local stale = { untilAt = nil, guid = {} }
+-- The sorted, unexpired ids of one zone, kept until something changes.
 local cache = { realm = nil, map = nil, list = nil, validUntil = nil }
 
 -- nil when unreadable: never a made-up 0.
@@ -61,7 +70,7 @@ local function realm()
     return type(r) == "string" and r or "?"
 end
 
--- This realm's maps (created on first use).
+-- This realm's zones (created on first use).
 local function maps()
     local r = realm()
     realms[r] = realms[r] or {}
@@ -70,18 +79,18 @@ end
 
 local function invalidate() cache.realm, cache.map, cache.list, cache.validUntil = nil, nil, nil, nil end
 
--- Forget what's older than EXPIRE on one map (and the map once empty).
+-- Forget what's older than EXPIRE in one zone (and the zone once empty).
 local function prune(map, t)
     local all = maps()
     local ids = all[map]
     if not ids then return end
-    for zone, seen in pairs(ids) do
-        if t - seen >= EXPIRE then ids[zone] = nil end
+    for id, seen in pairs(ids) do
+        if t - seen >= EXPIRE then ids[id] = nil end
     end
     if next(ids) == nil then all[map] = nil end
 end
 
--- The zone ids seen on a map and not expired, ascending: the layer numbers.
+-- The layer ids seen in a zone and not expired, ascending: the layer numbers.
 -- nil when the time can't be read (expiry can't be judged).
 local function layers(map)
     local t = now()
@@ -89,9 +98,9 @@ local function layers(map)
     local r = realm()
     if cache.realm == r and cache.map == map and cache.list and t < cache.validUntil then return cache.list end
     local list, oldest = {}, nil
-    for zone, seen in pairs(maps()[map] or {}) do
+    for id, seen in pairs(maps()[map] or {}) do
         if t - seen < EXPIRE then
-            list[#list + 1] = zone
+            list[#list + 1] = id
             if not oldest or seen < oldest then oldest = seen end
         end
     end
@@ -101,72 +110,117 @@ local function layers(map)
     return list
 end
 
-local function rank(map, zone)
-    for i, z in ipairs(layers(map) or {}) do
-        if z == zone then return i end
+local function rank(map, id)
+    for i, l in ipairs(layers(map) or {}) do
+        if l == id then return i end
     end
     return nil
 end
 
--- The player's uiMapID now, or nil.
+-- The zone-level map the player is in, or nil: the uiMapID walked up its
+-- parents to the Zone map. A map with no Zone above it stays itself.
 local function liveMap()
-    local m = P(C_Map.GetBestMapForUnit("player"))
-    return type(m) == "number" and m or nil
+    local id = P(C_Map.GetBestMapForUnit("player"))
+    if type(id) ~= "number" or id <= 0 then return nil end
+    local zoneType = Enum and Enum.UIMapType and P(Enum.UIMapType.Zone)
+    if type(zoneType) ~= "number" then zoneType = ZONE_TYPE end
+    local m = id
+    for _ = 1, MAP_DEPTH do
+        local info = C_Map.GetMapInfo(m)
+        if type(info) ~= "table" then break end
+        local kind, up = P(info.mapType), P(info.parentMapID)
+        if type(kind) ~= "number" then break end
+        if kind == zoneType then return m end
+        if kind < zoneType or type(up) ~= "number" or up <= 0 then break end
+        m = up
+    end
+    return id
 end
 
--- The current layer's zone id, only while you're still on the map it was
--- seen on: a map change doesn't always come with ZONE_CHANGED_NEW_AREA.
-local function currentZone(map)
-    if current.zone and map and current.map == map then return current.zone end
+-- The current layer's id, only while you're still in the zone it was seen
+-- in: a zone change doesn't always come with ZONE_CHANGED_NEW_AREA.
+local function currentLayer(map)
+    if current.layer and map and current.map == map then return current.layer end
     return nil
 end
 
-local function zoneOf(unit)
+-- The layer a unit's GUID tells, and the GUID; nil when it tells none.
+local function layerOf(unit)
     local guid = P(UnitGUID(unit))
     if type(guid) ~= "string" then return nil end
-    local unitType, _, _, _, zone = strsplit("-", guid)
-    if unitType ~= "Creature" then return nil end
-    return tonumber(zone)
+    local kind, _, server = strsplit("-", guid)
+    if kind ~= "Creature" and kind ~= "Vehicle" then return nil end
+    if P(UnitPlayerControlled(unit)) == true then return nil end
+    local id = tonumber(server)
+    if not id or id <= 0 then return nil end
+    return id, guid
 end
 
--- Is this zone id known, unexpired, on another map of this realm?
-local function elsewhere(zone, map, t)
-    for m, ids in pairs(maps()) do
-        if m ~= map and ids[zone] and t - ids[zone] < EXPIRE then return true end
-    end
-    return false
+local function forget()
+    current.layer, current.map = nil, nil
+    votes, voted, votesMap = {}, {}, nil
 end
 
--- Look at one unit; true when it told us the layer. `confirmOnly`: accept
--- only an id already known on this map (nameplates).
-local function see(unit, confirmOnly)
-    unit = P(unit)
-    if type(unit) ~= "string" then return false end
-    if P(UnitOnTaxi("player")) == true or P(IsInInstance()) == true then return false end
-    if P(UnitIsPlayer(unit)) == true then return false end
-    local zone = zoneOf(unit)
-    local map = liveMap()
-    local t = now()
-    if not zone or not map or not t then return false end
+-- File a sighting of the current layer.
+local function file(map, id, t)
     local all = maps()
-    local known = all[map] and all[map][zone] and t - all[map][zone] < EXPIRE
-    if not known and (confirmOnly or elsewhere(zone, map, t)) then return false end
+    local known = all[map] and all[map][id] and t - all[map][id] < EXPIRE
     all[map] = all[map] or {}
-    all[map][zone] = t
+    all[map][id] = t
     prune(map, t)
     if not known then invalidate() end
-    current.zone, current.map = zone, map
-    return true
 end
 
-local function forget() current.zone, current.map = nil, nil end
+-- Look at one unit: its creature votes once for the layer it carries.
+local function see(unit)
+    unit = P(unit)
+    if type(unit) ~= "string" then return end
+    if P(UnitOnTaxi("player")) == true or P(IsInInstance()) == true then return end
+    if P(UnitIsPlayer(unit)) == true then return end
+    local id, guid = layerOf(unit)
+    local map, t = liveMap(), now()
+    if not id or not map or not t then return end
+    if stale.untilAt and GetTime() < stale.untilAt and stale.guid[guid] then return end
+    -- Another zone than the votes were cast in: they were about that zone.
+    if votesMap ~= map then forget(); votesMap = map end
+    if voted[guid] then return end
+    voted[guid] = true
+    votes[#votes + 1] = id
+    if #votes > VOTES then table.remove(votes, 1) end
+    if currentLayer(map) == id then file(map, id, t) return end
+    local count = 0
+    for _, v in ipairs(votes) do if v == id then count = count + 1 end end
+    if count >= (current.layer and 3 or 2) then
+        current.layer, current.map = id, map
+        file(map, id, t)
+    end
+end
 
--- Read again what's already on screen (no event fires for it): the target
--- first, then the mouseover, then nameplates; the first that answers wins.
+-- Read what's already on screen again (no event fires for it).
 local function rescan()
-    if see("target") or see("mouseover") then return end
-    for i = 1, PLATES do
-        if see("nameplate" .. i, true) then return end
+    see("target")
+    see("mouseover")
+    for i = 1, PLATES do see("nameplate" .. i) end
+end
+
+-- The game moved us: unknown, the creatures in view are the old layer's for
+-- STALE seconds, and what's on screen is read again a few times.
+local function moved()
+    forget()
+    local guids = {}
+    local function add(unit)
+        local guid = P(UnitGUID(unit))
+        if type(guid) == "string" then guids[guid] = true end
+    end
+    add("target")
+    add("mouseover")
+    for i = 1, PLATES do add("nameplate" .. i) end
+    stale.untilAt, stale.guid = GetTime() + STALE, guids
+    for _, s in ipairs(AFTER_MOVE) do
+        C_Timer.After(s, function()
+            rescan()
+            GlassPanel.Refresh("layer")
+        end)
     end
 end
 
@@ -176,18 +230,20 @@ local function load()
     local db = rawget(_G, "GlassPanelLayerDB")
     if type(db) ~= "table" then db = {} end
     db.maps = nil   -- the pre-release format, without realms
+    if db.v ~= FORMAT then db.realms = nil end   -- zoneUIDs (#17), not layers
+    db.v = FORMAT
     local saved, t = type(db.realms) == "table" and db.realms or {}, now()
     local clean = {}
     for r, rmaps in pairs(saved) do
         if type(r) == "string" and type(rmaps) == "table" then
             for map, ids in pairs(rmaps) do
                 if type(map) == "number" and type(ids) == "table" then
-                    for zone, seen in pairs(ids) do
+                    for id, seen in pairs(ids) do
                         -- Unreadable time: keep it all, the next sighting prunes.
-                        if type(zone) == "number" and type(seen) == "number" and (not t or t - seen < EXPIRE) then
+                        if type(id) == "number" and type(seen) == "number" and (not t or t - seen < EXPIRE) then
                             clean[r] = clean[r] or {}
                             clean[r][map] = clean[r][map] or {}
-                            clean[r][map][zone] = seen
+                            clean[r][map][id] = seen
                         end
                     end
                 end
@@ -198,25 +254,13 @@ local function load()
         for map, ids in pairs(rmaps) do
             clean[r] = clean[r] or {}
             clean[r][map] = clean[r][map] or {}
-            for zone, seen in pairs(ids) do clean[r][map][zone] = seen end
+            for id, seen in pairs(ids) do clean[r][map][id] = seen end
         end
     end
     realms = clean
     db.realms = realms
     GlassPanelLayerDB = db
     invalidate()
-end
-
--- A group change: unknown now, and look again while the hop happens.
-local function regroup()
-    forget()
-    for _, s in ipairs(REGROUP) do
-        C_Timer.After(s, function()
-            forget()
-            rescan()
-            GlassPanel.Refresh("layer")
-        end)
-    end
 end
 
 -- "12 min", "1 h 05".
@@ -234,7 +278,7 @@ GlassPanel.RegisterBlock({
     order = 180,
     events = { "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_CONTROL_GAINED",
                "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED",
-               "GROUP_JOINED", "GROUP_LEFT", "ZONE_CHANGED_NEW_AREA", "ZONE_CHANGED", "ZONE_CHANGED_INDOORS",
+               "SHARD_TRANSFER", "ZONE_CHANGED_NEW_AREA", "ZONE_CHANGED", "ZONE_CHANGED_INDOORS",
                "UNIT_PHASE" },
     unitEvents = { UNIT_PHASE = "player" },
     onEvent = function(_, event, arg)
@@ -242,15 +286,15 @@ GlassPanel.RegisterBlock({
             if arg == ADDON then load() end
         elseif event == "PLAYER_TARGET_CHANGED" then see("target")
         elseif event == "UPDATE_MOUSEOVER_UNIT" then see("mouseover")
-        elseif event == "NAME_PLATE_UNIT_ADDED" then see(arg, true)
+        elseif event == "NAME_PLATE_UNIT_ADDED" then see(arg)
+        elseif event == "SHARD_TRANSFER" then
+            moved()
         elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_ENABLED"
             or event == "PLAYER_CONTROL_GAINED" then
             rescan()
-        elseif event == "GROUP_JOINED" or event == "GROUP_LEFT" then
-            regroup()
         elseif event == "ZONE_CHANGED" or event == "ZONE_CHANGED_INDOORS" then
-            -- Mostly subzones (same map): only a new uiMapID resets it.
-            if current.zone and current.map ~= liveMap() then
+            -- Mostly subzones (same zone): only a new zone map resets it.
+            if current.layer and current.map ~= liveMap() then
                 forget()
                 rescan()
             end
@@ -260,47 +304,48 @@ GlassPanel.RegisterBlock({
     end,
     text = function()
         local map = liveMap()
-        local zone = currentZone(map)
-        local n = zone and rank(map, zone)
+        local id = currentLayer(map)
+        local n = id and rank(map, id)
         return n and tostring(n) or "|cff888888?|r"
     end,
     tooltip = function(_, tt)
         tt:AddLine("Layer")
         local map = liveMap()
-        local cur = currentZone(map)
+        local cur = currentLayer(map)
         local list = map and layers(map) or {}
         local n
-        for i, zone in ipairs(list) do if zone == cur then n = i end end
+        for i, id in ipairs(list) do if id == cur then n = i end end
         if n then
-            tt:AddDoubleLine("Current layer", n .. "  |cff888888(zone " .. cur .. ")|r", 1, 0.82, 0, 1, 1, 1)
+            tt:AddDoubleLine("Current layer", n .. "  |cff888888(id " .. cur .. ")|r", 1, 0.82, 0, 1, 1, 1)
         else
             tt:AddDoubleLine("Current layer", "unknown", 1, 0.82, 0, 0.7, 0.7, 0.7)
         end
         local t = now()
         if #list > 0 and t then
             tt:AddLine(" ")
-            tt:AddLine("Layers seen on this map")
+            tt:AddLine("Layers seen in this zone")
             local ids = maps()[map]
-            for i, zone in ipairs(list) do
-                local mark = zone == cur and "|cff40ff40> |r" or ""
-                tt:AddDoubleLine(mark .. "Layer " .. i, "zone " .. zone .. ", " .. age(t - ids[zone]) .. " ago",
+            for i, id in ipairs(list) do
+                local mark = id == cur and "|cff40ff40> |r" or ""
+                tt:AddDoubleLine(mark .. "Layer " .. i, "id " .. id .. ", " .. age(t - ids[id]) .. " ago",
                     1, 1, 1, 0.7, 0.7, 0.7)
             end
         end
         tt:AddLine(" ")
-        tt:AddLine("Target or mouse over an NPC to detect your layer.", 0.7, 0.7, 0.7, true)
+        tt:AddLine("Detected from the NPCs around you (target, mouseover, nameplates): two must agree.",
+            0.7, 0.7, 0.7, true)
         tt:AddLine("Numbers count the layers you've seen here; others may number them differently.",
             0.7, 0.7, 0.7, true)
-        tt:AddLine("Left-click: forget this map's layers", 0.3, 1, 0.3)
+        tt:AddLine("Left-click: forget this zone's layers", 0.3, 1, 0.3)
     end,
     onClick = function(_, button)
         if button ~= "LeftButton" then return end
-        -- The map you're on, not the one the last sighting was on.
+        -- The zone you're in, not the one the last sighting was in.
         local map = liveMap()
         if map then maps()[map] = nil end
         invalidate()
         forget()
-        API.Print("Layer: forgot the layers seen on this map.")
+        API.Print("Layer: forgot the layers seen in this zone.")
         GlassPanel.Refresh("layer")
     end,
 })

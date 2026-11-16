@@ -1,4 +1,4 @@
--- The Layer plugin (#17).
+-- The Layer plugin (#17, #138: the layer is the creature GUID's server field).
 dofile("tests/wow_stubs.lua")
 dofile("tests/harness.lua")
 
@@ -8,267 +8,260 @@ local function tip()
     b._scripts.OnEnter(b)
     return table.concat(GameTooltip._lines, "\n")
 end
-local function creature(zone) return "Creature-0-4621-0-" .. zone .. "-5624-0008392ED7" end
-local function target(guid, isPlayer)
-    WoW.units.target = { guid = guid, isPlayer = isPlayer }
+-- A new creature on a layer: its own spawn and its own zoneUID, which says
+-- nothing about the layer (#138).
+local spawn = 0
+local function npc(layer, kind)
+    spawn = spawn + 1
+    return string.format("%s-0-%d-0-%d-5624-%010X", kind or "Creature", layer, 76000 + spawn, spawn)
+end
+local function target(guid, opts)
+    WoW.units.target = { guid = guid, isPlayer = opts and opts.isPlayer, controlled = opts and opts.controlled }
     WoW.fire("PLAYER_TARGET_CHANGED"); WoW.tick()
 end
+local function plate(i, guid)
+    WoW.units["nameplate" .. i] = { guid = guid }
+    WoW.fire("NAME_PLATE_UNIT_ADDED", "nameplate" .. i); WoW.tick()
+end
+-- Two creatures that agree: enough while the layer is unknown.
+local function seen(layer) target(npc(layer)); plate(1, npc(layer)) end
 
--- Saved from an earlier session: one fresh layer on this map, one expired,
--- one malformed entry.
 local T = WoW.serverTime
--- This realm's saved maps.
+-- This realm's saved zones.
 local function DB() return GlassPanelLayerDB.realms[WoW.realm] end
-GlassPanelLayerDB = { maps = { [1429] = { [77] = T } }, realms = {
+
+-- Saves from before #138 hold zoneUIDs, not layers: dropped once.
+GlassPanelLayerDB = { maps = { [1429] = { [77] = T } }, realms = { Doomhowl = { [1429] = { [76067] = T } } } }
+loadAddon()
+eq(GlassPanelLayerDB.v, 2, "format stamped")
+eq(GlassPanelLayerDB.maps, nil, "the pre-release realm-less format is dropped")
+eq(next(GlassPanelLayerDB.realms), nil, "zoneUID sightings dropped")
+
+-- Saved in this format: one fresh layer here, one expired, one malformed entry.
+GlassPanelLayerDB = { v = 2, realms = {
     Doomhowl = {
-        [1429] = { [50] = T - 600, [9] = T - 7200 },
+        [1429] = { [5000] = T - 600, [4000] = T - 7200 },
         [1453] = "junk",
     },
-    -- Another realm's ids on the same map: never ranked with ours.
-    Soulseeker = { [1429] = { [20] = T - 60, [30] = T - 60 } },
+    -- Another realm's ids in the same zone: never ranked with ours.
+    Soulseeker = { [1429] = { [100] = T - 60, [200] = T - 60 } },
 } }
-
 loadAddon()
 eq(textOf("layer"), GREY_Q, "unknown until a creature is seen")
-check(tip():find("Target or mouse over an NPC to detect your layer.", 1, true), "hint")
+check(tip():find("two must agree", 1, true), "hint")
 check(tip():find("Current layer\tunknown", 1, true), "tooltip: unknown")
-eq(DB()[1429][9], nil, "expired entry pruned at load")
-eq(DB()[1429][50], T - 600, "fresh entry kept")
+eq(DB()[1429][4000], nil, "expired entry pruned at load")
+eq(DB()[1429][5000], T - 600, "fresh entry kept")
 eq(DB()[1453], nil, "malformed entry dropped")
-eq(GlassPanelLayerDB.maps, nil, "the pre-release realm-less format is dropped")
-eq(GlassPanelLayerDB.realms.Soulseeker[1429][20], T - 60, "other realms kept")
+eq(GlassPanelLayerDB.realms.Soulseeker[1429][100], T - 60, "other realms kept")
 
--- Target: ranked among the zone ids known on this map (50 < 76067).
-target(creature(76067))
-eq(textOf("layer"), "2", "target: second-lowest zone id seen here (this realm only)")
-eq(DB()[1429][76067], T, "sighting saved with the server time")
+-- One creature isn't proof; a second that agrees is (any zoneUIDs).
+target(npc(6843))
+eq(textOf("layer"), GREY_Q, "one creature: not yet")
+eq(DB()[1429][6843], nil, "and nothing filed")
+WoW.fire("PLAYER_TARGET_CHANGED"); WoW.tick()
+eq(textOf("layer"), GREY_Q, "the same creature again doesn't vote twice")
+plate(1, npc(6843))
+eq(textOf("layer"), "2", "two agree: second-lowest id seen here (5000 < 6843, this realm only)")
+eq(DB()[1429][6843], T, "sighting saved with the server time")
 
--- Mouseover: a lower id seen, so that's layer 1 now.
-WoW.units.mouseover = { guid = creature(18) }
-WoW.fire("UPDATE_MOUSEOVER_UNIT"); WoW.tick()
-eq(textOf("layer"), "1", "mouseover detected")
-
--- Nameplate (the unit token comes with the event): it confirms an id
--- already known on this map...
-WoW.units.nameplate3 = { guid = creature(76067) }
-WoW.fire("NAME_PLATE_UNIT_ADDED", "nameplate3"); WoW.tick()
-eq(textOf("layer"), "3", "nameplate detected: third of 18, 50, 76067")
--- ...but never adds one: it may be across a zone border.
-WoW.units.nameplate4 = { guid = creature(12) }
-WoW.fire("NAME_PLATE_UNIT_ADDED", "nameplate4"); WoW.tick()
-eq(textOf("layer"), "3", "a new id on a nameplate: ignored")
-eq(DB()[1429][12], nil, "and not saved")
+-- Changing a known layer takes 3 of the last 5.
 WoW.serverTime = T + 90
+plate(2, npc(4500))
+plate(3, npc(4500))
+eq(textOf("layer"), "2", "two for another layer: kept (a pair of patrols)")
+plate(4, npc(4500))
+eq(textOf("layer"), "1", "three of five: the new layer (4500 < 5000 < 6843)")
 local t = tip()
-check(t:find("Current layer\t3  |cff888888(zone 76067)|r", 1, true), "tooltip: current layer and zone id")
-check(t:find("Layer 1\tzone 18, 1 min ago", 1, true), "tooltip: known layers with age")
-check(t:find("Layer 2\tzone 50, 11 min ago", 1, true), "tooltip: saved layer listed")
-check(t:find("> |rLayer 3", 1, true), "tooltip marks the current layer")
+check(t:find("Current layer\t1  |cff888888(id 4500)|r", 1, true), "tooltip: current layer and id")
+check(t:find("Layer 2\tid 5000, 11 min ago", 1, true), "tooltip: saved layer listed with age")
+check(t:find("Layer 3\tid 6843, 1 min ago", 1, true), "tooltip: earlier layer listed")
+check(t:find("> |rLayer 1", 1, true), "tooltip marks the current layer")
+-- Mouseover votes too, and a sighting of the current layer refreshes it.
+WoW.serverTime = T + 120
+WoW.units.mouseover = { guid = npc(4500) }
+WoW.fire("UPDATE_MOUSEOVER_UNIT"); WoW.tick()
+eq(DB()[1429][4500], T + 120, "mouseover: current layer seen again")
 
--- Not detected: secret GUIDs, players, pets, and nothing on a taxi, in an
--- instance or in combat.
-target(creature(18))
-eq(textOf("layer"), "1", "baseline")
-WoW.fire("GROUP_JOINED", 1, "Party-1"); WoW.tick()
-eq(textOf("layer"), GREY_Q, "group joined: unknown again")
-target("secret")
-eq(textOf("layer"), GREY_Q, "secret GUID skipped")
--- A client secret keeps its type: a secret GUID is still a "string".
-local secretGuid = creature(424242)
-WoW.MarkSecret(secretGuid)
-target(secretGuid)
-eq(textOf("layer"), GREY_Q, "secret string GUID skipped")
-eq(DB()[1429][424242], nil, "and not saved")
-target("Player-4621-0A1B2C3D", true)
-eq(textOf("layer"), GREY_Q, "player skipped")
-target("Pet-0-4621-0-76067-416-0100000001")
-eq(textOf("layer"), GREY_Q, "pet skipped")
-target(creature(76067), true)
-eq(textOf("layer"), GREY_Q, "UnitIsPlayer skipped")
-WoW.layer.taxi = true
-target(creature(76067))
-eq(textOf("layer"), GREY_Q, "not on a taxi")
-WoW.layer.taxi, WoW.layer.instance = false, true
-target(creature(76067))
-eq(textOf("layer"), GREY_Q, "not in an instance")
-WoW.layer.instance = false
--- A readable GUID counts in combat too (only a secret one is skipped).
-local inCombat = InCombatLockdown
-InCombatLockdown = function() return true end
-target(creature(76067))
-InCombatLockdown = inCombat
-eq(textOf("layer"), "3", "readable in combat: counted")
-
--- Resets: group left, phase change for the player (not for others).
-WoW.fire("GROUP_LEFT", 1, "Party-1"); WoW.tick()
-eq(textOf("layer"), GREY_Q, "group left: unknown")
-WoW.timers = {}
-target(creature(76067))
-WoW.fire("UNIT_PHASE", "party1"); WoW.tick()
-eq(textOf("layer"), "3", "someone else's phase change: kept")
+-- Not counted: secret GUIDs, players, pets, totems and guardians, and
+-- nothing on a taxi or in an instance.
 WoW.fire("UNIT_PHASE", "player"); WoW.tick()
 eq(textOf("layer"), GREY_Q, "own phase change: unknown")
+WoW.fire("UNIT_PHASE", "party1"); WoW.tick()
+local function oneThen(guid, opts, what)
+    target(guid, opts)
+    plate(5, npc(7777))
+    eq(textOf("layer"), GREY_Q, what)
+    WoW.fire("UNIT_PHASE", "player"); WoW.tick()
+end
+oneThen(npc(7777), { controlled = true }, "a player-controlled creature (totem) doesn't vote")
+oneThen("Player-4621-0A1B2C3D", { isPlayer = true }, "a player doesn't vote")
+oneThen("Pet-0-7777-0-76067-416-0100000001", nil, "a pet doesn't vote")
+oneThen(npc(7777), { isPlayer = true }, "UnitIsPlayer doesn't vote")
+oneThen("secret", nil, "a secret GUID doesn't vote")
+-- A client secret keeps its type: a secret GUID is still a "string".
+local secretGuid = npc(7777)
+WoW.MarkSecret(secretGuid)
+oneThen(secretGuid, nil, "a secret string GUID doesn't vote")
+oneThen(npc(0), nil, "a zero server id doesn't vote")
+WoW.layer.taxi = true
+oneThen(npc(7777), nil, "not on a taxi")
+WoW.layer.taxi, WoW.layer.instance = false, true
+target(npc(7777)); plate(5, npc(7777))
+eq(textOf("layer"), GREY_Q, "not in an instance")
+WoW.layer.instance = false
+-- Vehicles are creatures too; a readable GUID counts in combat (only a secret one is skipped).
+local inCombat = InCombatLockdown
+InCombatLockdown = function() return true end
+target(npc(4500, "Vehicle")); plate(5, npc(4500))
+InCombatLockdown = inCombat
+eq(textOf("layer"), "1", "a vehicle and a creature, in combat: counted")
 
--- A new map ranks its own zone ids: 80001 is layer 1 in Stormwind.
-target(creature(76067))
+-- A group change moves nobody by itself (a host on the same layer).
+WoW.fire("GROUP_JOINED", 1, "Party-1"); WoW.tick()
+eq(textOf("layer"), "1", "group joined: kept")
+
+-- SHARD_TRANSFER: the game moved us. Unknown; what's in view is the old layer's.
+WoW.timers = {}
+local inView = { target = { guid = npc(4500) }, nameplate1 = { guid = npc(4500) }, nameplate2 = { guid = npc(4500) } }
+WoW.units = inView
+WoW.fire("SHARD_TRANSFER"); WoW.tick()
+eq(textOf("layer"), GREY_Q, "moved: unknown")
+eq(#WoW.timers, 3, "three looks scheduled")
+WoW.now = WoW.now + 0.3
+WoW.fire("NAME_PLATE_UNIT_ADDED", "nameplate1"); WoW.fire("PLAYER_TARGET_CHANGED"); WoW.tick()
+eq(textOf("layer"), GREY_Q, "the units in view at the move don't vote")
+WoW.now = WoW.now + 5
+WoW.flushTimers(5); WoW.tick()
+eq(textOf("layer"), GREY_Q, "5 s later: still the old layer's units, still unknown")
+plate(3, npc(5000))
+plate(4, npc(5000))
+eq(textOf("layer"), "2", "two creatures of the new layer: known")
+-- After STALE seconds the units that were in view vote again.
+WoW.fire("UNIT_PHASE", "player")
+WoW.units = inView
+WoW.now = WoW.now + 10
+WoW.flushTimers(); WoW.tick()
+eq(textOf("layer"), "1", "the last look: the units in view at the move vote again")
+WoW.units = {}
+
+-- Layers are a zone's: a cave or building map inside it keeps the layer.
+WoW.mapInfo = { [1429] = { mapType = 3, parentMapID = 1415 }, [1415] = { mapType = 2, parentMapID = 947 },
+    [2001] = { mapType = 5, parentMapID = 2000 }, [2000] = { mapType = 4, parentMapID = 1429 } }
+WoW.map = 2001
+WoW.fire("ZONE_CHANGED_INDOORS"); WoW.tick()
+eq(textOf("layer"), "1", "a micro map inside the zone: kept")
+plate(5, npc(4500))
+eq(DB()[2001], nil, "filed under the zone, not the building")
+WoW.map = 1429
+
+-- A new zone ranks its own ids; a server id may be shared between zones.
 WoW.map = 1453
 WoW.fire("ZONE_CHANGED_NEW_AREA"); WoW.tick()
-eq(textOf("layer"), GREY_Q, "new map: unknown")
-target(creature(80001))
-eq(textOf("layer"), "1", "ranked among this map's ids only")
-eq(DB()[1453][80001], WoW.serverTime, "kept per map")
--- An id known on one map isn't filed under another (a creature across the
--- border, even targeted): 50 belongs to 1429. The layer stays as it was.
-target(creature(50))
-eq(textOf("layer"), "1", "another map's id: not this map's layer")
-eq(DB()[1453][50], nil, "and not saved here")
-
--- Expiry: after 2 hours an old sighting stops counting, and is pruned on
--- the next one.
+eq(textOf("layer"), GREY_Q, "new zone: unknown")
+seen(5000)
+eq(textOf("layer"), "1", "ranked among this zone's ids only")
+eq(DB()[1453][5000], WoW.serverTime, "kept per zone")
+-- Votes cast in one zone don't count in the next, even with no event.
+target(npc(8000))
 WoW.map = 1429
-WoW.fire("ZONE_CHANGED_NEW_AREA")
-WoW.serverTime = T + 90 + 7200
-target(creature(76067))   -- 18 last seen at T + 90, 50 at T - 600
-eq(textOf("layer"), "1", "expired layers no longer counted")
-eq(DB()[1429][18], nil, "expired layer pruned")
+plate(6, npc(8000))
+eq(textOf("layer"), GREY_Q, "one vote per zone: not yet")
 
--- Persistence: a reload keeps what was seen, and reads the target again.
-WoW.units.target = { guid = creature(18) }
-WoW.fire("PLAYER_TARGET_CHANGED")
-DB()[1453][5] = WoW.serverTime   -- fresh on another map (80001 there expires)
-local saved = WoW.units.target
+-- Expiry: after 2 hours an old sighting stops counting, and is pruned on the next one.
+WoW.fire("ZONE_CHANGED_NEW_AREA")
+WoW.serverTime = T + 120 + 7200
+seen(6843)   -- 4500 last seen at T + 120, 5000 and 6843 earlier
+eq(textOf("layer"), "1", "expired layers no longer counted")
+eq(DB()[1429][4500], nil, "expired layer pruned")
+
+-- Persistence: a reload keeps what was seen, and reads what's on screen again.
+DB()[1429][9000] = WoW.serverTime
+DB()[1429][1000] = WoW.serverTime - 7000
 WoW.units = {}
 loadAddon()
 eq(textOf("layer"), GREY_Q, "after a reload: unknown until seen")
-WoW.units.target = saved
+WoW.units = { target = { guid = npc(6843) }, nameplate9 = { guid = npc(6843) } }
 WoW.fire("PLAYER_ENTERING_WORLD", false, true); WoW.tick()
-eq(textOf("layer"), "1", "the target is read again on entering the world")
-target(creature(76067))
-eq(textOf("layer"), "2", "saved layers rank the new sighting")
+eq(textOf("layer"), "2", "target and nameplates read again on entering the world (1000, 6843, 9000)")
+check(tip():find("Layer 3\tid 9000", 1, true), "saved layers rank with the new sighting")
+WoW.units = {}
 
 -- A layer that expires between sightings stops counting at the next repaint.
-DB()[1429][18] = WoW.serverTime - 7000
-target(creature(76070))
-eq(textOf("layer"), "3", "18, 76067, 76070")
 WoW.serverTime = WoW.serverTime + 300
 GlassPanel.Refresh("layer"); WoW.tick()
-eq(textOf("layer"), "2", "expired layer dropped from the ranks")
-check(not tip():find("zone 18", 1, true), "and from the tooltip")
+eq(textOf("layer"), "1", "expired layer dropped from the ranks")
+check(not tip():find("id 1000", 1, true), "and from the tooltip")
 
--- Left-click forgets this map's layers; other buttons don't.
-local b = block("layer").widget
-b._scripts.OnClick(b, "RightButton")
-eq(textOf("layer"), "2", "right-click does nothing")
-check(DB()[1429] ~= nil, "right-click keeps the map")
-b._scripts.OnClick(b, "LeftButton"); WoW.tick()
-eq(textOf("layer"), GREY_Q, "left-click: unknown")
-eq(DB()[1429], nil, "left-click forgets this map")
-check(DB()[1453] ~= nil, "other maps kept")
-check(WoW.chat[#WoW.chat]:find("forgot the layers seen on this map", 1, true), "prints a line")
-
--- Rescans: what's on screen is read again after combat and a taxi, and a
--- few times after a group change (the hop comes later, with no event).
-WoW.fire("ZONE_CHANGED_NEW_AREA"); WoW.tick()
-target(creature(18))         -- known here again, for the group change below
-target(creature(76067))
+-- Rescans after combat and a taxi.
 WoW.fire("UNIT_PHASE", "player"); WoW.tick()
-eq(textOf("layer"), GREY_Q, "baseline: unknown, a creature targeted")
+WoW.units = { target = { guid = npc(6843) }, mouseover = { guid = npc(6843) } }
 WoW.fire("PLAYER_REGEN_ENABLED"); WoW.tick()
-eq(textOf("layer"), "2", "read again after combat")
-WoW.fire("UNIT_PHASE", "player"); WoW.tick()
+eq(textOf("layer"), "1", "read again after combat")
+WoW.fire("UNIT_PHASE", "player")
+WoW.units = { nameplate2 = { guid = npc(9000) }, nameplate3 = { guid = npc(9000) } }
 WoW.fire("PLAYER_CONTROL_GAINED"); WoW.tick()
 eq(textOf("layer"), "2", "read again after a taxi")
-WoW.units.target = nil
-WoW.units.nameplate7 = { guid = creature(76067) }
-WoW.timers = {}
--- The target wins over the mouseover and nameplates (all three known).
-WoW.fire("UNIT_PHASE", "player")
-WoW.units.target = { guid = creature(18) }
-WoW.units.mouseover = { guid = creature(76067) }
-WoW.fire("PLAYER_REGEN_ENABLED"); WoW.tick()
-eq(textOf("layer"), "1", "rescan: the target first")
--- A rescan that finds only a new id on a nameplate files nothing.
-WoW.units.target, WoW.units.mouseover = nil, nil
-WoW.units.nameplate7 = { guid = creature(99999) }
-WoW.fire("UNIT_PHASE", "player")
-WoW.fire("PLAYER_REGEN_ENABLED"); WoW.tick()
-eq(textOf("layer"), GREY_Q, "rescan: a new nameplate id isn't a layer")
-eq(DB()[1429][99999], nil, "nor saved")
-WoW.units.nameplate7 = { guid = creature(76067) }
-WoW.fire("GROUP_JOINED", 1, "Party-1"); WoW.tick()
-eq(textOf("layer"), GREY_Q, "group joined: unknown")
-eq(#WoW.timers, 3, "three looks scheduled")
-WoW.units.nameplate7 = { guid = creature(18) }   -- the old layer's creature still there
-WoW.flushTimers(5); WoW.tick()
-eq(textOf("layer"), "1", "5 s later: still the old layer")
-WoW.units.nameplate7 = { guid = creature(76067) }  -- the hop happened
-WoW.flushTimers(15); WoW.tick()
-eq(textOf("layer"), "2", "15 s later: the new layer, with no event")
-WoW.flushTimers(); WoW.tick()
-WoW.units.nameplate7 = nil
 
--- A new uiMapID without ZONE_CHANGED_NEW_AREA (Codex review): the old
+-- A new zone map without ZONE_CHANGED_NEW_AREA (Codex review on #17): the old
 -- sighting doesn't carry over, even with no creature to read.
-WoW.fire("ZONE_CHANGED_NEW_AREA"); WoW.tick()
-target(creature(76067))
-eq(textOf("layer"), "2", "baseline on 1429")
 WoW.units = {}
 WoW.map = 1453
-WoW.fire("ZONE_CHANGED_INDOORS"); WoW.fire("PLAYER_TARGET_CHANGED"); WoW.tick()
-eq(textOf("layer"), GREY_Q, "map changed through ZONE_CHANGED_INDOORS: unknown")
+WoW.fire("ZONE_CHANGED_INDOORS"); WoW.tick()
+eq(textOf("layer"), GREY_Q, "zone changed through ZONE_CHANGED_INDOORS: unknown")
 local t2 = tip()
 check(t2:find("Current layer\tunknown", 1, true), "tooltip: unknown")
-check(not t2:find("zone 76067", 1, true), "tooltip: the old map's layers aren't listed")
--- Even with no event at all, the next repaint checks the live map.
+check(not t2:find("id 9000", 1, true), "tooltip: the old zone's layers aren't listed")
+-- Even with no event at all, the next repaint checks the live zone.
 WoW.map = 1429
-WoW.fire("ZONE_CHANGED"); WoW.tick()
-target(creature(76067))
+seen(9000)
+eq(textOf("layer"), "2", "baseline")
 WoW.map = 1453
 GlassPanel.Refresh("layer"); WoW.tick()
-eq(textOf("layer"), GREY_Q, "map changed silently: unknown at the next repaint")
-local t3 = tip()
-check(t3:find("Current layer	unknown", 1, true), "silent change: tooltip unknown")
-check(not t3:find("zone 76067", 1, true), "silent change: the old map's layers aren't listed")
--- The reset forgets the map you're on, not the last sighting's.
+eq(textOf("layer"), GREY_Q, "zone changed silently: unknown at the next repaint")
+seen(3500)
+eq(textOf("layer"), "1", "1453's own layer")
+-- The reset forgets the zone you're in, not the last sighting's.
 local b1429 = DB()[1429]
 local blk = block("layer").widget
+blk._scripts.OnClick(blk, "RightButton")
+check(DB()[1453] ~= nil, "right-click does nothing")
 blk._scripts.OnClick(blk, "LeftButton"); WoW.tick()
-check(DB()[1429] == b1429 and b1429 ~= nil, "left-click on 1453 keeps 1429's layers")
+eq(textOf("layer"), GREY_Q, "left-click: unknown")
+check(DB()[1429] == b1429 and b1429 ~= nil, "left-click in 1453 keeps 1429's layers")
 eq(DB()[1453], nil, "and forgets 1453's")
--- A subzone change on the same map keeps the layer (nothing to re-read).
+check(WoW.chat[#WoW.chat]:find("forgot the layers seen in this zone", 1, true), "prints a line")
+-- A new zone through ZONE_CHANGED reads what's on screen again.
 WoW.map = 1429
-target(creature(76067))
-WoW.units = {}
-WoW.fire("ZONE_CHANGED"); WoW.tick()
-eq(textOf("layer"), "2", "subzone change, same map: kept")
--- A new map through ZONE_CHANGED re-reads what's on screen.
+seen(9000)
 WoW.map = 1453
-WoW.units.target = { guid = creature(80500) }
+WoW.units = { target = { guid = npc(3000) }, nameplate1 = { guid = npc(3000) } }
 WoW.fire("ZONE_CHANGED"); WoW.tick()
-eq(textOf("layer"), "1", "map change: the target is read again")
+eq(textOf("layer"), "1", "zone change: what's on screen is read again")
 WoW.units = {}
 WoW.map = 1429
 
 -- Unreadable server time: nothing saved, nothing ranked (never a made-up 0).
+WoW.fire("ZONE_CHANGED_NEW_AREA")
 local st = WoW.serverTime
 WoW.serverTime = WoW.Secret("time")
-target(creature(76067))
+seen(9000)
 eq(textOf("layer"), GREY_Q, "secret time: unknown")
-check(tip():find("Current layer	unknown", 1, true), "tooltip: unknown")
+check(tip():find("Current layer\tunknown", 1, true), "tooltip: unknown")
 WoW.serverTime = st
-for _, seen in pairs(DB()[1429]) do check(type(seen) == "number" and seen > 0, "no 0 or secret saved") end
+for _, when in pairs(DB()[1429]) do check(type(when) == "number" and when > 0, "no 0 or secret saved") end
 
 -- A realm of its own: another character's realm starts empty here.
-target(creature(76067))
+seen(9000)
 WoW.realm = "Soulseeker"
 GlassPanel.Refresh("layer"); WoW.tick()
 eq(textOf("layer"), GREY_Q, "another realm: our ids don't rank there")
-GlassPanelLayerDB.realms.Soulseeker = { [1429] = { [20] = WoW.serverTime, [30] = WoW.serverTime } }
+GlassPanelLayerDB.realms.Soulseeker = { [1429] = { [100] = WoW.serverTime, [200] = WoW.serverTime } }
 WoW.fire("ZONE_CHANGED_NEW_AREA")
-target(creature(25))
-eq(textOf("layer"), "2", "ranked among Soulseeker's ids (20, 25, 30)")
-eq(GlassPanelLayerDB.realms.Soulseeker[1429][25], WoW.serverTime, "saved under its realm")
-eq(GlassPanelLayerDB.realms.Doomhowl[1429][25], nil, "not under ours")
+seen(150)
+eq(textOf("layer"), "2", "ranked among Soulseeker's ids (100, 150, 200)")
+eq(GlassPanelLayerDB.realms.Soulseeker[1429][150], WoW.serverTime, "saved under its realm")
+eq(GlassPanelLayerDB.realms.Doomhowl[1429][150], nil, "not under ours")
 WoW.realm = "Doomhowl"
 
 check(next(GlassPanel.failures) == nil, "no failures")
