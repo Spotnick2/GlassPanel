@@ -499,3 +499,153 @@ function API.ItemLoader(owner, onLoaded)
     function L.Listening() return listening end
     return L
 end
+
+-- The picker window (#74): pick which entries a block shows, and in what
+-- order (Currencies' chooser, #47; Reagents copied it, #68). spec:
+-- - name, title, hint, empty: the window's global name and texts;
+-- - items(): the entries offered, each { id = ..., ... }, in the order the
+--   unpicked ones are listed;
+-- - picks(items): the saved order, as ids;
+-- - resolve(id): the entry for a saved id items() doesn't hold, or nil when
+--   the client can't resolve it right now (it's kept, at the end, untouched);
+-- - save(order): write the ids back;
+-- - label(entry): a row's text.
+-- Returns { Open, Refresh, RefreshSoon (once per frame, only while shown),
+-- Window, rows }. Rows: a checkbox to show, Up/Down to order the shown ones.
+local PICKER_ROW_W, PICKER_ROW_H = 340, 26
+function API.Picker(spec)
+    local p = { rows = {} }
+    local rows, win = p.rows, nil
+
+    -- The rows: the shown ones first, in order (only those the client
+    -- resolves), then the rest as items() lists them. `shown` is that first
+    -- part, as ids; `unresolved` the saved ids the client doesn't resolve now.
+    local function entries()
+        local items = spec.items()
+        local byId = {}
+        for _, e in ipairs(items) do byId[e.id] = e end
+        local list, shown, used, unresolved = {}, {}, {}, {}
+        for _, id in ipairs(spec.picks(items)) do
+            local e = byId[id] or spec.resolve(id)
+            if e then
+                list[#list + 1] = e
+                shown[#shown + 1] = id
+                used[id] = true
+            else
+                unresolved[#unresolved + 1] = id
+            end
+        end
+        for _, e in ipairs(items) do
+            if not used[e.id] then list[#list + 1] = e end
+        end
+        return list, shown, used, unresolved
+    end
+
+    -- Write `shown` (the visible order) back, the unresolved saved ids kept
+    -- at the end, untouched.
+    local function saveShown(shown, unresolved)
+        local keep = {}
+        for _, id in ipairs(shown) do keep[#keep + 1] = id end
+        for _, id in ipairs(unresolved) do keep[#keep + 1] = id end
+        spec.save(keep)
+        p.Refresh()
+    end
+
+    local function move(id, step)
+        local _, shown, _, unresolved = entries()
+        for i, v in ipairs(shown) do
+            if v == id then
+                local j = i + step
+                if j >= 1 and j <= #shown then shown[i], shown[j] = shown[j], shown[i] end
+                break
+            end
+        end
+        saveShown(shown, unresolved)
+    end
+
+    local function toggle(id, on)
+        local _, shown, _, unresolved = entries()
+        local out = {}
+        for _, v in ipairs(shown) do
+            if v ~= id then out[#out + 1] = v end
+        end
+        if on then out[#out + 1] = id end
+        saveShown(out, unresolved)
+    end
+
+    local function row(i)
+        if rows[i] then return rows[i] end
+        local r = CreateFrame("Frame", nil, win.content)
+        r:SetSize(PICKER_ROW_W, PICKER_ROW_H)
+        r:SetPoint("TOPLEFT", win.content, "TOPLEFT", 0, -(i - 1) * PICKER_ROW_H)
+        r.check = CreateFrame("CheckButton", nil, r, "UICheckButtonTemplate")
+        r.check:SetSize(24, 24)
+        r.check:SetPoint("LEFT", r, "LEFT", 0, 0)
+        r.check:SetScript("OnClick", function(self) toggle(r.id, self:GetChecked() and true or false) end)
+        r.text = GlassPanel.Glass.Font(r, 12, "LEFT")
+        r.text:SetPoint("LEFT", r.check, "RIGHT", 4, 0)
+        r.up = API.Button(r, "Up", 44, function() move(r.id, -1) end)
+        r.up:SetPoint("RIGHT", r, "RIGHT", -52, 0)
+        r.down = API.Button(r, "Down", 48, function() move(r.id, 1) end)
+        r.down:SetPoint("RIGHT", r, "RIGHT", -2, 0)
+        rows[i] = r
+        return r
+    end
+
+    function p.Refresh()
+        if not win then return end
+        local list, shown, used = entries()
+        local pos = {}
+        for i, id in ipairs(shown) do pos[id] = i end
+        for i, e in ipairs(list) do
+            local r = row(i)
+            r.id = e.id
+            r.check:SetChecked(used[e.id] == true)
+            r.text:SetText(spec.label(e))
+            r.up:SetShown(used[e.id] == true)
+            r.down:SetShown(used[e.id] == true)
+            r.up:SetEnabled(pos[e.id] ~= nil and pos[e.id] > 1)
+            r.down:SetEnabled(pos[e.id] ~= nil and pos[e.id] < #shown)
+            r:Show()
+        end
+        for i = #list + 1, #rows do rows[i]:Hide() end
+        win.content:SetHeight(math.max(#list, 1) * PICKER_ROW_H)
+        win.empty:SetShown(#list == 0)
+    end
+
+    -- Events come in bursts (login, loot, bags): one refresh per frame.
+    local queued = false
+    function p.RefreshSoon()
+        if queued or not (win and win:IsShown()) then return end
+        queued = true
+        C_Timer.After(0, function()
+            queued = false
+            if win and win:IsShown() then p.Refresh() end
+        end)
+    end
+
+    function p.Open()
+        if not win then
+            win = API.Window(spec.name, 400, 320)
+            win.title:SetText(spec.title)
+            win.hint:SetText(spec.hint)
+            local scroll = CreateFrame("ScrollFrame", nil, win, "UIPanelScrollFrameTemplate")
+            scroll:SetPoint("TOPLEFT", win.hint, "BOTTOMLEFT", 0, -8)
+            scroll:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -30, 42)
+            win.content = CreateFrame("Frame", nil, scroll)
+            win.content:SetSize(PICKER_ROW_W, PICKER_ROW_H)
+            scroll:SetScrollChild(win.content)
+            API.AutoHideScrollBar(scroll)
+            win.empty = GlassPanel.Glass.Font(win.content, 12, "LEFT")
+            win.empty:SetPoint("TOPLEFT", win.content, "TOPLEFT", 4, -4)
+            win.empty:SetText(spec.empty)
+            local close = API.Button(win, "Close", 90, function() win:Hide() end)
+            close:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -12, 10)
+        end
+        p.Refresh()
+        win:Show()
+    end
+
+    function p.Window() return win end
+    return p
+end

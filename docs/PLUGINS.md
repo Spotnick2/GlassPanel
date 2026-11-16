@@ -160,6 +160,16 @@ every id (GearScore's new gear). The load events fire for every item the client 
 listens only while one of its ids is pending. GearScore, Reagents and Ammo use it. Additive:
 `API_VERSION` is unchanged.
 
+`Picker(spec)` (#74) is the chooser window for a block that shows the entries the player picks, in
+their order (Currencies, Reagents): a checkbox per entry, Up/Down on the shown ones. `spec` holds the
+window's global `name`, its `title`, `hint` and `empty` texts, and five functions: `items()` (the
+entries offered, each `{ id = ..., ... }`, listed in that order when not picked), `picks(items)` (the
+saved order, as ids), `resolve(id)` (the entry for a saved id `items()` doesn't hold, or `nil` when the
+client can't resolve it right now: it's kept at the end of the saved order, untouched), `save(order)`
+and `label(entry)` (a row's text). It returns `Open()`, `Refresh()`, `RefreshSoon()` (once per frame,
+and only while the window is shown: call it from your events), `Window()` and `rows`. Additive:
+`API_VERSION` is unchanged.
+
 `GlassPanel.Glass` is the material (`Apply`, `Bar`, `Font`, …) for a block that draws more than
 text, such as the XP bar. It's GlassPanel's instance of the embedded library LibGlass-1.0
 (github.com/Spotnick2/LibGlass; its `CLAUDE.md` is the contract and `docs/GLASS-MATERIAL.md` the
