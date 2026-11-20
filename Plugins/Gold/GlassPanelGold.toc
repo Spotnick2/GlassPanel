@@ -1,10 +1,11 @@
 ## Interface: 16001
 ## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[Gold]|r
-## Notes: Your money, and what you gained or spent this session.
+## Notes: Your money, and what you earned or spent this session (kept across /reload).
 ## Author: Spotnick
 ## Version: @project-version@
 ## Group: GlassPanel
 ## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
 ## Dependencies: GlassPanel
+## SavedVariablesPerCharacter: GlassPanelGoldDB
 
 Gold.lua
