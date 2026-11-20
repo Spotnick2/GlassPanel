@@ -51,15 +51,18 @@ check(found, "session loss measured from the first plain read")
 check(next(GlassPanel.failures) == nil, "no failures across secret transitions")
 
 -- The session survives a /reload and starts again at a login (#161).
-local function goldTip()
-    local b = block("gold")
-    b.widget._scripts.OnEnter(b.widget)
+local function tipLines()
     local lines = {}
     for _, line in ipairs(GameTooltip._lines) do
         local l, r = line:match("^(.-)	(.*)$")
         if l then lines[l] = r end
     end
     return lines
+end
+local function goldTip()
+    local b = block("gold")
+    b.widget._scripts.OnEnter(b.widget)
+    return tipLines()
 end
 GlassPanelGoldDB = nil
 WoW.moneySecret, WoW.money, WoW.serverTime = false, 10000, 100000
@@ -112,6 +115,34 @@ tip = goldTip()
 eq(tip["Started with"], "4g0s0c", "a bad time keeps the amount")
 eq(tip["This session"], "", "but no length")
 eq(tip["Per hour"], nil, "and no rate")
+
+-- An open tooltip moves on by itself (Codex on #162): the length, and the rate
+-- once the session is 5 minutes old, without another event or hover.
+GlassPanelGoldDB = nil
+WoW.money, WoW.serverTime = 10000, 100000
+loadAddon()
+WoW.money = 70000
+WoW.serverTime = 100000 + 299
+tip = goldTip()
+eq(tip["This session"], "4m", "4 minutes in")
+eq(tip["Per hour"], nil, "no rate yet")
+check(block("gold")._test.ticker() ~= nil, "the open tooltip ticks")
+WoW.serverTime = 100000 + 360
+WoW.fireTickers(); WoW.tick()
+tip = tipLines()
+eq(tip["This session"], "6m", "the length moved on while open")
+eq(tip["Per hour"], "+60g0s0c", "and the rate appeared")
+GameTooltip:Hide()
+WoW.fireTickers(); WoW.tick()
+eq(block("gold")._test.ticker(), nil, "a closed tooltip stops the ticker")
+
+-- A flat session past 5 minutes has a known rate: zero, with no sign.
+WoW.money = 10000
+tip = goldTip()
+eq(tip["Earned"], "0g0s0c", "no change")
+eq(tip["Per hour"], "0g0s0c", "a zero rate, unsigned")
+GameTooltip:Hide()
+WoW.fireTickers()
 
 -- The plugin's option: reset the session now.
 WoW.money, WoW.serverTime = 20000, 100000

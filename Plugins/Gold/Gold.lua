@@ -79,7 +79,25 @@ local function duration(s)
     return string.format("%dm", m)
 end
 
-local block = GlassPanel.RegisterBlock({
+-- The session's length and rate move while the tooltip is open (Codex on #162):
+-- a 1 s ticker repaints it then (Warlock's pattern), and stops itself.
+local block, ticker
+local function tooltipOpen()
+    local w = block and block.widget
+    return w ~= nil and GameTooltip:GetOwner() == w and GameTooltip:IsShown() and true or false
+end
+local function stopTicker()
+    if ticker then ticker:Cancel() end
+    ticker = nil
+end
+local function startTicker()
+    if ticker then return end
+    ticker = C_Timer.NewTicker(1, function()
+        if tooltipOpen() then GlassPanel.Refresh("gold") else stopTicker() end
+    end)
+end
+
+block = GlassPanel.RegisterBlock({
     id = "gold",
     label = "Gold",
     showLabel = false,   -- the coin icons say it (no caption on the TBC bar either)
@@ -105,12 +123,13 @@ local block = GlassPanel.RegisterBlock({
         tt:AddLine("Gold")
         local m = money()
         if m == nil then
+            stopTicker()
             tt:AddLine("The client is hiding your money right now.", 0.7, 0.7, 0.7, true)
             return
         end
         tt:AddDoubleLine("Carried", API.CoinText(m), 1, 1, 1, 1, 1, 1)
         ensure()
-        if not session then return end
+        if not session then stopTicker(); return end
         local t = now()
         local elapsed = (session.at and t and t >= session.at) and (t - session.at) or nil
         tt:AddLine(" ")
@@ -119,16 +138,15 @@ local block = GlassPanel.RegisterBlock({
         local delta = m - session.start
         local label, sign, r, g = "Earned", "+", 0.3, 1
         if delta < 0 then label, sign, r, g, delta = "Spent", "-", 1, 0.3, -delta end
-        if delta == 0 then
-            tt:AddDoubleLine("Earned", API.CoinText(0), 1, 1, 1, 0.7, 0.7, 0.7)
-        else
-            tt:AddDoubleLine(label, sign .. API.CoinText(delta), 1, 1, 1, r, g, 0.3)
-            if elapsed and elapsed >= PER_HOUR_AFTER then
-                local rate = math.floor(delta * 3600 / elapsed)
-                tt:AddDoubleLine("Per hour", sign .. API.CoinText(rate), 1, 1, 1, r, g, 0.3)
-            end
+        if delta == 0 then sign, r, g = "", 0.7, 0.7 end   -- no change: grey, no sign
+        tt:AddDoubleLine(label, sign .. API.CoinText(delta), 1, 1, 1, r, g, r == 0.7 and 0.7 or 0.3)
+        if elapsed and elapsed >= PER_HOUR_AFTER then
+            local rate = math.floor(delta * 3600 / elapsed)
+            if rate == 0 then sign, r, g = "", 0.7, 0.7 end
+            tt:AddDoubleLine("Per hour", sign .. API.CoinText(rate), 1, 1, 1, r, g, r == 0.7 and 0.7 or 0.3)
         end
         tt:AddLine("Kept across /reload; starts again at each login.", 0.7, 0.7, 0.7, true)
+        if elapsed then startTicker() else stopTicker() end
     end,
     options = {
         { label = "Reset the gold session",
@@ -138,5 +156,6 @@ local block = GlassPanel.RegisterBlock({
 })
 
 if block then
-    block._test = { reset = reset, session = function() return session end, duration = duration }
+    block._test = { reset = reset, session = function() return session end, duration = duration,
+                    ticker = function() return ticker end }
 end
