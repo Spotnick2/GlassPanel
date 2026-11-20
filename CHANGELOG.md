@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Alts (the AltStable block): the bar now shows the gold of your characters on this character's faction and ruleset, the gold you can actually mail around. The tooltip shows that total and everyone's. To keep everyone's on the bar, switch on "The bar shows every character's gold" in the plugin's options. Needs an AltStable that knows rulesets; with an older one, "this side" is this realm and faction.
+
 ## v1.0.3
 
 - `/gpanel` (the list of commands) and `/gpanel move`'s usage line show their choices, like `on|off` and `left|center|right`, correctly: the separators were swallowed and the text came out garbled.

@@ -2,7 +2,8 @@
 -- ..\AltStable\docs\PUBLIC-API.md. Not a client API: AltStable is another
 -- addon, and this mirrors its documented contract (not its code).
 -- WoW.alts = { characters = { { guid, name, realm, faction, class, level,
--- money, hidden, current }, ... }, version = 1 }; WoW.altsToggles counts
+-- money, hidden, current, ruleset, rulesetName }, ... }, version = 1,
+-- features = PUBLIC_API_FEATURES or nil }; WoW.altsToggles counts
 -- ToggleSheet calls. WoW.altsChanged() is a change: like AltStable, one
 -- "CharactersChanged" per burst, on the next frame (WoW.flushTimers(0)), each
 -- listener under pcall (errors in WoW.altsErrors). A listener registered by
@@ -24,6 +25,7 @@ end
 
 AltStable = setmetatable({}, { __index = function(_, k)
     if k == "PUBLIC_API_VERSION" then return WoW.alts.version end
+    if k == "PUBLIC_API_FEATURES" then return WoW.alts.features end
 end })
 
 function AltStable.GetCharacters()
