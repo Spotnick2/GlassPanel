@@ -61,7 +61,7 @@ core's `ADDON_LOADED`.
   Currencies use it. `API.Plain(v)` is the one "secret becomes nil" guard;
   use it at every read. `API.Returned(v)` asks "did the client return anything" without comparing:
   **never write `raw ~= nil` on a raw read**, since comparing a secret (even with nil) throws on
-  the client, and the offline stub can't catch it. The global `GetCoinTextureString` is **absent** (70009, still in the 70938 dump);
+  the client, and the offline stub can't catch it. The global `GetCoinTextureString` is **absent** (70009, still in the 70959 dump);
   use `C_CurrencyInfo`'s. `MEASURED_ON_BUILD` lives here too; the login notice for another build
   speaks only in a **development copy** (`API.IsDevelopmentCopy`: version `dev` from deploy, or the
   raw `@project-version@`), never in a release (Priestly #76: what flags an addon out of date is the
@@ -486,7 +486,7 @@ from `C_TaxiMap`, Frequent Flier's node readable; its 20% is still unmeasured.
   write new addon-agnostic findings there, not into a copy here. Read "False friends" before
   porting any TBC call: several moved APIs return a struct instead of a tuple
   (`C_SkillInfo.GetSkillLineInfo`, `C_Container.GetContainerItemInfo`).
-- `C:\Projects\WoW\References\Forever\api\forever-api-1.60.1.70938.md` is the full API dump: functions, events,
+- `C:\Projects\WoW\References\Forever\api\forever-api-1.60.1.70959.md` is the full API dump: functions, events,
   **widget methods** (the only list of those) and the `_G` walk. It proves a name exists, not
   that it works. `GetProfessions` is listed but returns `nil x7`. **The `_G` walk includes the
   globals of whatever addons were loaded** (70124 and 70338 list `GetMapID`, `GetTalentData`, `ConvertID`,

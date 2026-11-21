@@ -186,7 +186,7 @@ function Ambiguate(fullName, context)
     if context == "none" then return fullName end
     return (fullName:gsub("%-.*$", ""))
 end
-function GetBuildInfo() return "1.60.1", "70938", "Nov 12 2026", 16001 end
+function GetBuildInfo() return "1.60.1", "70959", "Nov 12 2026", 16001 end
 -- Only "Version" is read. A release-shaped version by default; a test sets
 -- WoW.addonVersion = "dev" to run as a deployed development copy.
 C_AddOns = { GetAddOnMetadata = function(name, key)

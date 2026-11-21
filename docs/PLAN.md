@@ -65,8 +65,8 @@ loader with GearScore); **#45** Gold without AltStable (postponed). (#26, Layer 
 NovaWorldBuffs guild messages, closed: NWB doesn't track layers on Forever.)
 
 Not measured yet:
-- Build 70938 is what the code and the offline stubs are checked against
-  (`API.MEASURED_ON_BUILD`, #145); the owner plays and tests on it.
+- Build 70959 is what the code and the offline stubs are checked against
+  (`API.MEASURED_ON_BUILD`, #145, #158); the owner plays and tests on it.
 - Ammo for warriors and rogues (`UnitUsesAmmo`) and the thrown count; the Well Rested cap at
   5/5 (XP+ rested lines).
 - Flight (#124): `UnitOnTaxi` at `PLAYER_CONTROL_LOST` (EllesmereUI found it false at takeoff),
