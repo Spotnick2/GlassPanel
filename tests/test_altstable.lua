@@ -125,6 +125,21 @@ WoW.alts.characters[2].ruleset = nil
 WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
 eq(textOf("altstable"), "123g45s67c |cff888888?|r", "unplaced record flagged")
 check(tip():find("1 character(s) with no ruleset or faction known, not counted.", 1, true), "and said")
+-- Everyone on the bar (Codex on #164): this side's row keeps its warning...
+everyone(true)
+t = tip()
+check(t:find("Total (4)	131g45s67c", 1, true), "everyone's total")
+check(t:find("Horde, PvP (1)	123g45s67c", 1, true), "this side's row")
+check(t:find("1 character(s) with no ruleset or faction known, not counted in Horde, PvP's total.", 1, true),
+      "and its unplaced record said")
+-- ... and with this character unplaced, the row stays, unknown, with why.
+WoW.alts.characters[1].ruleset = nil
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
+eq(textOf("altstable"), "131g45s67c", "the bar's everyone total is unaffected")
+t = tip()
+check(t:find("This faction and ruleset	|cff888888?|r", 1, true), "this side's row: unknown")
+check(t:find("AltStable can't tell this character's ruleset or faction yet.", 1, true), "and why")
+everyone(false)
 WoW.alts.features = nil
 for _, c in ipairs(WoW.alts.characters) do c.ruleset, c.rulesetName = nil, nil end
 

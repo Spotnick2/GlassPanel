@@ -122,7 +122,15 @@ local function gather(withList)
     local chars = AS.GetCharacters()
     local st, slist, why = side(chars)
     if not showAll() then return st, slist, AS.GetTotals(), why end
-    return AS.GetTotals(), chars, st
+    return AS.GetTotals(), chars, st, why
+end
+
+-- A side's unplaced records, said under its total.
+local function unplacedLine(tt, t, whose)
+    if (t.unplaced or 0) > 0 then
+        tt:AddLine(t.unplaced .. " character(s) with no " .. (t.rulesets and "ruleset" or "realm")
+            .. " or faction known, not counted" .. (whose or "") .. ".", 0.7, 0.7, 0.7, true)
+    end
 end
 
 -- The total as coin text, or nil when no counted character's gold is known:
@@ -192,20 +200,24 @@ GlassPanel.RegisterBlock({
             tt:AddLine(" ")
             tt:AddDoubleLine("Total (" .. t.characters .. ")", totalText(t) or UNKNOWN,
                 1, 0.82, 0, 1, 1, 1)
-            -- The other figure: everyone under this side, this side under everyone.
-            if other then
-                local label = all and other.name or "Everyone"
-                tt:AddDoubleLine(label .. " (" .. other.characters .. ")", totalText(other) or UNKNOWN,
+            -- The other figure: everyone under this side, this side under
+            -- everyone (Codex on #164: with its own warnings, or a ? and why).
+            if not all then
+                tt:AddDoubleLine("Everyone (" .. other.characters .. ")", totalText(other) or UNKNOWN,
                     0.8, 0.8, 0.8, 0.8, 0.8, 0.8)
+            elseif other then
+                tt:AddDoubleLine(other.name .. " (" .. other.characters .. ")", totalText(other) or UNKNOWN,
+                    0.8, 0.8, 0.8, 0.8, 0.8, 0.8)
+                unplacedLine(tt, other, " in " .. other.name .. "'s total")
+            else
+                tt:AddDoubleLine(byRuleset() and "This faction and ruleset" or "This realm and faction",
+                    UNKNOWN, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8)
+                if why then tt:AddLine(why, 0.7, 0.7, 0.7, true) end
             end
             if t.unknown > 0 then
                 tt:AddLine(t.unknown .. " character(s) with unknown gold, not counted.", 0.7, 0.7, 0.7, true)
             end
-            if (t.unplaced or 0) > 0 then
-                tt:AddLine(t.unplaced .. " character(s) with no " .. (t.rulesets and "ruleset" or "realm")
-                    .. " or faction known, not counted.",
-                    0.7, 0.7, 0.7, true)
-            end
+            unplacedLine(tt, t)
             if t.hidden > 0 then
                 tt:AddLine(t.hidden .. " hidden in AltStable, not counted.", 0.7, 0.7, 0.7, true)
             end
