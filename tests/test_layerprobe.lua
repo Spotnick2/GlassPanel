@@ -52,11 +52,18 @@ check(logHas("tally: 3 creature(s); server fields: 4395 x2, 5100 x1"), "tallied,
 check(logHas("nameplate5: Player, 3 fields (another player: not logged)"), "another player: shape only")
 eq(logHas("Player-6933"), nil, "never their GUID")
 check(logHas("nameplate6: <secret>"), "a secret GUID: said, not touched")
+local _, why = T.fields(WoW.Secret("guid"))
+eq(why, "<secret>", "fields() tests secrecy before comparing with nil")
 local _, tally = T.guids()
 local best, n, values = T.majority(tally)
 eq(best, "4395", "the most common server field")
 eq(n, 2, "and its count")
 eq(values, 2, "two values seen")
+-- No consensus (Codex on #170): one value per NPC, as measured since the hotfix,
+-- or a tie, gives no field, never an arbitrary pick.
+eq(T.majority({ ["13621"] = 1, ["7122"] = 1, ["52070"] = 1 }), nil, "one value each: no consensus")
+eq(T.majority({ a = 2, b = 2 }), nil, "a tie: no consensus")
+eq(T.majority({ a = 3, b = 2 }), "a", "a clear majority of two or more")
 
 -- The player, now and at each load event.
 fp("layer player")
@@ -96,9 +103,22 @@ WoW.guild.inGuild = true
 fp("layer ping")
 eq(sent[1] and sent[1][3], "GUILD", "one GUILD addon message sent")
 eq(sent[1] and sent[1][1], "LayerProbe", "on our own prefix")
-WoW.fire("CHAT_MSG_ADDON", "LayerProbe", "ping", "GUILD", "Karuzo Elegia-")
+local token = sent[1] and sent[1][2]
+check(type(token) == "string" and token:find("^ping:"), "a random token, not a bare ping")
+-- Another guild member running the probe sends a ping too: never taken for ours (Codex on #170).
+WoW.fire("CHAT_MSG_ADDON", "LayerProbe", "ping", "GUILD", "Other Prober-")
+WoW.fire("CHAT_MSG_ADDON", "LayerProbe", "ping:1:2", "GUILD", "Other Prober-")
+eq(T.ownEcho(), nil, "someone else's ping isn't our echo")
+eq(logHas("Other Prober"), nil, "and their name isn't logged")
+WoW.fire("CHAT_MSG_ADDON", "LayerProbe", token, "GUILD", "Karuzo Elegia-")
 check(logHas("own GUILD echo: sender \"Karuzo Elegia-\" (str14, '-' at 14, after it BLANK)"), "our echo, whole, its realm part blank")
+check(logHas("the sender's name part \"Karuzo Elegia\""), "its name part said")
 eq(T.ownEcho(), "Karuzo Elegia-", "kept for the procedure")
+eq(T.pending(), nil, "the ping is answered")
+local before = #LayerProbeDB.log
+WoW.fire("CHAT_MSG_ADDON", "LayerProbe", token, "GUILD", "Karuzo Elegia-")
+check(LayerProbeDB.log[before + 1] and LayerProbeDB.log[before + 1]:find("after it BLANK", 1, true)
+      and not LayerProbeDB.log[before + 1]:find("Karuzo", 1, true), "the token again after the echo: shape only")
 WoW.fire("CHAT_MSG_ADDON", "NovaWorldBuffs", "x", "GUILD", "Someone Else-Realm7")
 check(logHas("GUILD addon message, prefix \"NovaWorldBuffs\": sender str19, '-' at 13, after it str6"), "another sender: shape")
 eq(logHas("Someone"), nil, "never their name")

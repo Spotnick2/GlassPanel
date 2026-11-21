@@ -49,8 +49,8 @@ end
 
 -- A GUID split into its fields, or nil, why. Never touches a secret.
 local function fields(g)
+    if secret(g) then return nil, "<secret>" end   -- first: even == nil on a secret throws (Codex on #170)
     if g == nil then return nil, "nil" end
-    if secret(g) then return nil, "<secret>" end
     if type(g) ~= "string" then return nil, type(g) end
     local out = {}
     for part in (g .. "-"):gmatch("([^-]*)-") do out[#out + 1] = part end
@@ -120,12 +120,17 @@ end
 
 -- The one server field most creatures agree on, its count, and how many
 -- distinct values there were.
+-- The server field most creatures share: only when at least two distinct GUIDs
+-- share it and no other value ties it (Codex on #170: with one value per NPC,
+-- as measured since the hotfix, any pick would be arbitrary). Else nil: no
+-- consensus. Also returns the best count and how many distinct values.
 local function majority(tally)
-    local best, n, values = nil, 0, 0
+    local best, n, values, tie = nil, 0, 0, false
     for s, c in pairs(tally) do
         values = values + 1
-        if c > n then best, n = s, c end
+        if c > n then best, n, tie = s, c, false elseif c == n then tie = true end
     end
+    if n < 2 or tie then return nil, n, values end
     return best, n, values
 end
 
@@ -224,6 +229,9 @@ local function afterTransfer(delay)
         if before and now then
             say(string.format("server field: %s before, %s %d s after: %s", before, now, delay,
                 now ~= before and "CHANGED" or "same"))
+        else
+            say(string.format("server field %d s after: inconclusive (no shared value %s)", delay,
+                before and "after" or "before"))
         end
     end)
 end
@@ -234,7 +242,9 @@ end
 
 local PREFIX = "LayerProbe"
 local MAX_SENDERS = 20
+local PENDING_FOR = 30    -- seconds an outstanding ping waits for its echo
 local senders, ownEcho = 0, nil
+local pending             -- { token, at }: our outstanding ping (Codex on #170)
 
 -- A sender's shape, never another player's name.
 local function senderShape(sender)
@@ -247,15 +257,25 @@ local function senderShape(sender)
         after:find("%S") and ("str" .. #after) or "BLANK")
 end
 
+-- Only the echo of OUR outstanding ping is ours: its token is random and only
+-- this client knows it, so another guild member running the probe (who sends a
+-- ping too) is never taken for us and never logged by name (Codex on #170).
+-- Whether the sender's name part matches ours is the measurement, so it's said.
 local function onAddonMessage(prefix, text, channel, sender)
     if channel ~= "GUILD" then return end
-    local mine = prefix == PREFIX and text == "ping"
+    if pending and GetTime() - pending.at > PENDING_FOR then pending = nil end
+    local mine = pending ~= nil and prefix == PREFIX and not secret(text) and text == pending.token
     if mine then
+        pending = nil
         ownEcho = sender
         say("own GUILD echo: sender " .. show(sender) .. " (" .. senderShape(sender) .. ")")
         local name = call("GetUnitName", "player", false)
-        say("  GetUnitName(player, false) " .. show(name) .. "; Ambiguate(sender, \"none\") "
-            .. show(type(sender) == "string" and not secret(sender) and call("Ambiguate", sender, "none") or nil))
+        local plain = type(sender) == "string" and not secret(sender)
+        local part = plain and (sender:match("^(.-)%-") or sender) or nil
+        local same = part ~= nil and not secret(name) and part == name
+        say("  GetUnitName(player, false) " .. show(name) .. "; the sender's name part " .. show(part)
+            .. (same and " MATCHES" or " doesn't match") .. "; Ambiguate(sender, none) "
+            .. show(plain and call("Ambiguate", sender, "none") or nil))
         return
     end
     if senders >= MAX_SENDERS then return end
@@ -268,7 +288,9 @@ local function ping()
     if not call("IsInGuild") then say("ping: not in a guild"); return false end
     if type(chat) ~= "table" then say("ping: no C_ChatInfo"); return false end
     Probe:Call("RegisterAddonMessagePrefix", chat.RegisterAddonMessagePrefix, PREFIX)
-    Probe:Call("SendAddonMessage GUILD", chat.SendAddonMessage, PREFIX, "ping", "GUILD")
+    pending = { token = string.format("ping:%d:%d", math.floor(GetTime() * 1000) % 1000000, math.random(1, 999999)),
+                at = GetTime() }
+    Probe:Call("SendAddonMessage GUILD", chat.SendAddonMessage, PREFIX, pending.token, "GUILD")
     return true
 end
 
@@ -291,7 +313,7 @@ local function creatureCheck(unit)
 end
 
 Probe:Steps("guids", {
-    rev = 1,
+    rev = 2,   -- 2: no-consensus majority, token-correlated echo (Codex on #170)
     title = "Layer: creature GUIDs since the 2026-11-20 hotfix",
     { text = "In an open-world zone (not an instance, not on a flight), out of combat. Type /fp to open the "
           .. "console beside this panel: the readings show there. Then press Next." },
@@ -305,7 +327,7 @@ Probe:Steps("guids", {
     { text = "Now put your mouse over a DIFFERENT NPC and keep it there: this step completes by itself.",
       wait = function()
           local t, m = UnitGUID("target"), UnitGUID("mouseover")
-          if m == nil or secret(m) then return false, "no readable mouseover yet" end
+          if secret(m) or m == nil then return false, "no readable mouseover yet" end   -- secret first
           if not secret(t) and m == t then return false, "that's your target: another NPC" end
           local f = fields(m)
           if not f or (f[1] ~= "Creature" and f[1] ~= "Vehicle") then return false, "not a creature" end
@@ -333,7 +355,9 @@ Probe:Steps("guids", {
       check = function()
           local _, tally = guids("after the layer change, check")
           local now = majority(tally)
-          if not (before and now) then return false, "no server field before or after" end
+          if not (before and now) then
+              return false, "inconclusive: no server field shared by two NPCs " .. (before and "after" or "before")
+          end
           return now ~= before, string.format("%s before, %s after", before, now)
       end },
     { text = "In a guild: press Send. One addon message (not chat) goes to your guild, and its echo shows "
@@ -391,4 +415,4 @@ end)
 
 NS._test = { Probe = Probe, fields = fields, readUnit = readUnit, guids = guids, majority = majority,
              player = player, realm = realm, blockText = blockText, atLoad = atLoad, senderShape = senderShape,
-             ping = ping, ownEcho = function() return ownEcho end }
+             ping = ping, ownEcho = function() return ownEcho end, pending = function() return pending end }
