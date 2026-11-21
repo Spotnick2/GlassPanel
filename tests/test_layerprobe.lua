@@ -137,6 +137,24 @@ check(LayerProbeDB.log[before + 1] and LayerProbeDB.log[before + 1]:find("after 
 -- A new ping forgets the last echo: the procedure waits for this send's (Codex on #170).
 T.ping()
 eq(T.ownEcho(), nil, "a new send clears the old echo")
+-- The procedure: the wait counts only the echo of this run's Send step.
+WoW.guild.inGuild = true
+eq(T.sendRun(), true, "Send step: sent")
+local tok2 = sent[#sent][2]
+eq((T.echoWait()), false, "no echo yet")
+WoW.fire("CHAT_MSG_ADDON", "LayerProbe", tok2, "GUILD", "Karuzo Elegia-")
+eq((T.echoWait()), true, "this send's echo completes the wait")
+T.sendLeave("done")
+-- A later run that skips Send: the earlier echo doesn't count (Codex on #170).
+T.sendLeave("skipped")
+local okW, whyW = T.echoWait()
+eq(okW, false, "Send skipped: nothing to wait for")
+check(whyW:find("nothing sent", 1, true), "and the wait says so")
+-- A Send that can't send (not in a guild): nothing either, and the old echo is gone.
+WoW.guild.inGuild = false
+eq(T.sendRun(), false, "Send step: nothing sent")
+eq((T.echoWait()), false, "a failed Send: nothing to wait for")
+eq(T.ownEcho(), nil, "a failed send clears the old echo too")
 rawset(_G, "GetUnitName", nil)
 WoW.fire("CHAT_MSG_ADDON", "NovaWorldBuffs", "x", "GUILD", "Someone Else-Realm7")
 check(logHas("GUILD addon message, prefix \"NovaWorldBuffs\": sender str19, '-' at 13, after it str6"), "another sender: shape")

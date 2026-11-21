@@ -244,7 +244,8 @@ local PREFIX = "LayerProbe"
 local MAX_SENDERS = 20
 local PENDING_FOR = 30    -- seconds an outstanding ping waits for its echo
 local senders, ownEcho = 0, nil
-local pending             -- { token, at }: our outstanding ping (Codex on #170)
+local pending             -- { token, at, id }: our outstanding ping (Codex on #170)
+local sendId, echoFor = 0, nil   -- each send's number; the send the last echo answered
 
 -- A sender's shape, never another player's name.
 local function senderShape(sender)
@@ -275,6 +276,7 @@ local function onAddonMessage(prefix, text, channel, sender)
     if pending and GetTime() - pending.at > PENDING_FOR then pending = nil end
     local token = pending ~= nil and prefix == PREFIX and not secret(text) and text == pending.token
     if token and ownNamePart(sender) then
+        echoFor = pending.id
         pending = nil
         ownEcho = sender
         say("own GUILD echo: sender " .. show(sender) .. " (" .. senderShape(sender) .. ")")
@@ -291,16 +293,18 @@ local function onAddonMessage(prefix, text, channel, sender)
     say("GUILD addon message, prefix " .. show(prefix) .. ": sender " .. senderShape(sender))
 end
 
+-- Returns this send's number, or false when nothing was sent.
 local function ping()
+    ownEcho, echoFor, pending = nil, nil, nil   -- this send's echo only, even when it can't send (Codex on #170)
     local chat = G("C_ChatInfo")
     if not call("IsInGuild") then say("ping: not in a guild"); return false end
     if type(chat) ~= "table" then say("ping: no C_ChatInfo"); return false end
     Probe:Call("RegisterAddonMessagePrefix", chat.RegisterAddonMessagePrefix, PREFIX)
-    ownEcho = nil   -- this send's echo only, never an earlier one (Codex on #170)
+    sendId = sendId + 1
     pending = { token = string.format("ping:%d:%d", math.floor(GetTime() * 1000) % 1000000, math.random(1, 999999)),
-                at = GetTime() }
+                at = GetTime(), id = sendId }
     Probe:Call("SendAddonMessage GUILD", chat.SendAddonMessage, PREFIX, pending.token, "GUILD")
-    return true
+    return sendId
 end
 
 --------------------------------------------------------------------------------
@@ -324,6 +328,22 @@ end
 -- The nameplate step's check: a layer only when the creatures agree (a shared
 -- field, no tie); a tie or one value each is inconclusive (Codex on #170).
 -- Sets the baseline the layer-change step compares against.
+-- The procedure's Send and wait steps: the wait counts only the echo of the
+-- send made by THIS run's Send step (Codex on #170): a skipped or failed Send
+-- leaves nothing to wait for, whatever an earlier /fp layer ping got.
+local attempt   -- the send number this run's Send step made, or nil
+local function sendRun()
+    attempt = ping() or nil
+    return attempt ~= nil
+end
+local function sendLeave(outcome)
+    if outcome ~= "done" then attempt = nil end
+end
+local function echoWait()
+    if attempt and echoFor == attempt and ownEcho ~= nil then return true, senderShape(ownEcho) end
+    return false, attempt and "no echo yet" or "nothing sent in this run (press Skip)"
+end
+
 local function nameplateCheck()
     local _, tally, n = guids("nameplates check")
     local best, count, values = majority(tally)
@@ -336,7 +356,7 @@ local function nameplateCheck()
 end
 
 Probe:Steps("guids", {
-    rev = 3,   -- 2: no-consensus majority, token-correlated echo; 3: echo needs our name too (Codex on #170)
+    rev = 4,   -- 2: no-consensus majority, token echo; 3: echo needs our name; 4: the wait is this run's send (Codex on #170)
     title = "Layer: creature GUIDs since the 2026-11-20 hotfix",
     { text = "In an open-world zone (not an instance, not on a flight), out of combat. Type /fp to open the "
           .. "console beside this panel: the readings show there. Then press Next." },
@@ -378,12 +398,8 @@ Probe:Steps("guids", {
           return now ~= before, string.format("%s before, %s after", before, now)
       end },
     { text = "In a guild: press Send. One addon message (not chat) goes to your guild, and its echo shows "
-          .. "what a sender looks like now. Not in a guild: Skip.", button = "Send", run = ping },
-    { text = "Waiting for the echo of that message.",
-      wait = function()
-          if ownEcho ~= nil then return true, senderShape(ownEcho) end
-          return false, "no echo yet"
-      end, timeout = 20 },
+          .. "what a sender looks like now. Not in a guild: Skip.", button = "Send", run = sendRun, leave = sendLeave },
+    { text = "Waiting for the echo of that message.", wait = echoWait, timeout = 20 },
     { text = "Type /reload (or press Reload now): the next step reads your GUID at each load event.", reload = true },
     { text = "Your GUID at each load event, after the reload.", auto = true, run = player,
       check = function()
@@ -433,4 +449,4 @@ end)
 NS._test = { Probe = Probe, fields = fields, readUnit = readUnit, guids = guids, majority = majority,
              player = player, realm = realm, blockText = blockText, atLoad = atLoad, senderShape = senderShape,
              ping = ping, ownEcho = function() return ownEcho end, pending = function() return pending end,
-             nameplateCheck = nameplateCheck }
+             nameplateCheck = nameplateCheck, sendRun = sendRun, sendLeave = sendLeave, echoWait = echoWait }
