@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Gold: the tooltip's session now shows what you started with, what you earned or spent, the rate per hour and how long the session has run, as Titan Panel's gold plugin does. The session is kept across a /reload and starts again only when you log in. "Reset the gold session" in the plugin's options starts a new one.
+
 ## v1.0.3
 
 - `/gpanel` (the list of commands) and `/gpanel move`'s usage line show their choices, like `on|off` and `left|center|right`, correctly: the separators were swallowed and the text came out garbled.
