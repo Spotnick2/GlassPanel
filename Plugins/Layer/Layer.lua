@@ -67,14 +67,29 @@ local function now()
     return type(t) == "number" and t or nil
 end
 
+-- Which realm the saved layers belong to. Since the 2026-11-20 hotfix the
+-- client hides the realm on purpose: GetRealmName() is "" (AltStable #408,
+-- #412; #167 here; the porting guide, "The realm is hidden"). Then this
+-- character: a character never leaves its realm, so its own sightings are one
+-- realm's. Keyed by its whole GUID, an opaque id (the guide: never parse a
+-- server out of it, which may leave the GUID). Alts on one realm no longer
+-- share sightings, which last 2 h anyway. Else "?".
 local function realm()
     local r = P(GetRealmName())
-    return type(r) == "string" and r or "?"
+    if type(r) == "string" and r:find("%S") then return r end
+    local g = P(UnitGUID("player"))
+    if type(g) == "string" and g:find("%S") then return "char:" .. g end
+    return "?"
 end
 
--- This realm's zones (created on first use).
+-- This realm's zones (created on first use). With no realm and no character
+-- to file them under ("?"), sightings stay in this session only, never saved
+-- (Codex on #168): a saved "?" would rank another character's realm against
+-- ours within the 2 h.
+local unplaced = {}
 local function maps()
     local r = realm()
+    if r == "?" then return unplaced end
     realms[r] = realms[r] or {}
     return realms[r]
 end
@@ -246,7 +261,7 @@ local function load()
     local saved, t = type(db.realms) == "table" and db.realms or {}, now()
     local clean = {}
     for r, rmaps in pairs(saved) do
-        if type(r) == "string" and type(rmaps) == "table" then
+        if type(r) == "string" and r ~= "?" and type(rmaps) == "table" then   -- "?": never ours (above)
             for map, ids in pairs(rmaps) do
                 if type(map) == "number" and type(ids) == "table" then
                     for id, seen in pairs(ids) do
@@ -262,7 +277,7 @@ local function load()
         end
     end
     for r, rmaps in pairs(realms) do
-        for map, ids in pairs(rmaps) do
+        for map, ids in pairs(r ~= "?" and rmaps or {}) do
             clean[r] = clean[r] or {}
             clean[r][map] = clean[r][map] or {}
             for id, seen in pairs(ids) do clean[r][map][id] = seen end

@@ -245,7 +245,12 @@ core's `ADDON_LOADED`.
   last 5 kept: 2 agree to set a layer, 3 to change one; target, mouseover and nameplates all vote; votes belong to
   one zone. Filed under the **zone-level map** (`C_Map.GetMapInfo` parents up to `Enum.UIMapType.Zone`: a cave or a
   building stays in its zone), numbered by rank among the ids seen there (local numbers: nothing says how many
-  layers exist). `GlassPanelLayerDB.realms[realm][zoneMap][id] = GetServerTime()` (nil time: nothing saved),
+  layers exist). `GlassPanelLayerDB.realms[realm][zoneMap][id] = GetServerTime()` (nil time: nothing saved;
+  `realm` is `GetRealmName()` while it reads, and since the 2026-11-20 hotfix hid it (`""`, #167) this
+  character, `char:<whole player GUID>` (opaque, as the porting guide says: never a server parsed out of it;
+  with neither, `?` is this session only, never saved, and a saved `?` is dropped at load;
+  a character never leaves its realm), else `?`; Blizzard said layering addons will be disabled through API
+  changes, and the creature GUID's server field Layer reads may go too),
   forgotten after 2 h; `v = 2` (older saves held zoneUIDs, dropped once). **`SHARD_TRANSFER`** (the game moved us):
   unknown, the units in view then don't vote for 10 s (the old layer's), read again at 2, 5 and 12 s; a group
   change alone resets nothing. Reads target, mouseover and nameplates again on entering the world, combat end, taxi end
