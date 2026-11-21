@@ -205,7 +205,13 @@ core's `ADDON_LOADED`.
   **never** by replacing `ChatFrame_DisplayTimePlayed`. Graphical blocks aren't painted while off
   screen; `Bar.Layout` marks them dirty when they come back.
 - **`Plugins\Gold`, `Plugins\Clock`**: gold (secret-safe) and the clock (hides Blizzard's
-  minimap clock). Plugins use the **public** API only, the same one third-party plugins get.
+  minimap clock). Gold's **session** (#161, TitanGold's stats): started with, earned/spent, per hour (after
+  5 min), length, in the tooltip; the baseline is the first plain `GetMoney`, saved per character
+  (`GlassPanelGoldDB.session = { start, at }`, `at` from `GetServerTime`). The load's first
+  `PLAYER_ENTERING_WORLD` decides: `isReloadingUi` plainly true takes the saved one back (checked whole),
+  anything else drops it at once (even while money is secret) and starts again; unmeasured by us. The
+  plugin option "Reset the gold session" starts one now.
+  Plugins use the **public** API only, the same one third-party plugins get.
 - **`Plugins\Professions`** (#15): icon + coloured rank/max per primary profession (secondary ones in the
   tooltip), from `C_SkillInfo.GetSkillLineInfo(i)` (a struct) matched by **skillID**, not name
   (`GetProfessions` returns nils). Stale/ensure like Durability. Left-click (out of combat) opens a

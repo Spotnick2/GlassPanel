@@ -96,6 +96,9 @@ end
 -- Real plugins load after it (below), so don't use this to stand in for one.
 -- opts.afterLibrary(): runs right after LibGlass loads, before the core's own files
 -- (Glass.lua builds at file scope, #96): a test of an older library goes here.
+-- opts.reload = true: PLAYER_ENTERING_WORLD says a /reload (false, true), not a
+-- login (true, false). Plugins' SavedVariables globals are never cleared here, so
+-- a second loadAddon{ reload = true } stands in for a /reload.
 function loadAddon(opts)
     opts = opts or {}
     -- A fresh session each call; client data (WoW.money, ...) set by the test stays.
@@ -161,7 +164,11 @@ function loadAddon(opts)
         end
     end
     WoW.fire("PLAYER_LOGIN")
-    WoW.fire("PLAYER_ENTERING_WORLD", true, false)
+    if opts.reload then
+        WoW.fire("PLAYER_ENTERING_WORLD", false, true)
+    else
+        WoW.fire("PLAYER_ENTERING_WORLD", true, false)
+    end
     WoW.tick()
     return GlassPanel
 end
