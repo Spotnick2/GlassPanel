@@ -237,26 +237,13 @@ core's `ADDON_LOADED`.
   a client with no `MenuUtil` gets the fallback, a click that cycles the role (never from an
   unreadable one). A picked role stays pending until `ROLE_CHANGED_INFORM` /
   `PLAYER_ROLES_ASSIGNED` (5 s). A refused or throwing `UnitSetRole` prints one line.
-- **`Plugins\Layer`** (#17, #138): the layer is creature GUIDs' **server field** (`Creature-0-<server>-…`, the 3rd),
-  not the zoneUID (5th, which #17 used: it differs between players on one layer and changes when the world
-  refreshes). Measured on live by LayerSwap (9 Nov 2026, `References\Addons\Miscellaneous\LayerSwap`; LayerETA
-  agrees), **unmeasured by us**. Creature or Vehicle, never `UnitPlayerControlled` (totems, guardians), secret GUIDs
-  skipped via `API.Plain` (readable ones count in combat); not on a taxi or in an instance. Each GUID votes once,
-  last 5 kept: 2 agree to set a layer, 3 to change one; target, mouseover and nameplates all vote; votes belong to
-  one zone. Filed under the **zone-level map** (`C_Map.GetMapInfo` parents up to `Enum.UIMapType.Zone`: a cave or a
-  building stays in its zone), numbered by rank among the ids seen there (local numbers: nothing says how many
-  layers exist). `GlassPanelLayerDB.realms[realm][zoneMap][id] = GetServerTime()` (nil time: nothing saved;
-  `realm` is `GetRealmName()` while it reads, and since the 2026-11-20 hotfix hid it (`""`, #167) this
-  character, `char:<whole player GUID>` (opaque, as the porting guide says: never a server parsed out of it;
-  with neither, `?` is this session only, never saved, and a saved `?` is dropped at load;
-  a character never leaves its realm), else `?`; Blizzard said layering addons will be disabled through API
-  changes, and the creature GUID's server field Layer reads may go too),
-  forgotten after 2 h; `v = 2` (older saves held zoneUIDs, dropped once). **`SHARD_TRANSFER`** (the game moved us):
-  unknown, the units in view then don't vote for 10 s (the old layer's), read again at 2, 5 and 12 s; a group
-  change alone resets nothing. Reads target, mouseover and nameplates again on entering the world, combat end, taxi end
-  and a zone change (`ZONE_CHANGED[_INDOORS]`). The current layer holds only while the live zone is the one it was
-  seen in (checked at every read). Zone and player phase changes make it unknown. No NWB listener (#26, closed: NWB doesn't track layers on Forever).
-  Left-click forgets the current zone's layers.
+- **Layer: retired** (#171). It read the layer from creature GUIDs' server field (#17, #138, after
+  LayerSwap). Since the 2026-11-20 hotfix every creature has its own (LayerProbe, #169, 71037: seven NPCs
+  side by side, seven values; `docs/FOREVER-PROBE.md`), and Blizzard announced layering addons would be
+  disabled, so the block could only show `?`. The code is in git history (the last version: #168's
+  per-character keys after the realm went dark); `Tools\LayerProbe` stays, to measure again if that changes.
+  An old `GlassPanelLayer` left in AddOns is refused by `RegisterBlock` (`Engine.RETIRED`, with a line saying to
+  delete it), and deploy warns about the folder (never deletes it).
 - **`Plugins\GearScore`** (#16): TitanGearScore's per-item formula on a fixed 200-point bracket
   scale (not derived from `GetBuildInfo`), plus Blizzard's `GetAverageItemLevel()` equipped value.
   Items via `GetInventoryItemID`/`Link` and `C_Item.GetItemInfo` (the global `GetItemInfo` is

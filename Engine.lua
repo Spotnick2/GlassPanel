@@ -160,6 +160,13 @@ local function listen(block, event)
     table.insert(listeners[event], block)
 end
 
+-- Blocks we retired: an old copy of their plugin left in AddOns (an upgrade
+-- that didn't delete the folder) is refused with a line saying what to do,
+-- instead of showing a block that can't work (Codex on #172).
+Engine.RETIRED = {
+    layer = "retired (#171): the game no longer lets addons read the layer. Delete the GlassPanelLayer folder from AddOns",
+}
+
 local function invalid(spec, why)
     local id = type(spec) == "table" and type(spec.id) == "string" and spec.id or "?"
     API.Print("|cffff6060RegisterBlock refused|r " .. id .. ": " .. why)
@@ -187,6 +194,7 @@ end
 function GlassPanel.RegisterBlock(spec)
     if type(spec) ~= "table" then return invalid(spec, "not a table") end
     if type(spec.id) ~= "string" or spec.id == "" then return invalid(spec, "id must be a non-empty string") end
+    if Engine.RETIRED[spec.id] then return invalid(spec, Engine.RETIRED[spec.id]) end
     if Engine.byId[spec.id] then return invalid(spec, "id already registered") end
     if type(spec.text) ~= "function" then return invalid(spec, "text must be a function") end
     if spec.side ~= nil and spec.side ~= "left" and spec.side ~= "center" and spec.side ~= "right" then

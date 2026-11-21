@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Since the game stopped telling addons which realm you are on (20 November), Layer could mix up layers seen on different realms, and Alts could count characters with no known realm as being on your side. Layer now tells realms apart another way, and Alts says those characters are unknown instead.
+- Layer is gone. Since 20 November the game no longer lets addons tell which layer you're on (Blizzard announced it would switch layering addons off, and NPCs no longer give it away), so the block could only show a question mark. If a `GlassPanelLayer` folder is still in your AddOns folder after updating, delete it (or switch "Glass Panel [Layer]" off in the AddOns list): Glass Panel ignores it and says so in chat until you do.
+- Alts: since the game stopped telling addons which realm you are on (20 November), characters with no known realm could be counted as being on your side. They're now shown as unknown and left out of that total.
 - Alts (the AltStable block): the bar now shows the gold of your characters on this character's faction and ruleset, the gold you can actually mail around. The tooltip shows that total and everyone's. To keep everyone's on the bar, switch on "The bar shows every character's gold" in the plugin's options. Needs an AltStable that knows rulesets; with an older one, "this side" is this realm and faction.
 - Gold: the tooltip's session now shows what you started with, what you earned or spent, the rate per hour and how long the session has run, as Titan Panel's gold plugin does. The session is kept across a /reload and starts again only when you log in. "Reset the gold session" in the plugin's options starts a new one.
 
