@@ -64,6 +64,16 @@ eq(values, 2, "two values seen")
 eq(T.majority({ ["13621"] = 1, ["7122"] = 1, ["52070"] = 1 }), nil, "one value each: no consensus")
 eq(T.majority({ a = 2, b = 2 }), nil, "a tie: no consensus")
 eq(T.majority({ a = 3, b = 2 }), "a", "a clear majority of two or more")
+-- The nameplate step's check: a tie is inconclusive, not a pass (Codex on #170).
+WoW.units.target, WoW.units.nameplate1, WoW.units.nameplate2, WoW.units.nameplate3 =
+    { guid = "Creature-0-1-0-1-1-01" }, { guid = "Creature-0-1-0-1-1-02" },
+    { guid = "Creature-0-2-0-1-1-03" }, { guid = "Creature-0-2-0-1-1-04" }
+local okTie, whyTie = T.nameplateCheck()
+eq(okTie, false, "a 2-2 tie fails the nameplate check")
+check(whyTie:find("inconclusive", 1, true), "as inconclusive")
+WoW.units.nameplate3 = { guid = "Creature-0-1-0-1-1-05" }
+eq((T.nameplateCheck()), true, "three on one field: passes")
+WoW.units.target, WoW.units.nameplate1, WoW.units.nameplate2, WoW.units.nameplate3 = nil, nil, nil, nil
 
 -- The player, now and at each load event.
 fp("layer player")
@@ -105,20 +115,29 @@ eq(sent[1] and sent[1][3], "GUILD", "one GUILD addon message sent")
 eq(sent[1] and sent[1][1], "LayerProbe", "on our own prefix")
 local token = sent[1] and sent[1][2]
 check(type(token) == "string" and token:find("^ping:"), "a random token, not a bare ping")
+rawset(_G, "GetUnitName", function(unit, showServer) return unit == "player" and "Karuzo Elegia" or nil end)
 -- Another guild member running the probe sends a ping too: never taken for ours (Codex on #170).
 WoW.fire("CHAT_MSG_ADDON", "LayerProbe", "ping", "GUILD", "Other Prober-")
 WoW.fire("CHAT_MSG_ADDON", "LayerProbe", "ping:1:2", "GUILD", "Other Prober-")
 eq(T.ownEcho(), nil, "someone else's ping isn't our echo")
-eq(logHas("Other Prober"), nil, "and their name isn't logged")
+-- ...nor our own token sent back by someone else (Codex on #170, again).
+WoW.fire("CHAT_MSG_ADDON", "LayerProbe", token, "GUILD", "Other Prober-")
+eq(T.ownEcho(), nil, "our token from another sender isn't our echo")
+check(T.pending() ~= nil, "and our ping keeps waiting")
+check(logHas("our token, but from a sender that isn't this character: str13"), "said, by shape")
+eq(logHas("Other Prober"), nil, "their name is never logged")
 WoW.fire("CHAT_MSG_ADDON", "LayerProbe", token, "GUILD", "Karuzo Elegia-")
 check(logHas("own GUILD echo: sender \"Karuzo Elegia-\" (str14, '-' at 14, after it BLANK)"), "our echo, whole, its realm part blank")
-check(logHas("the sender's name part \"Karuzo Elegia\""), "its name part said")
 eq(T.ownEcho(), "Karuzo Elegia-", "kept for the procedure")
 eq(T.pending(), nil, "the ping is answered")
 local before = #LayerProbeDB.log
 WoW.fire("CHAT_MSG_ADDON", "LayerProbe", token, "GUILD", "Karuzo Elegia-")
 check(LayerProbeDB.log[before + 1] and LayerProbeDB.log[before + 1]:find("after it BLANK", 1, true)
       and not LayerProbeDB.log[before + 1]:find("Karuzo", 1, true), "the token again after the echo: shape only")
+-- A new ping forgets the last echo: the procedure waits for this send's (Codex on #170).
+T.ping()
+eq(T.ownEcho(), nil, "a new send clears the old echo")
+rawset(_G, "GetUnitName", nil)
 WoW.fire("CHAT_MSG_ADDON", "NovaWorldBuffs", "x", "GUILD", "Someone Else-Realm7")
 check(logHas("GUILD addon message, prefix \"NovaWorldBuffs\": sender str19, '-' at 13, after it str6"), "another sender: shape")
 eq(logHas("Someone"), nil, "never their name")

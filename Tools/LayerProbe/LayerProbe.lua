@@ -257,25 +257,33 @@ local function senderShape(sender)
         after:find("%S") and ("str" .. #after) or "BLANK")
 end
 
--- Only the echo of OUR outstanding ping is ours: its token is random and only
--- this client knows it, so another guild member running the probe (who sends a
--- ping too) is never taken for us and never logged by name (Codex on #170).
--- Whether the sender's name part matches ours is the measurement, so it's said.
+-- The sender's name part (before any "-") when it's our own full name, else nil.
+local function ownNamePart(sender)
+    if secret(sender) or type(sender) ~= "string" then return nil end
+    local name = call("GetUnitName", "player", false)
+    if secret(name) or type(name) ~= "string" or name == "" then return nil end
+    local part = sender:match("^(.-)%-") or sender
+    if part == name then return part end
+end
+
+-- Only the echo of OUR outstanding ping, from OUR character, is ours (Codex on
+-- #170, twice): the token is random, but it's sent to the whole guild, so
+-- another member could send it back. Both must hold before the sender is saved
+-- whole; anything else is logged by shape only, and our ping keeps waiting.
 local function onAddonMessage(prefix, text, channel, sender)
     if channel ~= "GUILD" then return end
     if pending and GetTime() - pending.at > PENDING_FOR then pending = nil end
-    local mine = pending ~= nil and prefix == PREFIX and not secret(text) and text == pending.token
-    if mine then
+    local token = pending ~= nil and prefix == PREFIX and not secret(text) and text == pending.token
+    if token and ownNamePart(sender) then
         pending = nil
         ownEcho = sender
         say("own GUILD echo: sender " .. show(sender) .. " (" .. senderShape(sender) .. ")")
-        local name = call("GetUnitName", "player", false)
-        local plain = type(sender) == "string" and not secret(sender)
-        local part = plain and (sender:match("^(.-)%-") or sender) or nil
-        local same = part ~= nil and not secret(name) and part == name
-        say("  GetUnitName(player, false) " .. show(name) .. "; the sender's name part " .. show(part)
-            .. (same and " MATCHES" or " doesn't match") .. "; Ambiguate(sender, none) "
-            .. show(plain and call("Ambiguate", sender, "none") or nil))
+        say("  name part matches GetUnitName(player, false); Ambiguate(sender, none) "
+            .. show(call("Ambiguate", sender, "none")))
+        return
+    end
+    if token then
+        say("our token, but from a sender that isn't this character: " .. senderShape(sender) .. " (not saved)")
         return
     end
     if senders >= MAX_SENDERS then return end
@@ -288,6 +296,7 @@ local function ping()
     if not call("IsInGuild") then say("ping: not in a guild"); return false end
     if type(chat) ~= "table" then say("ping: no C_ChatInfo"); return false end
     Probe:Call("RegisterAddonMessagePrefix", chat.RegisterAddonMessagePrefix, PREFIX)
+    ownEcho = nil   -- this send's echo only, never an earlier one (Codex on #170)
     pending = { token = string.format("ping:%d:%d", math.floor(GetTime() * 1000) % 1000000, math.random(1, 999999)),
                 at = GetTime() }
     Probe:Call("SendAddonMessage GUILD", chat.SendAddonMessage, PREFIX, pending.token, "GUILD")
@@ -312,8 +321,22 @@ local function creatureCheck(unit)
     return tonumber(f[3]) ~= nil, "server field " .. tostring(f[3])
 end
 
+-- The nameplate step's check: a layer only when the creatures agree (a shared
+-- field, no tie); a tie or one value each is inconclusive (Codex on #170).
+-- Sets the baseline the layer-change step compares against.
+local function nameplateCheck()
+    local _, tally, n = guids("nameplates check")
+    local best, count, values = majority(tally)
+    before = best
+    if not best then
+        return false, string.format("inconclusive: %d creatures, %d server value(s), none shared by two without a tie",
+            n, values)
+    end
+    return true, string.format("%d creatures, %d server value(s), %s shared by %d", n, values, best, count)
+end
+
 Probe:Steps("guids", {
-    rev = 2,   -- 2: no-consensus majority, token-correlated echo (Codex on #170)
+    rev = 3,   -- 2: no-consensus majority, token-correlated echo; 3: echo needs our name too (Codex on #170)
     title = "Layer: creature GUIDs since the 2026-11-20 hotfix",
     { text = "In an open-world zone (not an instance, not on a flight), out of combat. Type /fp to open the "
           .. "console beside this panel: the readings show there. Then press Next." },
@@ -337,13 +360,7 @@ Probe:Steps("guids", {
     { text = "Turn nameplates on (V for enemies, Shift+V for friendly NPCs) and stand where several show, "
           .. "then press Read.", button = "Read",
       run = function() local _, tally, n = guids("nameplates"); return n, majority(tally) end,
-      check = function()
-          local _, tally, n = guids("nameplates check")
-          local best, count, values = majority(tally)
-          before = best
-          return n >= 2 and count >= 2, string.format("%d creatures, %d server value(s), the most common %s x%d",
-              n, values, tostring(best), count)
-      end, screenshot = "nameplates" },
+      check = function() return nameplateCheck() end, screenshot = "nameplates" },
     { text = "Look at GlassPanel's Layer block on the bar (hover it for its tooltip).", auto = true, run = blockText },
     { text = "Does the Layer block show a layer number (not a grey ?), and does its tooltip name one?", ask = true,
       screenshot = "layer block" },
@@ -415,4 +432,5 @@ end)
 
 NS._test = { Probe = Probe, fields = fields, readUnit = readUnit, guids = guids, majority = majority,
              player = player, realm = realm, blockText = blockText, atLoad = atLoad, senderShape = senderShape,
-             ping = ping, ownEcho = function() return ownEcho end, pending = function() return pending end }
+             ping = ping, ownEcho = function() return ownEcho end, pending = function() return pending end,
+             nameplateCheck = nameplateCheck }
