@@ -67,9 +67,17 @@ local function now()
     return type(t) == "number" and t or nil
 end
 
+-- Which realm the saved layers belong to. Since the 2026-11-20 hotfix the
+-- client hides the realm on purpose: GetRealmName() is "" (AltStable #408,
+-- #412; #167 here). Then the player GUID's server field ("Player-<id>-..."),
+-- unmeasured: whether it still differs between realms isn't known. Else "?".
 local function realm()
     local r = P(GetRealmName())
-    return type(r) == "string" and r or "?"
+    if type(r) == "string" and r:find("%S") then return r end
+    local g = P(UnitGUID("player"))
+    local id = type(g) == "string" and g:match("^Player%-(%d+)%-")
+    if id then return "server:" .. id end
+    return "?"
 end
 
 -- This realm's zones (created on first use).

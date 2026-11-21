@@ -197,6 +197,31 @@ eq(textOf("altstable"), "1g0s0c |cff888888?|r", "unplaced records flagged on the
 t = tip()
 check(t:find("2 character(s) with no realm or faction known, not counted.", 1, true), "and said (hidden ones not)")
 check(t:find("Total (1)\t1g0s0c", 1, true), "total of the placed ones")
+-- The realm hidden (#167): an older AltStable can hand on "" for a character
+-- first scanned after the 2026-11-20 hotfix. Blank is unknown, never a realm
+-- every such character shares.
+WoW.alts.characters = {
+    char("Karuzo Elegia", "Doomhowl", "Horde", "PRIEST", 60, 10000, { current = true }),
+    char("Newone", "", "Horde", "MAGE", 10, 50000),
+    char("Blankfac", "Doomhowl", " ", "MAGE", 10, 50000),
+}
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
+eq(textOf("altstable"), "1g0s0c |cff888888?|r", "blank realm and faction: not counted, flagged")
+t = tip()
+check(t:find("2 character(s) with no realm or faction known, not counted.", 1, true), "and said")
+everyone(true)
+check(tip():find("\nUnknown realm\n", 1, true), "a blank realm's header reads Unknown realm")
+everyone(false)
+WoW.alts.characters[1].realm = ""
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
+eq(textOf("altstable"), "|cff888888?|r", "this character's realm blank: this side unknown")
+-- With the ruleset feature, a blank ruleset is unknown too.
+WoW.alts.features = { ruleset = true }
+WoW.alts.characters[1].ruleset = "PvP"
+WoW.alts.characters[2].ruleset = ""
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
+eq(textOf("altstable"), "1g0s0c |cff888888?|r", "the ruleset places this character; a blank one doesn't")
+WoW.alts.features = nil
 WoW.alts.characters = saved
 WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Since the game stopped telling addons which realm you are on (20 November), Layer could mix up layers seen on different realms, and Alts could count characters with no known realm as being on your side. Layer now tells realms apart another way, and Alts says those characters are unknown instead.
 - Alts (the AltStable block): the bar now shows the gold of your characters on this character's faction and ruleset, the gold you can actually mail around. The tooltip shows that total and everyone's. To keep everyone's on the bar, switch on "The bar shows every character's gold" in the plugin's options. Needs an AltStable that knows rulesets; with an older one, "this side" is this realm and faction.
 - Gold: the tooltip's session now shows what you started with, what you earned or spent, the rate per hour and how long the session has run, as Titan Panel's gold plugin does. The session is kept across a /reload and starts again only when you log in. "Reset the gold session" in the plugin's options starts a new one.
 

@@ -61,12 +61,19 @@ local function classColour(classFile)
     return string.format("|cff%02x%02x%02x", byte(r), byte(g), byte(b))
 end
 
+-- A string with something in it, else nil. Since the 2026-11-20 hotfix the
+-- client hides the realm (GetRealmName() is "", #167), and an AltStable from
+-- before its #413 can hand that "" on: blank is unknown, never a realm.
+local function known(v)
+    if type(v) == "string" and v:find("%S") then return v end
+end
+
 -- What places a character on a side: its ruleset (when AltStable says) or its
 -- realm, and its faction. nil when the record doesn't say.
 local function place(c, rulesets)
-    local where = c.realm
-    if rulesets then where = c.ruleset end   -- not `and/or`: a nil ruleset must not fall back to the realm
-    if type(where) ~= "string" or type(c.faction) ~= "string" then return nil end
+    local where = known(c.realm)
+    if rulesets then where = known(c.ruleset) end   -- not `and/or`: a nil ruleset must not fall back to the realm
+    if not (where and known(c.faction)) then return nil end
     return where
 end
 
@@ -182,8 +189,8 @@ GlassPanel.RegisterBlock({
                 if not c.hidden then
                     shown = shown + 1
                     if shown <= MAX_ROWS then
-                        if c.realm ~= realm then
-                            realm = c.realm
+                        if known(c.realm) ~= realm then
+                            realm = known(c.realm)
                             tt:AddLine(realm or "Unknown realm", 0.5, 0.8, 0.8)
                         end
                         local colour = classColour(c.class)
