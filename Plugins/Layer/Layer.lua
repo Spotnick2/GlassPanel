@@ -69,14 +69,16 @@ end
 
 -- Which realm the saved layers belong to. Since the 2026-11-20 hotfix the
 -- client hides the realm on purpose: GetRealmName() is "" (AltStable #408,
--- #412; #167 here). Then the player GUID's server field ("Player-<id>-..."),
--- unmeasured: whether it still differs between realms isn't known. Else "?".
+-- #412; #167 here; the porting guide, "The realm is hidden"). Then this
+-- character: a character never leaves its realm, so its own sightings are one
+-- realm's. Keyed by its whole GUID, an opaque id (the guide: never parse a
+-- server out of it, which may leave the GUID). Alts on one realm no longer
+-- share sightings, which last 2 h anyway. Else "?".
 local function realm()
     local r = P(GetRealmName())
     if type(r) == "string" and r:find("%S") then return r end
     local g = P(UnitGUID("player"))
-    local id = type(g) == "string" and g:match("^Player%-(%d+)%-")
-    if id then return "server:" .. id end
+    if type(g) == "string" and g:find("%S") then return "char:" .. g end
     return "?"
 end
 

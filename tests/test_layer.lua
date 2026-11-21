@@ -263,14 +263,14 @@ eq(textOf("layer"), "2", "ranked among Soulseeker's ids (100, 150, 200)")
 eq(GlassPanelLayerDB.realms.Soulseeker[1429][150], WoW.serverTime, "saved under its realm")
 eq(GlassPanelLayerDB.realms.Doomhowl[1429][150], nil, "not under ours")
 -- The realm hidden (#167, the 2026-11-20 hotfix: GetRealmName() is ""): the
--- player GUID's server field tells realms apart, never one "" for all.
+-- character (its whole GUID, opaque) keys its own sightings, never one "" for all.
 WoW.realm = ""
 WoW.units.player = { guid = "Player-4395-0A1B2C3D" }
-GlassPanelLayerDB.realms["server:4395"] = { [1429] = { [300] = WoW.serverTime, [400] = WoW.serverTime } }
+GlassPanelLayerDB.realms["char:Player-4395-0A1B2C3D"] = { [1429] = { [300] = WoW.serverTime, [400] = WoW.serverTime } }
 WoW.fire("ZONE_CHANGED_NEW_AREA")
 seen(350)
-eq(textOf("layer"), "2", "ranked among this server's ids (300, 350, 400)")
-eq(GlassPanelLayerDB.realms["server:4395"][1429][350], WoW.serverTime, "saved under the server id")
+eq(textOf("layer"), "2", "ranked among this character's ids (300, 350, 400)")
+eq(GlassPanelLayerDB.realms["char:Player-4395-0A1B2C3D"][1429][350], WoW.serverTime, "saved under the character")
 eq(GlassPanelLayerDB.realms[""], nil, "never under the blank name")
 WoW.units.player = { guid = WoW.Secret("guid.player") }
 WoW.fire("ZONE_CHANGED_NEW_AREA")
