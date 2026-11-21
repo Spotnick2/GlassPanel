@@ -26,17 +26,33 @@ WoW.alts.characters = {
     char("Shy", "Doomhowl", "Horde", "DRUID", 20, 999999, { hidden = true }),
 }
 
+local function everyone(on)
+    block("altstable").options[1].set(on)
+    WoW.tick()
+end
+
 GlassPanelAltStableDB = nil
 loadAddon()
 check(block("altstable"), "block registered")
 check(next(GlassPanel.failures) == nil, "no failures")
--- Default scope: every character, the sheet's total (hidden left out).
-eq(textOf("altstable"), "131g45s67c", "total of every visible character")
+-- Default scope (#163): this side. An AltStable without the ruleset feature:
+-- this realm and faction (Doomhowl Horde: Karuzo and Bankalt).
+eq(textOf("altstable"), "128g45s67c", "this realm and faction by default (no ruleset feature)")
 eq(block("altstable").widget.caption._text, "Alts: ", "caption")
-
--- Tooltip: grouped by realm, class colours, level, current marked, hidden
--- ones skipped, then the total.
 local t = tip()
+check(t:find("^Alts: this realm and faction\n"), "fallback header")
+check(not t:find("Allie", 1, true) and not t:find("Farway", 1, true), "other faction and realm left out")
+check(t:find("Total (2)\t128g45s67c", 1, true), "this side's total")
+check(t:find("Everyone (4)\t131g45s67c", 1, true), "and everyone's")
+check(t:find("1 hidden in AltStable", 1, true), "scoped hidden count")
+
+-- Every character (the option): the sheet's total, the whole list.
+everyone(true)
+eq(GlassPanelAltStableDB.scope, "all", "saved")
+eq(textOf("altstable"), "131g45s67c", "total of every visible character")
+-- Tooltip: grouped by realm, class colours, level, current marked, hidden
+-- ones skipped, then the total, then this side's.
+t = tip()
 check(t:find("^Alts\n"), "header")
 local dh = t:find("\nDoomhowl\n", 1, true)
 local karuzo = t:find("|cff88888860|r |cffffffffKaruzo Elegia|r |cff4dff4d(logged in)|r\t123g45s67c", 1, true)
@@ -47,6 +63,7 @@ check(dh and bank and karuzo and ss and far and dh < bank and bank < karuzo and 
       "rows by realm then name, under realm headers")
 check(not t:find("Shy", 1, true), "hidden character not listed")
 check(t:find("Total (4)\t131g45s67c", 1, true), "total line")
+check(t:find("this realm and faction (2)\t128g45s67c", 1, true), "this side's under it")
 check(t:find("1 hidden in AltStable, not counted.", 1, true), "hidden count said")
 check(t:find("Left-click: open AltStable", 1, true), "click hint")
 
@@ -65,31 +82,78 @@ eq(WoW.altsToggles, 1, "left-click toggles AltStable's sheet")
 w._scripts.OnClick(w, "RightButton")
 eq(WoW.altsToggles, 1, "right-click doesn't")
 
--- Option: this realm and faction only (the logged-in character's).
-block("altstable").options[1].set(true)
-WoW.tick()
-eq(GlassPanelAltStableDB.realmOnly, true, "saved")
+-- Back to this side.
+everyone(false)
+eq(GlassPanelAltStableDB.scope, nil, "the default stored as nil")
 eq(textOf("altstable"), "123g45s67c |cff888888?|r", "Doomhowl Horde only (Bankalt unknown)")
-t = tip()
-check(t:find("^Alts: this realm and faction\n"), "scoped header")
-check(not t:find("Allie", 1, true) and not t:find("Farway", 1, true), "other faction and realm left out")
-check(t:find("Total (2)", 1, true), "scoped count")
-check(t:find("1 hidden in AltStable", 1, true), "scoped hidden count")
 -- No record of this character yet: the scope is unknown, not zero.
 WoW.alts.characters[1].current = nil
 WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
 eq(textOf("altstable"), "|cff888888?|r", "no current record: unknown")
-check(tip():find("AltStable doesn't know this character yet.", 1, true), "said in the tooltip")
+t = tip()
+check(t:find("AltStable doesn't know this character yet.", 1, true), "said in the tooltip")
+check(t:find("Everyone (4)\t126g45s67c", 1, true), "everyone's total still shown")
 WoW.alts.characters[1].current = true
-block("altstable").options[1].set(false)
-WoW.tick()
-eq(GlassPanelAltStableDB.realmOnly, nil, "off stored as nil")
-eq(textOf("altstable"), "126g45s67c |cff888888?|r", "back to every character")
+WoW.alts.characters[2].money = 50000
+
+-- The ruleset feature (AltStable #405): this faction and ruleset. Soulseeker
+-- is a second PvP realm, so Farway is on this side; Allie isn't (Alliance).
+WoW.alts.features = { ruleset = true }
+for _, c in ipairs(WoW.alts.characters) do c.ruleset, c.rulesetName = "PvP", "PvP" end
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
+eq(textOf("altstable"), "130g45s67c", "this faction and ruleset, across its realms")
+t = tip()
+check(t:find("^Alts: Horde, PvP\n"), "header names the side")
+check(t:find("Farway", 1, true) and not t:find("Allie", 1, true), "same ruleset in, other faction out")
+check(t:find("Total (3)\t130g45s67c", 1, true), "this side's total")
+check(t:find("Everyone (4)\t131g45s67c", 1, true), "and everyone's")
+-- Another ruleset is another side, whatever the realm's name.
+WoW.alts.characters[4].ruleset, WoW.alts.characters[4].rulesetName = "Hardcore", "Hardcore"
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
+eq(textOf("altstable"), "128g45s67c", "another ruleset left out")
+-- The name falls back to the key.
+WoW.alts.characters[1].rulesetName = nil
+check(tip():find("^Alts: Horde, PvP\n"), "no display name: the key")
+-- This character's ruleset unreadable: the side is unknown.
+WoW.alts.characters[1].ruleset = nil
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
+eq(textOf("altstable"), "|cff888888?|r", "no ruleset for this character: unknown")
+check(tip():find("AltStable can't tell this character's ruleset or faction yet.", 1, true), "and why")
+WoW.alts.characters[1].ruleset = "PvP"
+-- Another record's ruleset unreadable: said, not counted.
+WoW.alts.characters[2].ruleset = nil
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
+eq(textOf("altstable"), "123g45s67c |cff888888?|r", "unplaced record flagged")
+check(tip():find("1 character(s) with no ruleset or faction known, not counted.", 1, true), "and said")
+-- Everyone on the bar (Codex on #164): this side's row keeps its warning...
+everyone(true)
+t = tip()
+check(t:find("Total (4)	131g45s67c", 1, true), "everyone's total")
+check(t:find("Horde, PvP (1)	123g45s67c", 1, true), "this side's row")
+check(t:find("1 character(s) with no ruleset or faction known, not counted in Horde, PvP's total.", 1, true),
+      "and its unplaced record said")
+-- ... and with this character unplaced, the row stays, unknown, with why.
+WoW.alts.characters[1].ruleset = nil
+WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
+eq(textOf("altstable"), "131g45s67c", "the bar's everyone total is unaffected")
+t = tip()
+check(t:find("This faction and ruleset	|cff888888?|r", 1, true), "this side's row: unknown")
+check(t:find("AltStable can't tell this character's ruleset or faction yet.", 1, true), "and why")
+everyone(false)
+WoW.alts.features = nil
+for _, c in ipairs(WoW.alts.characters) do c.ruleset, c.rulesetName = nil, nil end
+
+-- The old option: either value means the new default.
+GlassPanelAltStableDB = { realmOnly = true }
+loadAddon()
+eq(textOf("altstable"), "128g45s67c", "realmOnly saved: this side")
+everyone(true)
+eq(GlassPanelAltStableDB.realmOnly, nil, "the old key is dropped on a change")
 
 -- AltStable's own icon, never a coin (a coin before "37s 81c" reads as 37 gold).
 eq(block("altstable").icon, 8197123, "AltStable's icon")
 
--- Default scope: the bar reads only the totals, not the whole list.
+-- Every character: the bar reads only the totals, not the whole list.
 local reads = 0
 local get = AltStable.GetCharacters
 AltStable.GetCharacters = function() reads = reads + 1; return get() end
@@ -120,21 +184,19 @@ WoW.alts.characters = {}
 WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
 eq(textOf("altstable"), "|cff888888?|r", "no characters yet (before AltStable's scan): ?")
 
--- This realm and faction: a record with no realm or faction isn't dropped
--- silently: not counted, flagged and said.
+-- This side: a record with no realm or faction isn't dropped silently: not
+-- counted, flagged and said.
 WoW.alts.characters = {
     char("Karuzo Elegia", "Doomhowl", "Horde", "PRIEST", 60, 10000, { current = true }),
     char("Oldpeer", nil, "Horde", "MAGE", 10, 50000),
     char("Partial", "Doomhowl", nil, "MAGE", 10, 50000),
     char("Gone", nil, nil, "MAGE", 10, 50000, { hidden = true }),
 }
-block("altstable").options[1].set(true)
-WoW.tick()
+everyone(false)
 eq(textOf("altstable"), "1g0s0c |cff888888?|r", "unplaced records flagged on the bar")
 t = tip()
 check(t:find("2 character(s) with no realm or faction known, not counted.", 1, true), "and said (hidden ones not)")
 check(t:find("Total (1)\t1g0s0c", 1, true), "total of the placed ones")
-block("altstable").options[1].set(false)
 WoW.alts.characters = saved
 WoW.altsChanged(); WoW.flushTimers(0); WoW.tick()
 

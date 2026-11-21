@@ -296,10 +296,15 @@ core's `ADDON_LOADED`.
   counted), left-click `AltStable.ToggleSheet()`. Reads **only AltStable's public API**
   (`..\AltStable\docs\PUBLIC-API.md`, `PUBLIC_API_VERSION` 1), never `AltStableDB`; any other
   version: no block, one printed line and a failure. Repaints on its `CharactersChanged` callback
-  (no events). Default scope is every character, `GetTotals()` (the sheet's own figure); the plugin
-  option "Only this realm and faction" (`GlassPanelAltStableDB.realmOnly`) sums the logged-in
-  character's realm and faction itself, unknown until AltStable has this character; a record with no
-  realm or faction isn't counted but is flagged and said. Unknown money is a grey `?`, never 0 (no
+  (no events). **Two scopes (#163)**, both totals in the tooltip, the bar's one chosen by the plugin
+  option "The bar shows every character's gold" (`GlassPanelAltStableDB.scope = "all"`; default nil:
+  **this side**; the old `realmOnly` key means the default, dropped on a change). Everyone is
+  `GetTotals()` (the sheet's own figure). This side is summed here from `GetCharacters()`: the
+  logged-in character's **faction and ruleset** (Forever's realms are its rulesets; mail crosses
+  neither), from the `ruleset` / `rulesetName` fields when `PUBLIC_API_FEATURES.ruleset` (AltStable
+  #405), else its **realm and faction**. Unknown until AltStable has this character with both; a
+  record with no ruleset (realm) or faction isn't counted but is flagged and said (AltStable's item
+  tooltips keep such a record on this side instead: a gold total doesn't count what it can't place). Unknown money is a grey `?`, never 0 (no
   known gold at all: only `?`). AltStable's own icon (file ID 8197123), never a coin (Gold's reason);
   `replaces = "gold"` (#50: **live**, `Bar.ReplacedBy` inside `Bar.IsHidden`: Gold is hidden
   while this block is registered and not hidden, never stored, so a character with the plugin off or
