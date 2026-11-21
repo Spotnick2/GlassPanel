@@ -44,8 +44,9 @@ for a full-width bar; `/gpanel setup` can also write an Edit Mode layout that ma
   ones you pick), **Reagents** (your class's, the ones you pick), **Ammo**, **PvP** (flag and its
   countdown), **Role**, **Clock**, **Warlock** (soul shards, Healthstone, Soulstone) and
   **AltStable** (your alts' gold on this faction and ruleset, the gold you can mail around, and
-  everyone's in the tooltip; needs [AltStable](https://www.curseforge.com/wow/addons/altstable),
-  v1.11.0 or later for the ruleset: an older one groups by realm, which the game no longer gives).
+  everyone's in the tooltip, with what this character earned or spent this session, as Gold shows it;
+  needs [AltStable](https://www.curseforge.com/wow/addons/altstable), v1.11.0 or later for the
+  ruleset: an older one groups by realm, which the game no longer gives).
 - **Durability** and **Ammo** can warn you when they run low: a message in the middle of the
   screen with the raid-warning sound, once when the figure turns yellow and once when it turns
   red, never during a fight. Switch it on in each plugin's options.
