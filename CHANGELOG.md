@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.0.4
 
 - Layer is gone. Since 20 November the game no longer lets addons tell which layer you're on (Blizzard announced it would switch layering addons off, and NPCs no longer give it away), so the block could only show a question mark. If a `GlassPanelLayer` folder is still in your AddOns folder after updating, delete it (or switch "Glass Panel [Layer]" off in the AddOns list): Glass Panel ignores it and says so in chat until you do.
 - Alts: since the game stopped telling addons which realm you are on (20 November), characters with no known realm could be counted as being on your side. They're now shown as unknown and left out of that total.

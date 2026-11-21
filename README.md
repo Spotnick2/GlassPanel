@@ -38,12 +38,13 @@ for a full-width bar; `/gpanel setup` can also write an Edit Mode layout that ma
 - **Flight**: on a taxi, the time left, from the first trip (worked out from the route's length,
   then exact once you've landed it). Zoomed, a glass bar with the destination shows under
   the XP+ bar while you fly.
-- **Gold** (what you gained or spent this session), **Bags**, **Durability** (lowest item and the
-  repair cost), **GearScore** and item level, **Professions**, **Guild** (online and who),
-  **Currencies** (the ones you pick), **Reagents** (your class's, the ones you pick), **Ammo**,
-  **PvP** (flag and its countdown), **Role**, **Layer** (read from the NPCs around you),
-  **Clock**, **Warlock** (soul shards, Healthstone, Soulstone) and **AltStable** (your alts' gold,
-  needs [AltStable](https://www.curseforge.com/wow/addons/altstable)).
+- **Gold** (what you started the session with, earned or spent, and per hour; kept across a
+  `/reload`, new at each login), **Bags**, **Durability** (lowest item and the repair cost),
+  **GearScore** and item level, **Professions**, **Guild** (online and who), **Currencies** (the
+  ones you pick), **Reagents** (your class's, the ones you pick), **Ammo**, **PvP** (flag and its
+  countdown), **Role**, **Clock**, **Warlock** (soul shards, Healthstone, Soulstone) and
+  **AltStable** (your alts' gold on this faction and ruleset, the gold you can mail around, and
+  everyone's in the tooltip; needs [AltStable](https://www.curseforge.com/wow/addons/altstable)).
 - **Durability** and **Ammo** can warn you when they run low: a message in the middle of the
   screen with the raid-warning sound, once when the figure turns yellow and once when it turns
   red, never during a fight. Switch it on in each plugin's options.
@@ -89,9 +90,8 @@ titles then follow it.
 
 - Forever is Vanilla content on the modern client, so some readouts are honest about what the
   game won't tell an addon: a number the client hides shows as `?`, never a made-up figure.
-- The game doesn't tell addons which layer you're on, so **Layer** reads it from the NPCs around
-  you (two must agree) and numbers the layers you've seen in your zone. Another player may number
-  the same layer differently.
+- There's no Layer block any more: since 20 November 2026 the game no longer lets addons tell which
+  layer you're on.
 - The glass is [LibGlass](https://github.com/Spotnick2/LibGlass), shared with the other Glass
   addons. The newest copy among them runs, so a library fix reaches you through whichever Glass
   addon updated last.
@@ -108,8 +108,7 @@ you expected and what happened instead. Lua errors are hidden by default on this
 ## Coming from Titan Panel?
 
 Glass Panel includes the readouts of these Titan Panel plugins, so you can drop them:
-[Titan Panel [GearScore]](https://www.curseforge.com/wow/addons/titan-panel-gearscore) (the GearScore plugin),
-[Titan Panel [Layer]](https://www.curseforge.com/wow/addons/titan-panel-layer) (the Layer plugin) and
+[Titan Panel [GearScore]](https://www.curseforge.com/wow/addons/titan-panel-gearscore) (the GearScore plugin) and
 [Titan Panel [XP]](https://www.curseforge.com/wow/addons/titan-panel-xp) (the XP+ plugin).
 
 ## Development
