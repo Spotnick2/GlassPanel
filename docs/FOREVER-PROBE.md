@@ -3,12 +3,39 @@
 What GlassPanel's probes measured in game. Each entry names its build. Addon-agnostic findings are
 copied to `C:\Projects\WoW\References\Docs\PORTING-TBC-TO-FOREVER.md`.
 
-## Creature GUIDs since the realm hotfix (LayerProbe, #169): not run yet
+## Creature GUIDs since the realm hotfix (LayerProbe, #169): 1.60.1.71037, 2026-11-20
 
-`/fp steps layer guids` measures whether a creature GUID's server field is still the layer after the
-2026-11-20 hotfix hid the realm (#167). It reads the target, mouseover and nameplate GUIDs, the field
-across a `SHARD_TRANSFER`, the player's GUID at each load event, the realm APIs, the `C_GameRules`
-rulesets and a GUILD addon message's sender. Asked by TitanLayer, which reads the same field.
+The owner ran `/fp steps layer guids` on a level-1 human in Northshire Valley (Elwynn, map 1429), a PvE
+realm, then `/fp layer guids` once more among wolves with nameplates on. Asked by TitanLayer, which reads
+the same field. The layer change (`SHARD_TRANSFER`) and the guild message steps were skipped.
+
+**Creature GUIDs no longer carry the layer.** Before the 2026-11-20 hotfix, a creature GUID's server field
+was the layer and creatures nearby agreed on it (#138, after LayerSwap). Now every creature has its own:
+
+| NPC | server | zoneUID |
+|---|---|---|
+| Deputy Willem (823), targeted | 13621 | 358817 |
+| Godric Rothgar (1213), beside him, mouseover | 7122 | 3910430 |
+| Young Wolf (299), nameplate 1 | 52070 | 7625356 |
+| Young Wolf, nameplate 2 | 26102 | 14298300 |
+| Young Wolf, nameplate 3 | 5827 | 16775450 |
+| Young Wolf, nameplate 4 | 6330 | 682402 |
+| Young Wolf, nameplate 5 | 5618 | 16296650 |
+
+Seven creatures, seven server fields, seven zoneUIDs. The GUIDs keep their shape: 7 fields, plain strings,
+`Creature-0-<n>-0-<n>-<npc id>-<spawn>`, never secret. The Layer block showed a grey `?` (it needs two
+creatures to agree, and none do). **Layer can't tell layers apart any more.** Blizzard announced the same day
+that targeted layering addons would be disabled through API changes; this is how.
+
+**The realm** (the porting guide's "The realm is hidden" section has these too):
+- `GetRealmName()` `""`, `GetRealmID()` `0`, `GetNormalizedRealmName()` `""` (not nil).
+- `UnitFullName("player")` is `"Zoruka", "Sumner"`: the **surname** where the realm was, the same as
+  `UnitName("player")`. `GetUnitName("player", false)` is `"Zoruka Sumner"`.
+- `C_GameRules.IsGameRuleActive`: `Enum.GameRule.HardcoreRuleset` 10, `RPRuleset` 214, `PvPRuleset` 213 exist
+  and answer booleans, all `false` here (PvE).
+- The player's GUID (`Player-6796-…`) reads at file scope, `ADDON_LOADED`, `PLAYER_LOGIN` and
+  `PLAYER_ENTERING_WORLD`, the same each time, after a `/reload` (a fresh login isn't measured). Layer's
+  per-character key (#168) is readable from the start.
 
 ## RestedXP Guides (RXPProbe, #80): 1.60.1.70374, 2026-10-15
 
