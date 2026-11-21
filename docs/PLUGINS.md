@@ -199,3 +199,11 @@ belongs (an unplaced one at `API.FloatDefaultY(frame)`, a slot stacked under the
 lower `order`). Call `API.PlaceFloats()` after the float shows or hides, and `API.SnapFloat(frame)` after
 a drop and before saving its spot (it moves the frame clear of another float). A saved spot is never
 moved by the core. RegisterFloat also tracks the frame for the top-edge announcement. Additive.
+
+**The money session (#160).** `GlassPanel.API.MoneySession()` returns this character's gold session as a
+fresh table, `{ start, at, now, delta, elapsed }` (copper at its start, server time it started, copper now,
+`now - start` (negative: spent), seconds since, or nil when the server time can't be read), or nil while
+there's none: before the first plain `GetMoney`, or while the money is hidden. It's kept across a
+`/reload` and starts again at each login. `GlassPanel.API.ResetMoneySession()` starts it again now and
+returns true, or false when the money can't be read (it then starts at the next plain read). Gold and
+Alts both show it. Additive: `API_VERSION` is unchanged.

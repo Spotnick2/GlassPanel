@@ -36,7 +36,7 @@ list; the layout keeps a disabled plugin's place. `test_toc.lua` checks every pl
 `.pkgmeta` `move-folders` line.
 
 Core TOC load order: `Libs\LibGlass-1.0\LibGlass-1.0.xml` → `Libs\LibTaxiTime-1.0\LibTaxiTime-1.0.xml` → `Compat.lua` → `Suite.lua` → `Glass.lua` → `Engine.lua` → `Layout.lua` → `Bar.lua` →
-`Room.lua` → `Edge.lua` → `Floats.lua` → `Settings.lua` → `Share.lua` → `Setup.lua` → `Options.lua` → `GlassPanel.lua`. Plugins load after the
+`Room.lua` → `Edge.lua` → `Floats.lua` → `Money.lua` → `Settings.lua` → `Share.lua` → `Setup.lua` → `Options.lua` → `GlassPanel.lua`. Plugins load after the
 core's `ADDON_LOADED`.
 
 - **`Compat.lua`**: `GlassPanel.API`, the only route to client APIs that moved or may be absent.
@@ -206,11 +206,16 @@ core's `ADDON_LOADED`.
   screen; `Bar.Layout` marks them dirty when they come back.
 - **`Plugins\Gold`, `Plugins\Clock`**: gold (secret-safe) and the clock (hides Blizzard's
   minimap clock). Gold's **session** (#161, TitanGold's stats): started with, earned/spent, per hour (after
-  5 min), length, in the tooltip; the baseline is the first plain `GetMoney`, saved per character
-  (`GlassPanelGoldDB.session = { start, at }`, `at` from `GetServerTime`). The load's first
+  5 min), length, in the tooltip, read from the core's session (`Money.lua`). The plugin option "Reset the
+  gold session" starts one now.
+- **`Money.lua`** (#160): this character's money session, **in the core** because Alts replaces Gold on
+  the bar and both show it: `API.MoneySession()` (a fresh `{ start, at, now, delta, elapsed }`, or nil
+  while there's none or the money is hidden) and `API.ResetMoneySession()` (true, or false while hidden).
+  The baseline is the first plain `GetMoney`, saved in the core's per-character
+  `GlassPanelCharDB.moneySession = { start, at }` (`at` from `GetServerTime`). The load's first
   `PLAYER_ENTERING_WORLD` decides: `isReloadingUi` plainly true takes the saved one back (checked whole),
-  anything else drops it at once (even while money is secret) and starts again; unmeasured by us. The
-  plugin option "Reset the gold session" starts one now.
+  anything else drops it at once (even while money is secret) and starts again; unmeasured by us. Its
+  own frame (`PLAYER_ENTERING_WORLD`, `PLAYER_MONEY`), under pcall (`money:session`). Additive.
   Plugins use the **public** API only, the same one third-party plugins get.
 - **`Plugins\Professions`** (#15): icon + coloured rank/max per primary profession (secondary ones in the
   tooltip), from `C_SkillInfo.GetSkillLineInfo(i)` (a struct) matched by **skillID**, not name
