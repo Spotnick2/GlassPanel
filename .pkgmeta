@@ -18,7 +18,6 @@ move-folders:
   GlassPanel/Plugins/Professions: GlassPanelProfessions
   GlassPanel/Plugins/Currencies: GlassPanelCurrencies
   GlassPanel/Plugins/Role: GlassPanelRole
-  GlassPanel/Plugins/Layer: GlassPanelLayer
   GlassPanel/Plugins/GearScore: GlassPanelGearScore
   GlassPanel/Plugins/AltStable: GlassPanelAltStable
   GlassPanel/Plugins/Warlock: GlassPanelWarlock

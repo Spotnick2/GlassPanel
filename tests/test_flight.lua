@@ -18,12 +18,12 @@ WoW.taxi.routes = { [2] = { 1, 2 }, [3] = { 1, 2, 3 } }
 -- Pick `slot` on the flight map and take off; the flight runs from WoW.now.
 local function takeOff(slot)
     TakeTaxiNode(slot)
-    WoW.layer.taxi = false   -- still false when control goes (EllesmereUI's note)
+    WoW.taxi.on = false   -- still false when control goes (EllesmereUI's note)
     WoW.fire("PLAYER_CONTROL_LOST"); WoW.tick()
-    WoW.layer.taxi = true
+    WoW.taxi.on = true
 end
 local function landNow()
-    WoW.layer.taxi = false
+    WoW.taxi.on = false
     WoW.fire("PLAYER_CONTROL_GAINED"); WoW.tick()
 end
 local function repaint() WoW.fireTickers(); WoW.tick() end
@@ -123,7 +123,7 @@ repaint()
 WoW.now = 6000
 TakeTaxiNode(2)
 WoW.now = 6010
-WoW.layer.taxi = false
+WoW.taxi.on = false
 WoW.fire("PLAYER_CONTROL_LOST"); WoW.tick()
 eq(F().flight(), nil, "a pick 10 s old doesn't start a flight")
 WoW.flushTimers(); WoW.tick()
@@ -131,13 +131,13 @@ eq(F().flight(), nil, "...and off the taxi a second later, still none")
 WoW.fire("PLAYER_CONTROL_GAINED")
 -- A flight not picked here (a quest's): noticed a second later, counting up, its route unknown.
 WoW.fire("PLAYER_CONTROL_LOST"); WoW.tick()
-WoW.layer.taxi = true
+WoW.taxi.on = true
 WoW.flushTimers(); WoW.tick()
 fl = F().flight()
 check(fl ~= nil and fl.to == nil, "on the taxi a second later: a flight, route unknown")
 eq(textOf("flight"), "|cff999999+0:00|r", "counting up")
 -- Its landing missed: off the taxi with no control back, the ticker ends it after SETTLE s.
-WoW.layer.taxi = false
+WoW.taxi.on = false
 WoW.now = 6030
 repaint()
 check(F().flight() ~= nil, "just found off the taxi: control back may still come")
@@ -151,7 +151,7 @@ GlassPanelFlightDB.routes["901>902"] = nil
 WoW.now = 6100
 takeOff(2)
 WoW.now = 6150
-WoW.layer.taxi = false
+WoW.taxi.on = false
 repaint()
 check(F().flight() ~= nil, "off the taxi before control back: still pending")
 WoW.now = 6151
@@ -166,7 +166,7 @@ WoW.now = 6260
 WoW.fire("PLAYER_CONTROL_GAINED"); WoW.tick()
 check(F().flight() ~= nil, "control back still on the taxi: not landed yet")
 WoW.now = 6261
-WoW.layer.taxi = false
+WoW.taxi.on = false
 repaint()
 eq(F().flight(), nil, "off the taxi at the next tick: landed")
 eq(GlassPanelFlightDB.routes["901>902"].base, 60, "...and learned, timed at control back")
@@ -200,11 +200,11 @@ landNow()
 eq(GlassPanelFlightDB.routes["901>902"].base, 89.6, "a resumed flight teaches nothing")
 -- Saved too long ago, or not on a taxi: no resume.
 GlassPanelFlightDB.current = { route = { keys = { 901, 902 }, names = { "A", "B" } }, at = WoW.serverTime - 99999 }
-WoW.layer.taxi = true
+WoW.taxi.on = true
 loadAddon()
 fl = F().flight()
 check(fl ~= nil and fl.to == nil, "a stale save: a flight, route unknown")
-WoW.layer.taxi = false
+WoW.taxi.on = false
 WoW.fire("PLAYER_CONTROL_GAINED"); WoW.tick()
 GlassPanelFlightDB.current = { route = { keys = { 901 }, names = { "A" } }, at = WoW.serverTime }
 loadAddon()
@@ -256,13 +256,13 @@ GlassPanelFlightDB.routes["901>902"] = nil
 WoW.now = 7800
 takeOff(2)
 WoW.now = 7810
-WoW.layer.taxi = false
+WoW.taxi.on = false
 repaint()   -- off the taxi for a moment
 WoW.now = 7811
-WoW.layer.taxi = true
+WoW.taxi.on = true
 repaint()   -- back on
 WoW.now = 7870
-WoW.layer.taxi = false
+WoW.taxi.on = false
 repaint()   -- the real landing: off the taxi, control back not yet
 check(F().flight() ~= nil, "the earlier moment off the taxi doesn't count: still waiting")
 WoW.now = 7871

@@ -1,15 +1,18 @@
 -- Flight stubs (Plugins/Flight, #124). From the 70532 dump: TakeTaxiNode,
 -- TaxiNodeName, GetNumRoutes, TaxiGetNodeSlot, GetTaxiMapID,
 -- C_TaxiMap.GetAllTaxiNodes(uiMapID) (TaxiNodeInfo: nodeID, slotIndex, name, ...),
--- TaxiRequestEarlyLanding. UnitOnTaxi is Layer's stub (WoW.layer.taxi); the
--- Frequent Flier node is in xp.lua's C_Traits (WoW.frequentFlier).
+-- TaxiRequestEarlyLanding, UnitOnTaxi (WoW.taxi.on, the player only; Layer's
+-- stub until Layer was retired, #171); the Frequent Flier node is in xp.lua's
+-- C_Traits (WoW.frequentFlier).
 --   WoW.taxi.mapID: GetTaxiMapID() (nil: the map has none)
 --   WoW.taxi.nodes[slot] = { id = nodeID or nil, name = "Crossroads, The Barrens" }
 --   WoW.taxi.routes[slot] = { slot, slot, ... }: the slots flown through, start first
 --   WoW.taxi.taken: the slots TakeTaxiNode was called with; WoW.taxi.early: early landings asked
 table.insert(WoW.resetHooks, function()
-    WoW.taxi = { mapID = 1414, nodes = {}, routes = {}, taken = {}, early = 0 }
+    WoW.taxi = { mapID = 1414, nodes = {}, routes = {}, taken = {}, early = 0, on = false }
 end)
+
+function UnitOnTaxi(unit) return unit == "player" and WoW.taxi.on end
 
 function TakeTaxiNode(slot) table.insert(WoW.taxi.taken, slot) end
 function TaxiRequestEarlyLanding() WoW.taxi.early = WoW.taxi.early + 1 end

@@ -49,7 +49,8 @@ Plugins (every block is one): **XP+** (#3, zoomable), **Combat** (#108, zoomable
 **Gold**, **Clock**, **Durability** (#12), **Bags** (#13), **PvP** (#14), **Professions** (#15),
 **GearScore** (#16), **Layer** (#17), **Guild** (#18), **Role** (#20), **Currencies** (#47),
 **AltStable** bridge (#46), **Warlock** (#67), **Reagents** (#68), **Ammo** (#66).
-Location was dropped: the minimap already shows it. RestedXP was dropped (#98).
+Location was dropped: the minimap already shows it. RestedXP was dropped (#98). Layer was retired after
+v1.0.3 (#171): since the 2026-11-20 hotfix, creature GUIDs no longer carry the layer (#169).
 
 Core: free lanes and drag and drop, room made for Blizzard's top frames without moving them,
 the opt-in Edit Mode layout, the options page, export/import, three glass looks, windows in
