@@ -88,7 +88,8 @@ WoW.realm = "Doomhowl"
 
 -- GlassPanel's Layer block.
 fp("layer block")
-check(logHas("Layer block shows: "), "the block's text read")
+-- (Layer is retired by #171: then the probe says so instead.)
+check(logHas("Layer block shows: ") or logHas("Layer block: not loaded"), "the block's text read, or its absence said")
 
 -- A guild addon message: our own echo whole, others by shape only.
 WoW.guild.inGuild = true
