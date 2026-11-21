@@ -142,6 +142,15 @@ if (Test-Path $pluginRoot) {
     }
 }
 
+# Plugins we retired: a folder left from an older deploy still loads (the core
+# refuses its block, but the folder stays). Said, never deleted here (#171).
+foreach ($retired in @("GlassPanelLayer")) {
+    $old = Join-Path $AddOnsPath $retired
+    if (Test-Path -LiteralPath $old) {
+        Write-Host "  WARNING: $retired is retired (#171) but still installed: delete $old" -ForegroundColor Yellow
+    }
+}
+
 if ($Probe) { Deploy-Probes }
 
 Write-Host ""

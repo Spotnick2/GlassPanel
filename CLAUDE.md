@@ -242,6 +242,8 @@ core's `ADDON_LOADED`.
   side by side, seven values; `docs/FOREVER-PROBE.md`), and Blizzard announced layering addons would be
   disabled, so the block could only show `?`. The code is in git history (the last version: #168's
   per-character keys after the realm went dark); `Tools\LayerProbe` stays, to measure again if that changes.
+  An old `GlassPanelLayer` left in AddOns is refused by `RegisterBlock` (`Engine.RETIRED`, with a line saying to
+  delete it), and deploy warns about the folder (never deletes it).
 - **`Plugins\GearScore`** (#16): TitanGearScore's per-item formula on a fixed 200-point bracket
   scale (not derived from `GetBuildInfo`), plus Blizzard's `GetAverageItemLevel()` equipped value.
   Items via `GetInventoryItemID`/`Link` and `C_Item.GetItemInfo` (the global `GetItemInfo` is

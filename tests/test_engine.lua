@@ -406,4 +406,11 @@ WoW.tick()
 block("dcbad").widget._scripts.OnDoubleClick(block("dcbad").widget, "LeftButton")
 check(GlassPanel.failures["dcbad:onDoubleClick"] ~= nil, "a throwing onDoubleClick is recorded")
 
+-- A retired block (#171): an old plugin copy left in AddOns is refused, with
+-- a line saying what to do (Codex on #172).
+WoW.chat = {}
+eq(GlassPanel.RegisterBlock({ id = "layer", text = function() return "1" end }), nil, "a retired id is refused")
+check(table.concat(WoW.chat, "\n"):find("Delete the GlassPanelLayer folder", 1, true), "and the player is told what to do")
+eq(GlassPanel.Engine.byId.layer, nil, "nothing registered")
+
 done("test_engine")
