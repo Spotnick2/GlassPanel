@@ -556,7 +556,11 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`) and the Li
   now: RXPProbe's went with the RestedXP plugin, #98). **RestProbe** (#81): the rested pool against the cap, **Well Rested** (a node in Forever's
   account-wide Legacy trees, read through `C_Traits` as Blizzard_MicroMenu's Camelot override does:
   Adventure 1188, Progression 1189, Professions 1187; matched by spell name), XP buffs (auras with
-  their IDs) and the rested build-up rate: `/fp steps rest rested`.
+  their IDs) and the rested build-up rate: `/fp steps rest rested`. **LayerProbe** (#169, `test_layerprobe`):
+  creature GUIDs since the 2026-11-20 hotfix (raw target, mouseover and nameplate GUIDs, tallied by the
+  server field; other players by shape only), the field across `SHARD_TRANSFER` (read again at 2, 5,
+  12 s), the player's GUID at each load event, the realm APIs and `C_GameRules`, and a GUILD addon
+  message's sender shape (our own echo whole), for Layer and TitanLayer: `/fp steps layer guids`.
 
 ## Addon basics
 

@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: LayerProbe
+## Notes: Throwaway probe for Layer (#169): creature GUIDs since the 2026-11-20 hotfix, the player's GUID, the hidden realm. A ForeverProbe module: /fp layer
+## Author: Spotnick
+## Version: dev
+## Dependencies: ForeverProbe
+## OptionalDeps: GlassPanel, GlassPanelLayer
+## SavedVariables: LayerProbeDB
+
+LayerProbe.lua

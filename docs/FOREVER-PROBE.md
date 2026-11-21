@@ -3,6 +3,13 @@
 What GlassPanel's probes measured in game. Each entry names its build. Addon-agnostic findings are
 copied to `C:\Projects\WoW\References\Docs\PORTING-TBC-TO-FOREVER.md`.
 
+## Creature GUIDs since the realm hotfix (LayerProbe, #169): not run yet
+
+`/fp steps layer guids` measures whether a creature GUID's server field is still the layer after the
+2026-11-20 hotfix hid the realm (#167). It reads the target, mouseover and nameplate GUIDs, the field
+across a `SHARD_TRANSFER`, the player's GUID at each load event, the realm APIs, the `C_GameRules`
+rulesets and a GUILD addon message's sender. Asked by TitanLayer, which reads the same field.
+
 ## RestedXP Guides (RXPProbe, #80): 1.60.1.70374, 2026-10-15
 
 The owner ran `/fp steps rxp arrow`: a Horde character in The Barrens, guide "12-17 The Barrens"
