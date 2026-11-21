@@ -272,10 +272,14 @@ seen(350)
 eq(textOf("layer"), "2", "ranked among this character's ids (300, 350, 400)")
 eq(GlassPanelLayerDB.realms["char:Player-4395-0A1B2C3D"][1429][350], WoW.serverTime, "saved under the character")
 eq(GlassPanelLayerDB.realms[""], nil, "never under the blank name")
+-- No readable GUID either (Codex on #168): this session only, never saved, and
+-- a saved "?" from an older copy is never read (another character's realm).
 WoW.units.player = { guid = WoW.Secret("guid.player") }
+GlassPanelLayerDB.realms["?"] = { [1429] = { [100] = WoW.serverTime, [200] = WoW.serverTime } }
 WoW.fire("ZONE_CHANGED_NEW_AREA")
 seen(350)
-check(GlassPanelLayerDB.realms["?"] and GlassPanelLayerDB.realms["?"][1429][350], "no readable GUID either: '?'")
+eq(GlassPanelLayerDB.realms["?"][1429][350], nil, "no identity: not saved")
+eq(textOf("layer"), "1", "ranked among this session's ids only (a saved '?' would make 350 the 3rd)")
 WoW.units.player = nil
 WoW.realm = "Doomhowl"
 
@@ -324,4 +328,11 @@ check(textOf("layer") ~= GREY_Q, "11 s after the first move: they vote again")
 WoW.units, WoW.timers = {}, {}
 
 check(next(GlassPanel.failures) == nil, "no failures")
+-- A "?" saved by an older copy is dropped at load (Codex on #168).
+GlassPanelLayerDB = { v = 2, realms = { ["?"] = { [1429] = { [100] = WoW.serverTime } },
+                                        Doomhowl = { [1429] = { [100] = WoW.serverTime } } } }
+loadAddon()
+eq(GlassPanelLayerDB.realms["?"], nil, "a saved '?' is dropped")
+eq(GlassPanelLayerDB.realms.Doomhowl[1429][100], WoW.serverTime, "real realms kept")
+
 done("test_layer")

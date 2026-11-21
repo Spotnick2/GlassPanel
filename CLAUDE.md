@@ -248,6 +248,7 @@ core's `ADDON_LOADED`.
   layers exist). `GlassPanelLayerDB.realms[realm][zoneMap][id] = GetServerTime()` (nil time: nothing saved;
   `realm` is `GetRealmName()` while it reads, and since the 2026-11-20 hotfix hid it (`""`, #167) this
   character, `char:<whole player GUID>` (opaque, as the porting guide says: never a server parsed out of it;
+  with neither, `?` is this session only, never saved, and a saved `?` is dropped at load;
   a character never leaves its realm), else `?`; Blizzard said layering addons will be disabled through API
   changes, and the creature GUID's server field Layer reads may go too),
   forgotten after 2 h; `v = 2` (older saves held zoneUIDs, dropped once). **`SHARD_TRANSFER`** (the game moved us):

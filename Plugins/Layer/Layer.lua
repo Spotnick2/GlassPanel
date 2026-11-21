@@ -82,9 +82,14 @@ local function realm()
     return "?"
 end
 
--- This realm's zones (created on first use).
+-- This realm's zones (created on first use). With no realm and no character
+-- to file them under ("?"), sightings stay in this session only, never saved
+-- (Codex on #168): a saved "?" would rank another character's realm against
+-- ours within the 2 h.
+local unplaced = {}
 local function maps()
     local r = realm()
+    if r == "?" then return unplaced end
     realms[r] = realms[r] or {}
     return realms[r]
 end
@@ -256,7 +261,7 @@ local function load()
     local saved, t = type(db.realms) == "table" and db.realms or {}, now()
     local clean = {}
     for r, rmaps in pairs(saved) do
-        if type(r) == "string" and type(rmaps) == "table" then
+        if type(r) == "string" and r ~= "?" and type(rmaps) == "table" then   -- "?": never ours (above)
             for map, ids in pairs(rmaps) do
                 if type(map) == "number" and type(ids) == "table" then
                     for id, seen in pairs(ids) do
@@ -272,7 +277,7 @@ local function load()
         end
     end
     for r, rmaps in pairs(realms) do
-        for map, ids in pairs(rmaps) do
+        for map, ids in pairs(r ~= "?" and rmaps or {}) do
             clean[r] = clean[r] or {}
             clean[r][map] = clean[r][map] or {}
             for id, seen in pairs(ids) do clean[r][map][id] = seen end
