@@ -298,4 +298,26 @@ GlassPanelDB.hidden.gold = nil   -- (as an imported setup could)
 GlassPanel.Bar.Layout()
 eq(block("gold").widget._shown, false, "replaced again")
 
+-- This character's gold this session (#160): the core's session, shared with
+-- Gold, which this block replaces on the bar.
+GlassPanelCharDB = nil
+WoW.moneySecret, WoW.money = false, 100000
+loadAddon({ plugins = { "GlassPanelAltStable" } })
+WoW.money = 112345
+WoW.fire("PLAYER_MONEY"); WoW.tick()
+check(tip():find("This session (this character)\t+1g23s45c", 1, true), "the session line: earned")
+WoW.money = 90000
+check(tip():find("This session (this character)\t-1g0s0c", 1, true), "spent")
+WoW.moneySecret = true
+check(not tip():find("This session", 1, true), "hidden money: no line, never a guess")
+WoW.moneySecret = false
+local resetOpt
+for _, o in ipairs(block("altstable").options) do if o.label == "Reset the gold session" then resetOpt = o end end
+check(resetOpt and resetOpt.run, "a reset option")
+WoW.chat = {}
+resetOpt.run()
+check(tip():find("This session (this character)\t0g0s0c", 1, true), "reset: nothing since")
+check(table.concat(WoW.chat, "\n"):find("starts again now", 1, true), "and said")
+GlassPanelCharDB = nil
+
 done("test_altstable")

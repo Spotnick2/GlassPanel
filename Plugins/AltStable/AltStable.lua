@@ -151,6 +151,30 @@ local UNKNOWN = "|cff888888?|r"
 
 local function refresh() GlassPanel.Refresh(ID) end
 
+-- This character's money this session (#160): the core's session (Money.lua),
+-- shared with Gold, which this block replaces on the bar. Nothing while there's
+-- no session (before the first plain GetMoney, or the money hidden right now).
+local function sessionLine(tt)
+    local s = API.MoneySession()
+    if not s then return end
+    local delta, sign, r, g = s.delta, "+", 0.3, 1
+    if delta < 0 then sign, r, g, delta = "-", 1, 0.3, -delta end
+    if delta == 0 then sign, r, g = "", 0.7, 0.7 end
+    tt:AddLine(" ")
+    tt:AddDoubleLine("This session (this character)", sign .. API.CoinText(delta), 1, 0.82, 0, r, g,
+        r == 0.7 and 0.7 or 0.3)
+end
+
+local function resetSession()
+    if API.ResetMoneySession() then
+        API.Print("Alts: this character's gold session starts again now.")
+    else
+        API.Print("Alts: the gold session starts again at the next readable amount (the client is hiding your money).")
+    end
+    refresh()
+    GlassPanel.Refresh("gold")
+end
+
 if not (type(AS) == "table" and AS.PUBLIC_API_VERSION == 1) then
     local why = "AltStable's public API version 1 not found (got "
         .. tostring(type(AS) == "table" and AS.PUBLIC_API_VERSION or nil) .. ")"
@@ -171,6 +195,9 @@ GlassPanel.RegisterBlock({
     replaces = "gold",
     order = 40,   -- left lane, right after Gold
     onInit = function() AS.RegisterCallback("CharactersChanged", refresh) end,
+    -- An open tooltip's session line follows the money (the engine redraws it
+    -- after a repaint); the bar's total waits for AltStable's own rescan.
+    events = { "PLAYER_MONEY" },
     text = function()
         local t = gather(false)
         local coins = t and totalText(t)
@@ -233,6 +260,7 @@ GlassPanel.RegisterBlock({
             tt:AddDoubleLine("Everyone (" .. other.characters .. ")", totalText(other) or UNKNOWN,
                 0.8, 0.8, 0.8, 0.8, 0.8, 0.8)
         end
+        sessionLine(tt)
         tt:AddLine(" ")
         tt:AddLine("Left-click: open AltStable", 0.3, 1, 0.3)
     end,
@@ -248,5 +276,8 @@ GlassPanel.RegisterBlock({
               d.scope, d.realmOnly = on and "all" or nil, nil
               refresh()
           end },
+        { label = "Reset the gold session",
+          note = "This character's gold this session, in the tooltip: kept across /reload, new at each login.",
+          run = resetSession },
     },
 })

@@ -64,11 +64,11 @@ local function goldTip()
     b.widget._scripts.OnEnter(b.widget)
     return tipLines()
 end
-GlassPanelGoldDB = nil
+GlassPanelCharDB = nil
 WoW.moneySecret, WoW.money, WoW.serverTime = false, 10000, 100000
 loadAddon()
-eq(GlassPanelGoldDB.session.start, 10000, "the session is saved per character")
-eq(GlassPanelGoldDB.session.at, 100000, "with its start time")
+eq(GlassPanelCharDB.moneySession.start, 10000, "the session is saved per character")
+eq(GlassPanelCharDB.moneySession.at, 100000, "with its start time")
 WoW.money, WoW.serverTime = 30000, 100000 + 2 * 3600
 loadAddon({ reload = true })
 local tip = goldTip()
@@ -87,13 +87,13 @@ tip = goldTip()
 eq(tip["Started with"], "0g50s0c", "a login starts a new session")
 eq(tip["Earned"], "0g0s0c", "with nothing earned yet")
 eq(tip["Per hour"], nil, "no rate for a session under 5 minutes")
-eq(GlassPanelGoldDB.session.start, 5000, "and saves it")
+eq(GlassPanelCharDB.moneySession.start, 5000, "and saves it")
 
 -- A login while money is secret drops the old session at once, so a /reload
 -- before the first plain read doesn't bring an earlier login's back.
 WoW.moneySecret = true
 loadAddon()
-eq(GlassPanelGoldDB.session, nil, "a login forgets the earlier session even before a plain read")
+eq(GlassPanelCharDB.moneySession, nil, "a login forgets the earlier session even before a plain read")
 loadAddon({ reload = true })
 WoW.moneySecret, WoW.money = false, 70000
 WoW.fire("PLAYER_MONEY"); WoW.tick()
@@ -102,14 +102,14 @@ eq(tip["Started with"], "7g0s0c", "the session starts at the first plain read")
 check(next(GlassPanel.failures) == nil, "no failures across reloads")
 
 -- A corrupt save is no session.
-GlassPanelGoldDB = { session = { start = "lots", at = 1 } }
+GlassPanelCharDB = { moneySession = { start = "lots", at = 1 } }
 WoW.money = 20000
 loadAddon({ reload = true })
 eq(goldTip()["Started with"], "2g0s0c", "a corrupt saved session is replaced")
-GlassPanelGoldDB = { session = { start = 1.5 } }
+GlassPanelCharDB = { moneySession = { start = 1.5 } }
 loadAddon({ reload = true })
-eq(GlassPanelGoldDB.session.start, 20000, "a fractional start isn't copper")
-GlassPanelGoldDB = { session = { start = 40000, at = "x" } }
+eq(GlassPanelCharDB.moneySession.start, 20000, "a fractional start isn't copper")
+GlassPanelCharDB = { moneySession = { start = 40000, at = "x" } }
 loadAddon({ reload = true })
 tip = goldTip()
 eq(tip["Started with"], "4g0s0c", "a bad time keeps the amount")
@@ -118,7 +118,7 @@ eq(tip["Per hour"], nil, "and no rate")
 
 -- An open tooltip moves on by itself (Codex on #162): the length, and the rate
 -- once the session is 5 minutes old, without another event or hover.
-GlassPanelGoldDB = nil
+GlassPanelCharDB = nil
 WoW.money, WoW.serverTime = 10000, 100000
 loadAddon()
 WoW.money = 70000
@@ -149,18 +149,18 @@ WoW.money, WoW.serverTime = 20000, 100000
 loadAddon()
 WoW.money, WoW.serverTime = 90000, 101000
 block("gold")._test.reset()
-eq(GlassPanelGoldDB.session.start, 90000, "reset starts the session again")
-eq(GlassPanelGoldDB.session.at, 101000, "now")
+eq(GlassPanelCharDB.moneySession.start, 90000, "reset starts the session again")
+eq(GlassPanelCharDB.moneySession.at, 101000, "now")
 check(WoW.chat[#WoW.chat]:find("starts again now"), "and says so")
 WoW.moneySecret = true
 block("gold")._test.reset()
-eq(GlassPanelGoldDB.session, nil, "a reset while money is secret waits for a plain read")
+eq(GlassPanelCharDB.moneySession, nil, "a reset while money is secret waits for a plain read")
 check(WoW.chat[#WoW.chat]:find("hiding"), "and says why")
 WoW.moneySecret = false
 eq(block("gold")._test.duration(59), "under a minute", "duration under a minute")
 eq(block("gold")._test.duration(3599), "59m", "minutes")
 eq(block("gold")._test.duration(3660), "1h 01m", "hours")
-GlassPanelGoldDB = nil
+GlassPanelCharDB = nil
 
 -- Clock: local time on the bar, realm time in the tooltip.
 loadAddon()

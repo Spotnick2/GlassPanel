@@ -6,6 +6,5 @@
 ## Group: GlassPanel
 ## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
 ## Dependencies: GlassPanel
-## SavedVariablesPerCharacter: GlassPanelGoldDB
 
 Gold.lua

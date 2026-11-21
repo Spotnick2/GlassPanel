@@ -8,6 +8,7 @@
 ## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
 ## OptionalDeps: GlassUI
 ## SavedVariables: GlassPanelDB
+## SavedVariablesPerCharacter: GlassPanelCharDB
 
 Libs\LibGlass-1.0\LibGlass-1.0.xml
 Libs\LibTaxiTime-1.0\LibTaxiTime-1.0.xml
@@ -20,6 +21,7 @@ Bar.lua
 Room.lua
 Edge.lua
 Floats.lua
+Money.lua
 Settings.lua
 Share.lua
 Setup.lua

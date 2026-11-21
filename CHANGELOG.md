@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Alts: the tooltip now shows what this character earned or spent this session, the same session as Gold's (kept across a /reload, new at each login). Alts takes Gold's place on the bar, so until now the session couldn't be seen with AltStable installed. "Reset the gold session" is in Alts' options too. A session running when you update starts again once.
+
 ## v1.0.4
 
 - Layer is gone. Since 20 November the game no longer lets addons tell which layer you're on (Blizzard announced it would switch layering addons off, and NPCs no longer give it away), so the block could only show a question mark. If a `GlassPanelLayer` folder is still in your AddOns folder after updating, delete it (or switch "Glass Panel [Layer]" off in the AddOns list): Glass Panel ignores it and says so in chat until you do.
