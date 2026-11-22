@@ -328,7 +328,9 @@ core's `ADDON_LOADED`.
 - **`Plugins\Ammo`** (#66): hunters, warriors and rogues only. On the bar, as Bags: its own
   icon, the caption "Ammo: " and the count (which ammo it is: the tooltip). The ranged slot (18) decides the
   kind from `C_Item.GetItemInfoInstant` (Weapon: Bows/Crossbow → arrows, Guns → bullets, Thrown →
-  the slot's own stack; anything else: no block). Projectile subclasses Arrow 2 / Bullet 3 have no
+  its **durability** `cur/max` from `GetInventoryItemDurability(18)` when that reads (a thrown weapon
+  doesn't stack on Forever, it wears down: seen in game 2026-11-21), yellow under 30% and red under 10%
+  of the maximum, else the slot's own stack; anything else: no block). Projectile subclasses Arrow 2 / Bullet 3 have no
   enum (item data). `UnitUsesAmmo` (**new in 70338**; Blizzard shows `CharacterAmmoSlot` on it) is
   the client's gate: a plain `false` hides arrows/bullets (thrown ignores it); absent or unreadable,
   the weapon decides. Count: `GetInventoryItemCount("player", 0)`, or that ammo in the bags when

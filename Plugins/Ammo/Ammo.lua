@@ -2,9 +2,16 @@
 -- for hunters, warriors and rogues only.
 --
 -- The ranged slot decides the kind: a bow or crossbow shoots arrows, a gun
--- bullets, a thrown weapon is its own ammunition (the equipped stack); a wand
--- or nothing: no block. The figure is coloured yellow under the class's "low"
--- threshold and red under "critical" (settable per class, GlassPanelAmmoDB).
+-- bullets, a thrown weapon is its own ammunition; a wand or nothing: no block.
+-- The figure is coloured yellow under the class's "low" threshold and red
+-- under "critical" (settable per class, GlassPanelAmmoDB).
+--
+-- A thrown weapon on Forever doesn't stack: it has durability and wears down
+-- as you throw it (seen in game, a rogue, 2026-11-21). When the ranged slot's
+-- GetInventoryItemDurability reads, the figure is that durability, "cur/max",
+-- yellow under 30% of the maximum and red under 10% (the class thresholds are
+-- counts, so they don't apply). Without durability, the equipped stack as
+-- before.
 --
 -- Forever (70338): UnitUsesAmmo(unit) is new in this build, and Blizzard's
 -- paper doll shows CharacterAmmoSlot only when it's true
@@ -143,6 +150,18 @@ local function levelOf(count, class)
     return 0
 end
 
+-- A thrown weapon's durability: yellow under 30% of its maximum, red under 10%.
+local THROWN_LOW, THROWN_CRITICAL = 0.30, 0.10
+local function levelFor(s)
+    if s.durability then
+        local f = s.durability / s.maxDurability
+        if f < THROWN_CRITICAL then return 2 end
+        if f < THROWN_LOW then return 1 end
+        return 0
+    end
+    return levelOf(s.count, s.class)
+end
+
 --------------------------------------------------------------------------------
 -- Item data loads late: an unresolved id is requested while the client says
 -- it isn't cached, once (an answered id is never requested again: no request
@@ -265,8 +284,16 @@ local function build()
     s.kind = kind
 
     if kind == "thrown" then
-        s.count = slotCount(RANGED_SLOT)
         s.spare, s.spareUnsure = bagCount(function(id) return id == s.weapon end)
+        -- Forever: durability, when the slot has it (current, maximum; nil without).
+        local okD, rawCur, rawMax = pcall(GetInventoryItemDurability, RANGED_SLOT)
+        local cur, max = nil, nil
+        if okD then cur, max = P(rawCur), P(rawMax) end
+        if type(cur) == "number" and type(max) == "number" and max > 0 then
+            s.count, s.durability, s.maxDurability = cur, cur, max
+            return s
+        end
+        s.count = slotCount(RANGED_SLOT)
         if s.count == nil then
             -- The stack can't be read: what the bags hold, marked unsure.
             s.count, s.fromBags, s.unsure = s.spare, true, true
@@ -309,7 +336,12 @@ local function report(s)
         alert.Reset()
     end
     if not s.kind or s.count == nil or s.unsure then return end
-    local l = levelOf(s.count, s.class)
+    local l = levelFor(s)
+    if s.durability then
+        alert.Set(l, "Thrown weapon " .. (l == 2 and "nearly broken" or "wearing down") .. ": "
+            .. s.durability .. "/" .. s.maxDurability .. " durability.")
+        return
+    end
     alert.Set(l, "Ammo " .. (l == 2 and "critical" or "low") .. ": "
         .. BreakUpLargeNumbers(s.count) .. " " .. KIND_NOUN[s.kind] .. " left.")
 end
@@ -330,7 +362,7 @@ local function current()
 end
 
 local COLOUR = { [0] = "ffffff", [1] = "ffd200", [2] = "ff4040" }
-local function colour(count, class) return COLOUR[levelOf(count, class)] end
+local function colour(s) return COLOUR[levelFor(s)] end
 
 local UNSURE = "|cff888888?|r"
 local WARN = "|cffff4040!|r"
@@ -416,7 +448,8 @@ local block = GlassPanel.RegisterBlock({
     icon = "Interface\\Icons\\INV_Ammo_Arrow_02",   -- "Ammo: " like Bags' caption; which ammo: the tooltip
     side = "right",
     order = 118,
-    events = { "PLAYER_ENTERING_WORLD", "PLAYER_EQUIPMENT_CHANGED", "BAG_UPDATE_DELAYED", "UNIT_INVENTORY_CHANGED" },
+    events = { "PLAYER_ENTERING_WORLD", "PLAYER_EQUIPMENT_CHANGED", "BAG_UPDATE_DELAYED", "UNIT_INVENTORY_CHANGED",
+               "UPDATE_INVENTORY_DURABILITY" },   -- a throw wears a thrown weapon down
     unitEvents = { UNIT_INVENTORY_CHANGED = "player" },
     onEvent = function() stale = true end,
     -- nil hides the block: not a class that shoots, or no weapon that takes ammo.
@@ -425,7 +458,9 @@ local block = GlassPanel.RegisterBlock({
         if not s.kind then return nil end
         local t
         if s.count == nil then t = UNSURE
-        else t = "|cff" .. colour(s.count, s.class) .. BreakUpLargeNumbers(s.count) .. "|r" end
+        elseif s.durability then
+            t = "|cff" .. colour(s) .. s.durability .. "|r|cff888888/" .. s.maxDurability .. "|r"
+        else t = "|cff" .. colour(s) .. BreakUpLargeNumbers(s.count) .. "|r" end
         if s.count ~= nil and s.unsure then t = t .. UNSURE end
         if s.missing then t = t .. WARN end
         return t
@@ -438,7 +473,21 @@ local block = GlassPanel.RegisterBlock({
             return
         end
         tt:AddDoubleLine("Weapon", itemName(s.weapon) or "?", 1, 0.82, 0, 1, 1, 1)
-        if s.kind == "thrown" then
+        if s.kind == "thrown" and s.durability then
+            local pct = math.floor(100 * s.durability / s.maxDurability + 0.5)
+            tt:AddDoubleLine("Durability", s.durability .. " / " .. s.maxDurability .. " (" .. pct .. "%)",
+                1, 0.82, 0, 1, 1, 1)
+            if s.spare and s.spare > 0 then
+                tt:AddDoubleLine("Spares in your bags", BreakUpLargeNumbers(s.spare), 1, 0.82, 0, 1, 1, 1)
+            end
+            if s.spareUnsure then
+                tt:AddLine("Some bag slots can't be read right now and aren't counted.", 0.7, 0.7, 0.7, true)
+            end
+            tt:AddLine(" ")
+            tt:AddLine("Yellow below " .. (100 * THROWN_LOW) .. "%, red below " .. (100 * THROWN_CRITICAL)
+                .. "% durability. Each throw wears it down.", 0.7, 0.7, 0.7, true)
+            return
+        elseif s.kind == "thrown" then
             if s.fromBags then
                 tt:AddLine("The equipped stack can't be read right now: the count is what your bags hold.",
                     0.7, 0.7, 0.7, true)
