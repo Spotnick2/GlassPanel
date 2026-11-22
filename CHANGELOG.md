@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- New: Glass Panel [Broker] puts other addons' LibDataBroker data sources on the bar, the way Titan Panel does: each one is a block of its own, which you move, hide and caption like the others. They're all off until you pick them under "Data brokers" in Options > AddOns > Glass Panel. Launchers (minimap-button addons) aren't listed, and neither is AltStable's while Glass Panel [AltStable] is on, since that block already shows it.
+
 ## v1.0.5
 
 - Alts: the tooltip now shows what this character earned or spent this session, the same session as Gold's (kept across a /reload, new at each login). Alts takes Gold's place on the bar, so until now the session couldn't be seen with AltStable installed. "Reset the gold session" is in Alts' options too. A session running when you update starts again once.

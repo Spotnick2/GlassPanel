@@ -310,6 +310,25 @@ core's `ADDON_LOADED`.
   `PLAYER_ENTERING_WORLD` or when a setting change brings the replacement on). The bar text reads
   only `GetTotals()`.
   GlassPanel keeps no character list (forgetting is AltStable's).
+- **`Plugins\Broker`** (#179): other addons' **LibDataBroker-1.1 data sources** as blocks (Titan's
+  `TitanLDB.lua` is the data reference), one block per broker the player **picks** (all off by default) in
+  an `API.Picker{ ordered = false }` chooser opened from its `GlassPanel.RegisterOptions` button (no block
+  of its own to carry it). Picks by broker name, account-wide (`GlassPanelBrokerDB.picks`); ids
+  `ldb:<name>`. **Data sources only** (launchers: GlassMiniMapBar); `COVERED` leaves out a broker a plugin
+  of ours shows (AltStable's, while `GlassPanelAltStable` is loaded, `C_AddOns.IsAddOnLoaded`). Blocks made at
+  `PLAYER_LOGIN` (every addon's files have run), then on `LibDataBroker_DataObjectCreated` and
+  `..._AttributeChanged__type`; any attribute change `GlassPanel.Refresh`es the block. Text, else value +
+  suffix (a secret: grey `?`); label (else the name) is the `caption`; `icon` is a **function** (+ `iconCoords`,
+  else the whole texture, as Titan); clicks get our button; the hover in Titan's order: a `tooltip` frame
+  (placed, shown, hidden here), then `OnEnter`/`OnLeave` (`onEnter` returns true), then `OnTooltipShow`
+  on our GameTooltip, else label and text. Un-picked: text nil (its Options row stays until /reload: no
+  unregister). **Bundles** LibDataBroker-1.1 (MINOR 4) and CallbackHandler-1.0 (MINOR 8) in its own
+  `Libs\` (committed, GuildSpy's copies, LDB = tekkub's upstream; not externals, so EMBEDDED-LIBRARIES
+  section 3 doesn't apply); deploy copies a plugin's `Libs\` (`-OwnLibs`), CI allows its CallbackHandler
+  LICENSE.txt, `test_toc` exempts `/Libs/` files from the namespace line. The core's contract grew for it
+  (additive): `icon` as a function (`Bar.lua`'s `iconAnswer`: plain file ID or path, coords four finite
+  numbers, else recorded `<id>:icon`), `onEnter`/`onLeave` (`hoverTaken`: no tooltip, none redrawn),
+  `RegisterOptions`, the Picker's `ordered`.
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable
   bag (free count or family) is left out and flagged with a grey `?`. Left-click: `ToggleAllBags`.

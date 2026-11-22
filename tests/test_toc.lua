@@ -99,7 +99,11 @@ for _, p in ipairs(list) do
         local src = io.open(f, "r")
         check(src ~= nil, name .. ": file exists: " .. f)
         if src then
-            check(src:read("*a"):find("\nGlassPanel = GlassPanel or {}\n", 1, true), "starts with the namespace line: " .. f)
+            -- A library a plugin bundles (#179: [Broker]'s LibDataBroker) is
+            -- third-party code, shipped unmodified: it doesn't get our line.
+            if not f:find("/Libs/", 1, true) then
+                check(src:read("*a"):find("\nGlassPanel = GlassPanel or {}\n", 1, true), "starts with the namespace line: " .. f)
+            end
             src:close()
             noPackagerKeyword(f)
         end

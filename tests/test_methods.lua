@@ -5,8 +5,16 @@
 dofile("tests/wow_stubs.lua")
 dofile("tests/harness.lua")
 
--- Exercise everything so every method is recorded.
-loadAddon()
+-- Exercise everything so every method is recorded. [Broker] (#179) gets two
+-- picked data sources: one with an icon, one with its own tooltip frame.
+GlassPanelBrokerDB = { picks = { "Tip", "Icon" } }
+loadAddon({ before = function()
+    assert(loadfile("Plugins/Broker/Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua"))()
+    assert(loadfile("Plugins/Broker/Libs/LibDataBroker-1.1/LibDataBroker-1.1.lua"))()
+    local LDB = LibStub("LibDataBroker-1.1")
+    LDB:NewDataObject("Tip", { type = "data source", text = "t", tooltip = CreateFrame("Frame", nil, UIParent) })
+    LDB:NewDataObject("Icon", { type = "data source", text = "i", icon = 1, iconCoords = { 0, 1, 0, 1 } })
+end })
 for _, blk in ipairs(GlassPanel.Engine.blocks) do
     local w = blk.widget
     w._scripts.OnEnter(w); w._scripts.OnLeave(w); w._scripts.OnClick(w, "LeftButton")
@@ -58,6 +66,7 @@ do
     local cb = GlassPanel.Engine.byId.currencies
     if cb and cb.options then cb.options[1].run() end
 end
+for _, set in ipairs(GlassPanel.Engine.optionSets) do set.options[1].run() end   -- [Broker]'s chooser
 do
     -- The ammo thresholds window (a hunter, so it opens), saved and reset.
     local ab = GlassPanel.Engine.byId.ammo

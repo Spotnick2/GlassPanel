@@ -13,8 +13,9 @@ menus) the README points to Titan Panel.
 **Not** a Titan port. Titan is a reference for *how each piece of data is read*
 (`C:\Projects\WoW\References\Addons\Plugins\TitanPanel`); none of its architecture is reused: no
 global button names, no `TitanGetVar`-style per-plugin variable store, no XML templates, no
-per-plugin right-click option menus, no multiple bars, no bottom bar, no auto-hide, no
-LibDataBroker host (yet).
+per-plugin right-click option menus, no multiple bars, no bottom bar, no auto-hide. Other addons'
+LibDataBroker data sources show through `Plugins\Broker` (#179), as blocks GlassPanel draws itself;
+launchers don't (GlassMiniMapBar collects minimap buttons).
 
 ## Status: v1.0.0
 
@@ -76,7 +77,7 @@ Not measured yet:
 - The first open of the options page from Glass UI's button (#104/#105) was fixed from
   Blizzard's source, not measured.
 
-Ideas, not planned: a LibDataBroker host, a bottom bar, auto-hide (all out of scope for now).
+Ideas, not planned: a bottom bar, auto-hide (both out of scope for now).
 
 ## Open questions (measure in game)
 

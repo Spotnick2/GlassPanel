@@ -238,19 +238,28 @@ local left
 -- "Plugin options" in the left column, one group per plugin, added the
 -- first time the panel opens after the plugin registered. get/set are the
 -- plugin's code: both run under pcall, a throw is recorded, never raised.
-local optionBlocks = {}   -- block id -> true once its options are on the panel
+-- A plugin with no block to carry them (GlassPanel.RegisterOptions, #179)
+-- comes after the blocks, keyed "set:<id>" so its id can't meet a block's.
+local optionBlocks = {}   -- block id (or "set:" .. id) -> true once its options are on the panel
 local optionsHeader = false
 local function addPluginOptions()
+    local owners = {}
     for _, block in ipairs(Engine.blocks) do
-        if block.options and #block.options > 0 and not optionBlocks[block.id] then
-            optionBlocks[block.id] = true
+        owners[#owners + 1] = { key = block.id, label = block.label or block.id, options = block.options }
+    end
+    for _, set in ipairs(Engine.optionSets) do
+        owners[#owners + 1] = { key = "set:" .. set.id, label = set.label, options = set.options }
+    end
+    for _, owner in ipairs(owners) do
+        if owner.options and #owner.options > 0 and not optionBlocks[owner.key] then
+            optionBlocks[owner.key] = true
             if not optionsHeader then
                 optionsHeader = true
                 header(left, "Plugin options")
             end
-            place(left, label(block.label or block.id, "GameFontNormal"), 22, 4)
-            for i, o in ipairs(block.options) do
-                local key = "options:" .. block.id .. ":" .. i
+            place(left, label(owner.label, "GameFontNormal"), 22, 4)
+            for i, o in ipairs(owner.options) do
+                local key = "options:" .. owner.key .. ":" .. i
                 if type(o.run) == "function" then
                     widgets[key] = button(left, o.label, 200, function()
                         local ok, err = pcall(o.run)

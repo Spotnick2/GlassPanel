@@ -37,3 +37,16 @@ and remain the work of their author:
                            MIT License; its own LICENSE ships beside it.
                            Fetched at build time, not kept in this
                            repository.
+
+Plugins/Broker (shipped as the GlassPanelBroker addon) bundles two more, in its
+own Libs/, unmodified:
+
+  CallbackHandler-1.0      Nevcairiel and the Ace3 Development Team. BSD
+                           licence, full text in
+                           Libs/CallbackHandler-1.0/LICENSE.txt.
+
+  LibDataBroker-1.1        tekkub. No licence text is published with it: its
+                           source repository has none, and its CurseForge
+                           page says "All Rights Reserved unless otherwise
+                           explicitly stated". Embedded unmodified, as the
+                           WoW addon ecosystem embeds it.

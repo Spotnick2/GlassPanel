@@ -76,6 +76,72 @@ function Bar.ShowsIcon(block)
     return not (d and d.iconsFor and d.iconsFor[block.id] == false)
 end
 
+-- Whether the icon is drawn right now: wanted, and (an icon function, #179)
+-- the block named a texture on its last repaint.
+local function iconDrawn(block)
+    if not Bar.ShowsIcon(block) then return false end
+    return type(block.icon) ~= "function" or (block.widget ~= nil and block.widget.iconTex ~= nil)
+end
+
+-- An icon function's answer (#179): texture, coords, both checked plain.
+-- A texture is a file ID or a non-empty path; coords { left, right, top,
+-- bottom } of finite numbers, else the stock trim. Anything else is recorded
+-- as <id>:icon and drawn as no icon (or the trim).
+local TRIM = { 0.08, 0.92, 0.08, 0.92 }   -- the stock icon border
+local function iconAnswer(block)
+    local ok, tex, coords = pcall(block.icon, block)
+    if not ok then
+        API.Fail(block.id .. ":icon", tex)
+        return nil, TRIM
+    end
+    if API.IsSecret(tex) or API.IsSecret(coords) then
+        API.Fail(block.id .. ":icon", "returned a secret value")
+        return nil, TRIM
+    end
+    if tex ~= nil and type(tex) ~= "number" and (type(tex) ~= "string" or tex == "") then
+        API.Fail(block.id .. ":icon", "returned a " .. type(tex) .. ", not a file ID or path")
+        return nil, TRIM
+    end
+    if coords == nil then return tex, TRIM end
+    local c = {}
+    if type(coords) == "table" then
+        for i = 1, 4 do
+            local v = API.Plain(coords[i])
+            if type(v) ~= "number" or v ~= v or v == math.huge or v == -math.huge then c = nil break end
+            c[i] = v
+        end
+    else
+        c = nil
+    end
+    if not c then
+        API.Fail(block.id .. ":icon", "coords must be { left, right, top, bottom } numbers")
+        return tex, TRIM
+    end
+    return tex, c
+end
+
+-- Re-read an icon function and draw what it says; true if the icon appeared
+-- or went (its width moves what follows).
+local function refreshIcon(block)
+    local b = block.widget
+    local tex, c = iconAnswer(block)
+    if tex ~= nil then
+        -- A new texture gets its coords again (whether SetTexture keeps the
+        -- old ones is not something we measured).
+        local old = b.iconCoords
+        if tex ~= b.iconTex then
+            b.icon:SetTexture(tex)
+            old = nil
+        end
+        if not (old and old[1] == c[1] and old[2] == c[2] and old[3] == c[3] and old[4] == c[4]) then
+            b.icon:SetTexCoord(c[1], c[2], c[3], c[4])
+            b.iconCoords = c
+        end
+    end
+    b.iconTex = tex
+    return Bar.UpdateIcon(block)
+end
+
 -- What the value shows: the block's text, except that a graphical block
 -- sized to its content this repaint (its width function said nil), with
 -- empty text and no icon showing, shows its label: it would otherwise shrink
@@ -84,7 +150,7 @@ end
 local function syncDisplay(block)
     local b = block.widget
     local shown = b.text or ""
-    if block.width ~= nil and b.fixedWidth == nil and b.text == "" and not Bar.ShowsIcon(block) then
+    if block.width ~= nil and b.fixedWidth == nil and b.text == "" and not iconDrawn(block) then
         shown = block.label ~= "" and block.label or block.id
     end
     if b.shownText == shown then return false end
@@ -98,7 +164,7 @@ end
 function Bar.UpdateIcon(block)
     local b = block.widget
     if not (b and b.icon) then return false end
-    local show = Bar.ShowsIcon(block)
+    local show = iconDrawn(block)
     if b.iconShown == show then return false end
     b.iconShown = show
     b.icon:SetShown(show)
@@ -136,7 +202,8 @@ function Bar.IsHidden(block)
     return Bar.ReplacedBy(block) ~= nil
 end
 
-local function onEnter(button)
+-- The block's tooltip, filled by its tooltip(block, GameTooltip).
+local function showTooltip(button)
     local block = button.block
     if not block.tooltip then return end
     GameTooltip:SetOwner(button, "ANCHOR_NONE")
@@ -156,13 +223,34 @@ local function onEnter(button)
     end
 end
 
+-- A block's onEnter (#179: a broker that draws its own tooltip) answers true
+-- when it took the hover: no tooltip of ours then, and none redrawn.
+local function onEnter(button)
+    local block = button.block
+    button.hoverTaken = nil
+    if block.onEnter then
+        local ok, taken = Engine.Call(block, "onEnter", block.onEnter, block, button)
+        if ok and not API.IsSecret(taken) and taken == true then
+            button.hoverTaken = true
+            return
+        end
+    end
+    showTooltip(button)
+end
+
 -- Redraw the tooltip if it's open on this block (called after a repaint).
 function Bar.RefreshTooltip(block)
     local b = block.widget
-    if b and b.visible and block.tooltip and GameTooltip:GetOwner() == b and GameTooltip:IsShown() then onEnter(b) end
+    if b and b.visible and block.tooltip and not b.hoverTaken and GameTooltip:GetOwner() == b
+        and GameTooltip:IsShown() then
+        showTooltip(b)
+    end
 end
 
 local function onLeave(button)
+    local block = button.block
+    button.hoverTaken = nil
+    if block.onLeave then Engine.Call(block, "onLeave", block.onLeave, block, button) end
     if GameTooltip:GetOwner() == button then GameTooltip:Hide() end
 end
 
@@ -298,8 +386,11 @@ function Bar.Attach(block)
         local icon = b:CreateTexture(nil, "ARTWORK")
         icon:SetSize(ICON, ICON)
         icon:SetPoint("LEFT", b, "LEFT", PAD, 0)
-        icon:SetTexture(block.icon)
-        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)   -- trim the stock icon border
+        -- An icon function (#179) is asked at each repaint (Bar.SetText).
+        if type(block.icon) ~= "function" then
+            icon:SetTexture(block.icon)
+            icon:SetTexCoord(TRIM[1], TRIM[2], TRIM[3], TRIM[4])
+        end
         b.icon = icon
         x = PAD + ICON + PAD
     end
@@ -355,6 +446,7 @@ function Bar.SetText(block, text)
     -- the value changing), and so is a width function (#78: XP+ zooms with
     -- its text "" throughout).
     local captionChanged = block.caption ~= nil and Bar.UpdateCaption(block)
+    local iconChanged = type(block.icon) == "function" and refreshIcon(block)
     local width = fixedWidth(block)
     local widthChanged = b.fixedWidth ~= width
     b.fixedWidth = width
@@ -365,7 +457,7 @@ function Bar.SetText(block, text)
     b.painted = true
     b.text = text
     local displayChanged = syncDisplay(block)
-    return textChanged or captionChanged or widthChanged or displayChanged
+    return textChanged or captionChanged or iconChanged or widthChanged or displayChanged
 end
 
 local function shows(block)

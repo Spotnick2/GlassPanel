@@ -1,0 +1,13 @@
+## Interface: 16001
+## Title: |cff7fd4ffGlass|r Panel |cFF0099FF[Broker]|r
+## Notes: Other addons' LibDataBroker data sources on the bar, the ones you pick.
+## Author: Spotnick
+## Version: @project-version@
+## Group: GlassPanel
+## IconTexture: Interface\Icons\INV_Misc_Gem_Variety_01
+## Dependencies: GlassPanel
+## SavedVariables: GlassPanelBrokerDB
+
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Broker.lua
