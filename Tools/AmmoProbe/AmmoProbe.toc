@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: AmmoProbe
+## Notes: Throwaway probe for Ammo (#177): a thrown weapon's count and durability on the ranged slot. A ForeverProbe module: /fp ammo
+## Author: Spotnick
+## Version: dev
+## Dependencies: ForeverProbe
+## OptionalDeps: GlassPanel, GlassPanelAmmo
+## SavedVariables: AmmoProbeDB
+
+AmmoProbe.lua

@@ -68,7 +68,8 @@ NovaWorldBuffs guild messages, closed: NWB doesn't track layers on Forever.)
 Not measured yet:
 - Build 71037 is what the code and the offline stubs are checked against
   (`API.MEASURED_ON_BUILD`, #145, #158, #166); the owner plays and tests on it.
-- Ammo for warriors and rogues (`UnitUsesAmmo`) and the thrown count; the Well Rested cap at
+- Ammo for warriors and rogues (`UnitUsesAmmo`) and the thrown count and durability (AmmoProbe,
+  `/fp steps ammo thrown`, #177); the Well Rested cap at
   5/5 (XP+ rested lines).
 - Flight (#124): `UnitOnTaxi` at `PLAYER_CONTROL_LOST` (EllesmereUI found it false at takeoff),
   `C_TaxiMap.GetAllTaxiNodes(GetTaxiMapID())` giving node ids on the flight map, Frequent

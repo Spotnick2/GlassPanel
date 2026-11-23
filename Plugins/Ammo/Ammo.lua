@@ -27,7 +27,9 @@
 -- stacks, the figure Blizzard's bag window shows on its ammo slot.
 -- UNMEASURED on the client: what UnitUsesAmmo says for warriors and rogues; the thrown stack's count, and
 -- whether it already includes the same weapon in the bags (then "Equipped"
--- and "In your bags" in the tooltip count those stacks twice). When a slot's
+-- and "In your bags" in the tooltip count those stacks twice); what
+-- GetInventoryItemDurability(18) gives for a thrown weapon. Tools\AmmoProbe
+-- measures them (/fp steps ammo thrown, #177). When a slot's
 -- count can't be read, the same item is counted in the bags instead (the
 -- thrown figure then carries a grey "?").
 --

@@ -555,6 +555,11 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`) and the Li
   server field; other players by shape only), the field across `SHARD_TRANSFER` (read again at 2, 5,
   12 s), the player's GUID at each load event, the realm APIs and `C_GameRules`, and a GUILD addon
   message's sender shape (our own echo whole), for Layer and TitanLayer: `/fp steps layer guids`.
+  **AmmoProbe** (#177, `test_ammoprobe`): a thrown weapon in the ranged slot, raw:
+  `GetInventoryItemCount("player", 18)` and `GetInventoryItemDurability(18)`, with `UnitUsesAmmo`, the
+  ammo slot's count and `C_Item.GetItemCount`; the same weapon in the bags and whether the slot's count
+  includes it; what the Ammo block shows; and every `UPDATE_INVENTORY_DURABILITY` (a throw wearing it
+  down): `/fp steps ammo thrown`.
 
 ## Addon basics
 
