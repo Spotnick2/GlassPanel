@@ -328,7 +328,9 @@ core's `ADDON_LOADED`.
 - **`Plugins\Ammo`** (#66): hunters, warriors and rogues only. On the bar, as Bags: its own
   icon, the caption "Ammo: " and the count (which ammo it is: the tooltip). The ranged slot (18) decides the
   kind from `C_Item.GetItemInfoInstant` (Weapon: Bows/Crossbow → arrows, Guns → bullets, Thrown →
-  the slot's own stack; anything else: no block). Projectile subclasses Arrow 2 / Bullet 3 have no
+  its **durability** `cur/max` from `GetInventoryItemDurability(18)` when that reads (a thrown weapon
+  doesn't stack on Forever, it wears down, 1 point a throw: measured 2026-11-22, `docs/FOREVER-PROBE.md`), yellow under 30% and red under 10%
+  of the maximum, else the slot's own stack; anything else: no block). Projectile subclasses Arrow 2 / Bullet 3 have no
   enum (item data). `UnitUsesAmmo` (**new in 70338**; Blizzard shows `CharacterAmmoSlot` on it) is
   the client's gate: a plain `false` hides arrows/bullets (thrown ignores it); absent or unreadable,
   the weapon decides. Count: `GetInventoryItemCount("player", 0)`, or that ammo in the bags when
@@ -553,6 +555,11 @@ Both need the LibGlass checkout at `..\LibGlass` (or `$env:LIBGLASS`) and the Li
   server field; other players by shape only), the field across `SHARD_TRANSFER` (read again at 2, 5,
   12 s), the player's GUID at each load event, the realm APIs and `C_GameRules`, and a GUILD addon
   message's sender shape (our own echo whole), for Layer and TitanLayer: `/fp steps layer guids`.
+  **AmmoProbe** (#177, `test_ammoprobe`): a thrown weapon in the ranged slot, raw:
+  `GetInventoryItemCount("player", 18)` and `GetInventoryItemDurability(18)`, with `UnitUsesAmmo`, the
+  ammo slot's count and `C_Item.GetItemCount`; the same weapon in the bags and whether the slot's count
+  includes it; what the Ammo block shows; and every `UPDATE_INVENTORY_DURABILITY` (a throw wearing it
+  down): `/fp steps ammo thrown`.
 
 ## Addon basics
 

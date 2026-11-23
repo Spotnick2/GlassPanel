@@ -109,6 +109,25 @@ check(has("Yellow below 100, red below 40."), "rogue defaults")
 WoW.usesAmmo = false; refresh()
 eq(textOf("ammo"), ICON(1004) .. "|cffffd20075|r", "thrown doesn't depend on UnitUsesAmmo")
 
+-- Thrown with durability (Forever: it doesn't stack, it wears down): cur/max, coloured by
+-- the fraction left, not the class's count thresholds.
+setup("ROGUE", THROWN, nil, nil, {
+    [0] = { slots = 1, free = 0, family = 0, items = { { id = THROWN, count = 1 } } },
+})
+WoW.invCount[18] = 1
+WoW.gear[18] = { cur = 80, max = 100 }; refresh()
+eq(textOf("ammo"), ICON(1004) .. "|cffffffff80|r|cff888888/100|r", "thrown with durability: cur/max, white")
+check(has("Durability\t80 / 100 (80%)"), "durability in the tooltip")
+check(has("Spares in your bags\t1"), "a spare in the bags")
+check(has("Yellow below 30%, red below 10% durability."), "the durability thresholds, not the class's counts")
+WoW.gear[18].cur = 29; WoW.fire("UPDATE_INVENTORY_DURABILITY"); WoW.tick()
+eq(textOf("ammo"), ICON(1004) .. "|cffffd20029|r|cff888888/100|r", "a throw wears it down: yellow under 30%")
+WoW.gear[18].cur = 9; WoW.fire("UPDATE_INVENTORY_DURABILITY"); WoW.tick()
+eq(textOf("ammo"), ICON(1004) .. "|cffff40409|r|cff888888/100|r", "red under 10%")
+WoW.gear[18].cur = "secret"; refresh()
+eq(textOf("ammo"), ICON(1004) .. "|cffff40401|r", "unreadable durability: the stack count, as before")
+WoW.gear = {}
+
 -- A warrior with a bow; the client says no ammo is used: no block.
 setup("WARRIOR", BOW, ARROWS, 30); refresh()
 eq(textOf("ammo"), ICON(2001) .. "|cffff404030|r", "warrior: red under 40")

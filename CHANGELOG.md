@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Ammo: with a thrown weapon equipped, the block shows its durability (like `73/100`) instead of a count, since thrown weapons don't stack in Forever but wear down as you throw them. It turns yellow below 30% and red below 10%, and the tooltip shows the durability and any spares in your bags.
+
 ## v1.0.5
 
 - Alts: the tooltip now shows what this character earned or spent this session, the same session as Gold's (kept across a /reload, new at each login). Alts takes Gold's place on the bar, so until now the session couldn't be seen with AltStable installed. "Reset the gold session" is in Alts' options too. A session running when you update starts again once.
