@@ -25,11 +25,16 @@
 -- MEASURED on 70338 (a hunter, 2026-10-12): GetInventoryItemCount on the
 -- ammo slot totals that ammo across the bags (Vanilla): 1,100 for six quiver
 -- stacks, the figure Blizzard's bag window shows on its ammo slot.
--- UNMEASURED on the client: what UnitUsesAmmo says for warriors and rogues; the thrown stack's count, and
--- whether it already includes the same weapon in the bags (then "Equipped"
--- and "In your bags" in the tooltip count those stacks twice); what
--- GetInventoryItemDurability(18) gives for a thrown weapon. Tools\AmmoProbe
--- measures them (/fp steps ammo thrown, #177). When a slot's
+-- MEASURED on 1.60.1 (a rogue, 2026-11-22, #177; by hand, /run, out of
+-- combat): with a thrown weapon equipped, GetInventoryItemCount("player", 18)
+-- is 1 and GetInventoryItemDurability(18) is 178, 200 (plain numbers). Each
+-- throw costs 1 point (two throws: 176/200), and the block showed 176/200 in
+-- white. docs/FOREVER-PROBE.md has the readings.
+-- UNMEASURED on the client: what UnitUsesAmmo says for warriors and rogues;
+-- whether the ranged slot's count includes the same weapon in the bags (then
+-- "Equipped" and "In your bags" in the tooltip count those stacks twice; no
+-- spare was at hand); durability in combat. Tools\AmmoProbe measures them
+-- (/fp steps ammo thrown). When a slot's
 -- count can't be read, the same item is counted in the bags instead (the
 -- thrown figure then carries a grey "?").
 --

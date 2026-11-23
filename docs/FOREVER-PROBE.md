@@ -3,6 +3,24 @@
 What GlassPanel's probes measured in game. Each entry names its build. Addon-agnostic findings are
 copied to `C:\Projects\WoW\References\Docs\PORTING-TBC-TO-FOREVER.md`.
 
+## A thrown weapon's count and durability (by hand, #177): 1.60.1, 2026-11-22
+
+Measured on a rogue with a thrown weapon in the ranged slot, out of combat, with a `/run` line rather
+than AmmoProbe (the contributor has no ForeverProbe):
+`/run local c,m=GetInventoryItemDurability(18) print("count",GetInventoryItemCount("player",18),"dur",c,m)`.
+
+| Reading | `GetInventoryItemCount("player", 18)` | `GetInventoryItemDurability(18)` |
+|---|---|---|
+| Equipped, before throwing | 1 | 178, 200 |
+| After two throws | (not re-read) | 176, 200 |
+
+- **A thrown weapon has durability, read as plain numbers out of combat**, and **each throw costs 1
+  point**. The slot's count is 1 for the equipped weapon, so a count says nothing about wear.
+- With #178's Ammo plugin installed, the block showed `176/200`, the figure in white (above 30%).
+- Not measured: whether the slot's count includes a spare of the same weapon in the bags (none at
+  hand), what `UnitUsesAmmo` says for a rogue, and whether the durability reads in combat (Forever
+  hides some values in combat). AmmoProbe (`/fp steps ammo thrown`) covers the first two.
+
 ## Creature GUIDs since the realm hotfix (LayerProbe, #169): 1.60.1.71037, 2026-11-20
 
 The owner ran `/fp steps layer guids` on a level-1 human in Northshire Valley (Elwynn, map 1429), a PvE
