@@ -174,30 +174,36 @@ eq(B("New"), nil, "unpicked: no block")
 -- The text: value + suffix, secrets, junk
 --------------------------------------------------------------------------------
 
-GlassPanelBrokerDB = { picks = { "V", "S", "N", "E" } }
+-- Secrets only in the creation table: LibDataBroker's setter compares the old
+-- value with the new one, which throws on a secret on the client (Codex on
+-- #180), and the offline mock can't make == throw.
+GlassPanelBrokerDB = { picks = { "V", "S", "N", "E", "C" } }
 loadAddon({ before = early({
     V = { type = "data source", value = "12", suffix = "ms" },
-    S = { type = "data source", text = "x" },
+    S = { type = "data source", text = WoW.Secret("broker text"), label = WoW.Secret("broker label"),
+          icon = WoW.Secret("broker icon") },
     N = { type = "data source", text = 42 },
     E = { type = "data source", text = "" },
+    C = { type = "data source", text = "c", icon = "x", iconCoords = { 0, "a", 0, 1 } },
 }) })
 eq(textOf("ldb:V"), "12 ms", "no text: value and suffix")
 eq(textOf("ldb:N"), "42", "a number is written out")
 eq(B("E").widget._shown, false, "empty text: no space")
-LDB():GetDataObjectByName("S").text = WoW.Secret("broker text")
-WoW.tick()
 eq(textOf("ldb:S"), "|cffaaaaaa?|r", "a secret text: a grey ?")
-LDB():GetDataObjectByName("S").label = WoW.Secret("broker label")
-WoW.tick()
 eq(B("S").widget.caption._text, "S: ", "a secret label: the broker's name")
-LDB():GetDataObjectByName("S").icon = WoW.Secret("broker icon")
-WoW.tick()
 eq(B("S").widget.icon._shown, false, "a secret icon: none")
-LDB():GetDataObjectByName("S").icon = "x"
-LDB():GetDataObjectByName("S").iconCoords = { 0, "a", 0, 1 }
+check(GlassPanel.failures["ldb:C:icon"] ~= nil, "bad iconCoords are recorded")
+eq(table.concat(B("C").widget.icon._coords, ","), "0.08,0.92,0.08,0.92", "and the stock trim drawn")
+
+-- A picked broker that turns launcher leaves the bar, its pick kept (Codex on #180).
+LDB():GetDataObjectByName("V").type = "launcher"
 WoW.tick()
-check(GlassPanel.failures["ldb:S:icon"] ~= nil, "bad iconCoords are recorded")
-eq(table.concat(B("S").widget.icon._coords, ","), "0.08,0.92,0.08,0.92", "and the stock trim drawn")
+eq(T().textOf("V"), nil, "turned launcher: no text")
+eq(B("V").widget._shown, false, "off the bar")
+eq(table.concat(T().picks(), ","), "V,S,N,E,C", "the pick kept")
+LDB():GetDataObjectByName("V").type = "data source"
+WoW.tick()
+eq(textOf("ldb:V"), "12 ms", "a data source again: back")
 
 --------------------------------------------------------------------------------
 -- The hover, in Titan's order: a tooltip frame, OnEnter, OnTooltipShow
@@ -238,6 +244,15 @@ WoW.tick()
 eq(#entered, 1, "a repaint doesn't call OnEnter again")
 ew._scripts.OnLeave(ew)
 eq(left[1], ew, "OnLeave gets it too")
+-- OnEnter's GameTooltip is the broker's: it may keep it open into the tooltip.
+LDB():GetDataObjectByName("Enter").OnEnter = function(f)
+    GameTooltip:SetOwner(f, "ANCHOR_NONE"); GameTooltip:Show()
+end
+ew._scripts.OnEnter(ew)
+ew._scripts.OnLeave(ew)
+eq(GameTooltip._shown, true, "a broker's own GameTooltip isn't hidden on leave")
+eq(#left, 2, "its OnLeave decides")
+GameTooltip:Hide()
 
 local pw = B("Plain").widget
 pw._scripts.OnEnter(pw)
@@ -250,6 +265,8 @@ ew._scripts.OnEnter(ew)
 check(GlassPanel.failures["ldb:Enter:onEnter"] ~= nil, "a throwing OnEnter is recorded")
 eq(table.concat(GameTooltip._lines, "\n"), "never", "and the core's tooltip stands in (OnTooltipShow)")
 ew._scripts.OnLeave(ew)
+eq(#left, 3, "OnEnter started (it threw): its OnLeave still cleans up")
+eq(GameTooltip._shown, false, "and the core hid its tooltip")
 LDB():GetDataObjectByName("Enter").OnClick = function() error("click") end
 WoW.now = WoW.now + 1
 ew._scripts.OnClick(ew, "LeftButton")

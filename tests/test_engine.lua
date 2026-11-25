@@ -464,11 +464,25 @@ eq(tipCalls, 0, "taken: no tooltip")
 eq(GameTooltip._shown, false, "none shown")
 hw._scripts.OnLeave(hw)
 eq(hover[2], "left", "onLeave called")
+-- Taken, the GameTooltip is the block's (Codex on #180): one it opened on its
+-- frame stays open on leave (the pointer may be moving into it).
+local hv2 = register({ id = "hv2", text = function() return "h" end,
+                       onEnter = function(_, f)
+                           GameTooltip:SetOwner(f, "ANCHOR_NONE"); GameTooltip:Show(); return true
+                       end,
+                       onLeave = function() end })
+WoW.tick()
+local hw2 = hv2.widget
+hw2._scripts.OnEnter(hw2)
+hw2._scripts.OnLeave(hw2)
+eq(GameTooltip._shown, true, "taken: the block's own GameTooltip isn't hidden on leave")
+GameTooltip:Hide()
 taken = false
 hw._scripts.OnEnter(hw)
 eq(tipCalls, 1, "not taken: the tooltip as usual")
 eq(GameTooltip._shown, true, "shown")
 hw._scripts.OnLeave(hw)
+eq(GameTooltip._shown, false, "ours: hidden on leave")
 
 -- RegisterOptions: checked like a block's, listed after the blocks'.
 check(GlassPanel.RegisterOptions({ id = "", label = "x", options = {} }) == nil, "refused: empty id")

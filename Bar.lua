@@ -247,11 +247,14 @@ function Bar.RefreshTooltip(block)
     end
 end
 
+-- The GameTooltip is hidden only when we drew it: a block that took the hover
+-- owns its tooltip, which may stay open while the pointer moves into it.
 local function onLeave(button)
     local block = button.block
+    local taken = button.hoverTaken
     button.hoverTaken = nil
     if block.onLeave then Engine.Call(block, "onLeave", block.onLeave, block, button) end
-    if GameTooltip:GetOwner() == button then GameTooltip:Hide() end
+    if not taken and GameTooltip:GetOwner() == button then GameTooltip:Hide() end
 end
 
 --------------------------------------------------------------------------------

@@ -321,13 +321,16 @@ core's `ADDON_LOADED`.
   suffix (a secret: grey `?`); label (else the name) is the `caption`; `icon` is a **function** (+ `iconCoords`,
   else the whole texture, as Titan); clicks get our button; the hover in Titan's order: a `tooltip` frame
   (placed, shown, hidden here), then `OnEnter`/`OnLeave` (`onEnter` returns true), then `OnTooltipShow`
-  on our GameTooltip, else label and text. Un-picked: text nil (its Options row stays until /reload: no
+  on our GameTooltip, else label and text; leaving runs the matching cleanup (our frame hidden, or the broker's
+`OnLeave`; the core hides GameTooltip only when it drew it). A secret reaches us only in the creation table
+(LDB's setter compares old and new: a later secret throws in the broker's code). A picked broker that turns
+launcher leaves the bar, its pick kept. Un-picked: text nil (its Options row stays until /reload: no
   unregister). **Bundles** LibDataBroker-1.1 (MINOR 4) and CallbackHandler-1.0 (MINOR 8) in its own
   `Libs\` (committed, GuildSpy's copies, LDB = tekkub's upstream; not externals, so EMBEDDED-LIBRARIES
   section 3 doesn't apply); deploy copies a plugin's `Libs\` (`-OwnLibs`), CI allows its CallbackHandler
   LICENSE.txt, `test_toc` exempts `/Libs/` files from the namespace line. The core's contract grew for it
   (additive): `icon` as a function (`Bar.lua`'s `iconAnswer`: plain file ID or path, coords four finite
-  numbers, else recorded `<id>:icon`), `onEnter`/`onLeave` (`hoverTaken`: no tooltip, none redrawn),
+  numbers, else recorded `<id>:icon`), `onEnter`/`onLeave` (`hoverTaken`: no tooltip, none redrawn, not hidden on leave),
   `RegisterOptions`, the Picker's `ordered`.
 - **`Plugins\Bags`** (#13): used/total over normal bags (family 0; ids from `Enum.BagIndex`);
   special bags (quiver, soul bag, the reagent slot) are listed apart and not counted. An unreadable

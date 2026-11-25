@@ -64,7 +64,8 @@ GlassPanel.RegisterBlock({
     text     = function(block) return "GS: 2057" end,  -- plain string, or nil/"" for no space
     tooltip  = function(block, tt) tt:AddLine("GearScore") end,  -- tt is GameTooltip
     onEnter  = function(block, frame) return false end,  -- optional (#179): return true when you drew the
-                                       -- hover yourself (no tooltip of ours then, none redrawn)
+                                       -- hover yourself (no tooltip of ours then, none redrawn,
+                                       -- and the GameTooltip isn't hidden on leave: yours to close)
     onLeave  = function(block, frame) end,       -- optional: the mouse left the block
     onClick  = function(block, mouseButton) end,
     onDoubleClick = function(block, mouseButton) end,  -- optional: the second click of a double-click comes here

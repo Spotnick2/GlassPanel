@@ -5,6 +5,10 @@
 -- holds and in which order a display honours its tooltip fields); its
 -- structure is not reused. What a data object gives us:
 -- - text (else value and suffix): the block's value. A secret is a grey ?.
+--   Only one given at creation reaches us: LibDataBroker's setter compares
+--   the old value with the new before storing it, which throws on a secret on
+--   the client, so a broker assigning one later errors in its own code and
+--   its block keeps the last value (Codex on #180; the library is unmodified).
 -- - label (else the broker's name): the caption, read at every repaint.
 -- - icon and iconCoords: the icon, read at every repaint (an icon function).
 --   No iconCoords: the whole texture, as Titan draws it (our own blocks trim
@@ -17,7 +21,8 @@
 --   A broker with none of them gets its name and text.
 --
 -- Data sources only (type "data source"): launchers are minimap buttons,
--- which GlassMiniMapBar collects. A broker a Glass Panel plugin already shows
+-- which GlassMiniMapBar collects; a picked broker that turns launcher leaves
+-- the bar, its pick kept. A broker a Glass Panel plugin already shows
 -- is not offered (COVERED). Every broker is off until the player ticks it in
 -- the chooser (the plugin's option button); the picks are account-wide
 -- (GlassPanelBrokerDB.picks, broker names). A broker can register before or
@@ -106,7 +111,9 @@ end
 local function textOf(name)
     if not picked[name] then return nil end
     local obj = objOf(name)
-    if not obj then return nil end
+    -- A broker that turned launcher leaves the bar (its pick is kept: a data
+    -- source again, it comes back).
+    if not (obj and isSource(obj)) then return nil end
     local text, secret = asText(obj.text)
     if secret then return UNKNOWN end
     if text == nil or text == "" then
@@ -134,7 +141,7 @@ local function placeTip(tip, frame)
 end
 
 local blocks = {}    -- name -> its block, or false when RegisterBlock refused it
-local shownTip = {}  -- block -> the `tooltip` frame we showed
+local hover = {}     -- block -> the hover path that ran: a `tooltip` frame, or "enter"
 local listener = {}  -- our CallbackHandler key
 
 local function spec(name, obj)
@@ -163,21 +170,28 @@ local function spec(name, obj)
             if type(tip) == "table" and type(tip.Show) == "function" then
                 placeTip(tip, frame)
                 tip:Show()
-                shownTip[block] = tip
+                hover[block] = tip
                 return true
             end
             if type(o.OnEnter) == "function" then
+                hover[block] = "enter"
                 o.OnEnter(frame)
                 return true
             end
             return false   -- OnTooltipShow, or nothing: the core's tooltip
         end,
+        -- The cleanup of the path that ran: our `tooltip` frame hidden, or the
+        -- broker's OnLeave (its tooltip is its own: it may keep it open while
+        -- the pointer moves into it). The core's tooltip: the core hides it.
         onLeave = function(block, frame)
-            local tip = shownTip[block]
-            shownTip[block] = nil
-            if tip then tip:Hide() end
-            local o = objOf(name)
-            if o and type(o.OnLeave) == "function" then o.OnLeave(frame) end
+            local path = hover[block]
+            hover[block] = nil
+            if path == "enter" then
+                local o = objOf(name)
+                if o and type(o.OnLeave) == "function" then o.OnLeave(frame) end
+            elseif path then
+                path:Hide()
+            end
         end,
         tooltip = function(_, tt)
             local o = objOf(name)
