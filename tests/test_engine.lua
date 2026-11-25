@@ -406,6 +406,101 @@ WoW.tick()
 block("dcbad").widget._scripts.OnDoubleClick(block("dcbad").widget, "LeftButton")
 check(GlassPanel.failures["dcbad:onDoubleClick"] ~= nil, "a throwing onDoubleClick is recorded")
 
+-- #179: an icon function, onEnter/onLeave, and options without a block.
+loadAddon({ plugins = false })
+check(register({ id = "i0", text = function() return "x" end, icon = {} }) == nil, "refused: icon neither texture nor function")
+check(register({ id = "i1", text = function() return "x" end, icon = "" }) == nil, "refused: an empty icon path")
+check(register({ id = "i2", text = function() return "x" end, onEnter = "yes" }) == nil, "refused: onEnter not a function")
+check(register({ id = "i3", text = function() return "x" end, onLeave = 1 }) == nil, "refused: onLeave not a function")
+local tex, coords, iconCalls = nil, nil, 0
+local fi = register({ id = "fi", label = "Fi", text = function() return "12" end,
+                      icon = function() iconCalls = iconCalls + 1; return tex, coords end })
+WoW.tick()
+local fiw = fi.widget
+eq(fiw.icon._shown, false, "an icon function saying nil: no icon")
+eq(fiw.textX, 4, "and no room for one")
+tex = 777
+GlassPanel.Refresh("fi"); WoW.tick()
+eq(fiw.icon._file, 777, "asked again at the repaint: drawn")
+eq(fiw.icon._shown, true, "shown")
+eq(table.concat(fiw.icon._coords, ","), "0.08,0.92,0.08,0.92", "no coords: the stock trim")
+eq(fiw.textX, 4 + 14 + 4, "the text moves past it")
+coords = { 0, 1, 0, 1 }
+GlassPanel.Refresh("fi"); WoW.tick()
+eq(table.concat(fiw.icon._coords, ","), "0,1,0,1", "its coords")
+GlassPanel._test.slash("icon fi off")
+eq(fiw.icon._shown, false, "the player's Icon off still wins")
+GlassPanel._test.slash("icon fi on")
+eq(fiw.icon._shown, true, "and on again")
+tex = WoW.Secret("icon")
+GlassPanel.Refresh("fi"); WoW.tick()
+eq(fiw.icon._shown, false, "a secret texture: no icon")
+check(GlassPanel.failures["fi:icon"] ~= nil, "recorded")
+GlassPanel.failures["fi:icon"] = nil
+tex, coords = 777, "wide"
+GlassPanel.Refresh("fi"); WoW.tick()
+eq(fiw.icon._shown, true, "bad coords: the icon still shows")
+eq(table.concat(fiw.icon._coords, ","), "0.08,0.92,0.08,0.92", "with the trim")
+check(GlassPanel.failures["fi:icon"] ~= nil, "and the coords are recorded")
+local fiBad = register({ id = "fib", text = function() return "1" end, icon = function() error("no icon") end })
+WoW.tick()
+eq(fiBad.widget.icon._shown, false, "a throwing icon function: no icon")
+eq(fiBad.widget.label._text, "1", "the text still shows")
+check(GlassPanel.failures["fib:icon"] ~= nil, "recorded")
+
+-- onEnter true: the block took the hover; no tooltip, none redrawn; onLeave hears it.
+local hover, tipCalls = {}, 0
+local taken = true
+local hv = register({ id = "hv", text = function() return "h" end,
+                      onEnter = function(_, f) hover[#hover + 1] = f; return taken end,
+                      onLeave = function(_, f) hover[#hover + 1] = "left" end,
+                      tooltip = function(_, tt) tipCalls = tipCalls + 1; tt:AddLine("ours") end })
+WoW.tick()
+local hw = hv.widget
+GameTooltip:Hide()
+hw._scripts.OnEnter(hw)
+eq(hover[1], hw, "onEnter gets the block's frame")
+eq(tipCalls, 0, "taken: no tooltip")
+eq(GameTooltip._shown, false, "none shown")
+hw._scripts.OnLeave(hw)
+eq(hover[2], "left", "onLeave called")
+-- Taken, the GameTooltip is the block's (Codex on #180): one it opened on its
+-- frame stays open on leave (the pointer may be moving into it).
+local hv2 = register({ id = "hv2", text = function() return "h" end,
+                       onEnter = function(_, f)
+                           GameTooltip:SetOwner(f, "ANCHOR_NONE"); GameTooltip:Show(); return true
+                       end,
+                       onLeave = function() end })
+WoW.tick()
+local hw2 = hv2.widget
+hw2._scripts.OnEnter(hw2)
+hw2._scripts.OnLeave(hw2)
+eq(GameTooltip._shown, true, "taken: the block's own GameTooltip isn't hidden on leave")
+GameTooltip:Hide()
+taken = false
+hw._scripts.OnEnter(hw)
+eq(tipCalls, 1, "not taken: the tooltip as usual")
+eq(GameTooltip._shown, true, "shown")
+hw._scripts.OnLeave(hw)
+eq(GameTooltip._shown, false, "ours: hidden on leave")
+
+-- RegisterOptions: checked like a block's, listed after the blocks'.
+check(GlassPanel.RegisterOptions({ id = "", label = "x", options = {} }) == nil, "refused: empty id")
+check(GlassPanel.RegisterOptions({ id = "s", options = {} }) == nil, "refused: no label")
+check(GlassPanel.RegisterOptions({ id = "s", label = "S", options = { { label = "x" } } }) == nil,
+      "refused: a malformed option")
+check(GlassPanel.failures["s:options"] ~= nil, "and recorded")
+local ran = 0
+check(GlassPanel.RegisterOptions({ id = "s", label = "Set", options = { { label = "Go", run = function() ran = ran + 1 end } } })
+      ~= nil, "a valid set")
+check(GlassPanel.RegisterOptions({ id = "s", label = "Again", options = {} }) == nil, "refused: the same id twice")
+local panel = GlassPanel.Options._test.panel
+panel:Hide(); panel:Show()
+local go = GlassPanel.Options._test.controls["options:set:s:1"]
+check(go ~= nil, "its button is on the panel")
+go._scripts.OnClick(go)
+eq(ran, 1, "and runs")
+
 -- A retired block (#171): an old plugin copy left in AddOns is refused, with
 -- a line saying what to do (Codex on #172).
 WoW.chat = {}

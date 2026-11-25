@@ -86,16 +86,18 @@ if (-not (Test-Path -LiteralPath (Join-Path $LibTaxiTime "Tools\deploy.ps1"))) {
 . (Join-Path $PSScriptRoot "LibPin.ps1")
 
 # Copy the files a TOC lists (plus the TOC) from $src to $dest, rewriting the
-# version token, and remove Lua files the TOC no longer lists. Libs\ belongs
-# to the library's own deploy: neither copied nor swept here.
-function Deploy-Toc([string]$src, [string]$tocName, [string]$dest) {
+# version token, and remove Lua files the TOC no longer lists. The core's
+# Libs\ belongs to the libraries' own deploys: neither copied nor swept here.
+# A plugin's Libs\ is its own, committed (#179: [Broker]'s LibDataBroker):
+# -OwnLibs copies and sweeps it like the rest.
+function Deploy-Toc([string]$src, [string]$tocName, [string]$dest, [switch]$OwnLibs) {
     Write-Host "Deploying $tocName -> $dest" -ForegroundColor Cyan
     New-Item -ItemType Directory -Force -Path $dest | Out-Null
     $toc = Join-Path $src $tocName
     (Get-Content -LiteralPath $toc -Raw) -replace '## Version: @project-version@', '## Version: dev' |
         Set-Content -LiteralPath (Join-Path $dest $tocName) -NoNewline
     $listed = Get-Content -LiteralPath $toc | ForEach-Object { $_.Trim() } |
-        Where-Object { $_ -notmatch "^#" -and $_ -match "[.](lua|xml)$" -and $_ -notmatch "^Libs\\" }
+        Where-Object { $_ -notmatch "^#" -and $_ -match "[.](lua|xml)$" -and ($OwnLibs -or $_ -notmatch "^Libs\\") }
     foreach ($f in $listed) {
         $target = Join-Path $dest $f
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
@@ -106,7 +108,7 @@ function Deploy-Toc([string]$src, [string]$tocName, [string]$dest) {
     $keep = $listed | ForEach-Object { [IO.Path]::GetFullPath((Join-Path $dest $_)).ToLower() }
     $libs = (Join-Path $dest "Libs\").ToLower()
     Get-ChildItem -LiteralPath $dest -Recurse -File -Filter "*.lua" |
-        Where-Object { -not $_.FullName.ToLower().StartsWith($libs) -and $keep -notcontains $_.FullName.ToLower() } |
+        Where-Object { ($OwnLibs -or -not $_.FullName.ToLower().StartsWith($libs)) -and $keep -notcontains $_.FullName.ToLower() } |
         ForEach-Object {
             Write-Host "  removing stale $($_.Name)" -ForegroundColor DarkYellow
             Remove-Item -LiteralPath $_.FullName -Force
@@ -138,7 +140,7 @@ if (Test-Path $pluginRoot) {
     foreach ($dir in Get-ChildItem -LiteralPath $pluginRoot -Directory) {
         $toc = Get-ChildItem -LiteralPath $dir.FullName -Filter "*.toc" | Select-Object -First 1
         if (-not $toc) { Write-Host "  skipping Plugins\$($dir.Name): no .toc" -ForegroundColor DarkYellow; continue }
-        Deploy-Toc $dir.FullName $toc.Name (Join-Path $AddOnsPath $toc.BaseName)
+        Deploy-Toc $dir.FullName $toc.Name (Join-Path $AddOnsPath $toc.BaseName) -OwnLibs
     }
 }
 

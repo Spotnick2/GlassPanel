@@ -114,6 +114,7 @@ function loadAddon(opts)
         end
     end
     WoW.frames, WoW.chat, WoW.timers = {}, {}, {}   -- a dead session's timers die with it
+    WoW.loadedAddons = { GlassPanel = true }        -- C_AddOns.IsAddOnLoaded (stubs/broker.lua)
     local ns = {}
     for _, line in ipairs(tocLines()) do
         local files = { line }
@@ -159,6 +160,7 @@ function loadAddon(opts)
                     local chunk = assert(loadfile(file))
                     chunk(p.name, pns)
                 end
+                WoW.loadedAddons[p.name] = true
                 WoW.fire("ADDON_LOADED", p.name)
             end
         end

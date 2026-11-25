@@ -167,6 +167,34 @@ Engine.RETIRED = {
     layer = "retired (#171): the game no longer lets addons read the layer. Delete the GlassPanelLayer folder from AddOns",
 }
 
+-- A plugin's options list (a block's spec.options, or RegisterOptions'):
+-- the list, or nil when any entry is malformed (recorded as <owner>:options).
+-- A checkbox (get + set), a slider (get + set with min < max, an optional
+-- step > 0 and fmt string) or a button (run), each with a label and an
+-- optional note.
+function Engine.CheckOptions(owner, options)
+    local ok = type(options) == "table"
+    local function num(v) return type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge end
+    for _, o in ipairs(ok and options or {}) do
+        local kind = type(o) == "table"
+            and ((type(o.get) == "function" and type(o.set) == "function") or type(o.run) == "function")
+        local slider = kind and (o.min ~= nil or o.max ~= nil or o.step ~= nil or o.fmt ~= nil)
+        if slider and not (num(o.min) and num(o.max) and o.min < o.max and o.run == nil
+                           and (o.step == nil or (num(o.step) and o.step > 0))
+                           and (o.fmt == nil or type(o.fmt) == "string")) then
+            kind = false
+        end
+        if not kind or type(o.label) ~= "string" or (o.note ~= nil and type(o.note) ~= "string") then
+            ok = false
+        end
+    end
+    if ok then return options end
+    API.Fail(owner .. ":options",
+        "options must be a list of { label = string, get + set (a checkbox; with min, max, step?, fmt?: a "
+        .. "slider) or run (a button), note = string? }")
+    return nil
+end
+
 local function invalid(spec, why)
     local id = type(spec) == "table" and type(spec.id) == "string" and spec.id or "?"
     API.Print("|cffff6060RegisterBlock refused|r " .. id .. ": " .. why)
@@ -177,7 +205,9 @@ end
 -- Required: id (unique string), text = function(block) -> string|nil.
 -- Optional: label (also the gold caption before the value, unless
 --   showLabel = false), caption(block) -> string (a caption that changes,
---   re-read on every repaint; nil or "" falls back to label), icon, side ("left"|"center"|"right": the default lane),
+--   re-read on every repaint; nil or "" falls back to label), icon (a file ID
+--   or path; or function(block) -> texture, coords? asked on every repaint,
+--   nil for no icon right now, #179), side ("left"|"center"|"right": the default lane),
 --   order (number, default 100),
 --   events = { "EVENT", ... }, onEvent(block, event, ...),
 --   unitEvents = { EVENT = "player" } (only that unit's firing of the event),
@@ -185,7 +215,9 @@ end
 --   tooltip(block, GameTooltip), onClick(block, mouseButton),
 --   onDoubleClick(block, mouseButton) (the second click of a double-click
 --   comes here instead of onClick), onInit(block),
---   onShown(block, visible) when it appears on or leaves the screen.
+--   onShown(block, visible) when it appears on or leaves the screen,
+--   onEnter(block, frame) -> true when the block drew its own hover (no
+--   tooltip then), onLeave(block, frame) (#179).
 -- For a block that draws more than text (the XP bar):
 --   width (px; or function(block) -> px, or nil for "sized to its content",
 --   asked on every repaint), build(block) once its widget exists
@@ -233,33 +265,13 @@ function GlassPanel.RegisterBlock(spec)
     end
     -- Malformed options drop the options (recorded), never the block: an
     -- optional setting mustn't take a plugin's readout off the bar.
-    if spec.options ~= nil then
-        local ok = type(spec.options) == "table"
-        local function num(v) return type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge end
-        for _, o in ipairs(ok and spec.options or {}) do
-            -- A checkbox (get + set), a slider (get + set with min < max, an
-            -- optional step > 0 and fmt string) or a button (run).
-            local kind = type(o) == "table"
-                and ((type(o.get) == "function" and type(o.set) == "function") or type(o.run) == "function")
-            local slider = kind and (o.min ~= nil or o.max ~= nil or o.step ~= nil or o.fmt ~= nil)
-            if slider and not (num(o.min) and num(o.max) and o.min < o.max and o.run == nil
-                               and (o.step == nil or (num(o.step) and o.step > 0))
-                               and (o.fmt == nil or type(o.fmt) == "string")) then
-                kind = false
-            end
-            if not kind or type(o.label) ~= "string" or (o.note ~= nil and type(o.note) ~= "string") then
-                ok = false
-            end
-        end
-        if not ok then
-            API.Fail(spec.id .. ":options",
-                "options must be a list of { label = string, get + set (a checkbox; with min, max, step?, fmt?: a "
-                .. "slider) or run (a button), note = string? }")
-            spec.options = nil
-        end
+    if spec.options ~= nil then spec.options = Engine.CheckOptions(spec.id, spec.options) end
+    if spec.icon ~= nil and type(spec.icon) ~= "function" and type(spec.icon) ~= "number"
+        and (type(spec.icon) ~= "string" or spec.icon == "") then
+        return invalid(spec, "icon must be a file ID, a path, or a function returning one")
     end
     for _, key in ipairs({ "onEvent", "tooltip", "onClick", "onDoubleClick", "onInit", "onShown", "build", "paint",
-                           "caption" }) do
+                           "caption", "onEnter", "onLeave" }) do
         if spec[key] ~= nil and type(spec[key]) ~= "function" then return invalid(spec, key .. " must be a function") end
     end
 
@@ -287,6 +299,24 @@ end
 function GlassPanel.Refresh(id)
     local block = Engine.byId[id]
     if block then Engine.MarkDirty(block) end
+end
+
+-- Options of a plugin that has no block of its own to carry them (#179:
+-- [Broker] registers its blocks only once the player picks brokers, so its
+-- chooser button can't hang on one). spec = { id, label, options }: listed
+-- under "Plugin options" like a block's, after the blocks'. Returns the spec,
+-- or nil after printing why it refused.
+Engine.optionSets = {}
+function GlassPanel.RegisterOptions(spec)
+    if type(spec) ~= "table" then return invalid(spec, "not a table") end
+    if type(spec.id) ~= "string" or spec.id == "" then return invalid(spec, "id must be a non-empty string") end
+    if type(spec.label) ~= "string" then return invalid(spec, "label must be a string") end
+    for _, s in ipairs(Engine.optionSets) do
+        if s.id == spec.id then return invalid(spec, "options already registered") end
+    end
+    if not Engine.CheckOptions(spec.id, spec.options) then return nil end
+    table.insert(Engine.optionSets, spec)
+    return spec
 end
 
 GlassPanel.Engine._test = { listeners = listeners, dirty = dirty, flushFrame = flushFrame, clockFrame = clockFrame }

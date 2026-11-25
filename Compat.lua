@@ -509,7 +509,9 @@ end
 -- - resolve(id): the entry for a saved id items() doesn't hold, or nil when
 --   the client can't resolve it right now (it's kept, at the end, untouched);
 -- - save(order): write the ids back;
--- - label(entry): a row's text.
+-- - label(entry): a row's text;
+-- - ordered = false: no Up/Down (#179: [Broker]'s picks are blocks of their
+--   own, placed on the bar, so their order here means nothing).
 -- Returns { Open, Refresh, RefreshSoon (once per frame, only while shown),
 -- Window, rows }. Rows: a checkbox to show, Up/Down to order the shown ones.
 local PICKER_ROW_W, PICKER_ROW_H = 340, 26
@@ -602,8 +604,8 @@ function API.Picker(spec)
             r.id = e.id
             r.check:SetChecked(used[e.id] == true)
             r.text:SetText(spec.label(e))
-            r.up:SetShown(used[e.id] == true)
-            r.down:SetShown(used[e.id] == true)
+            r.up:SetShown(spec.ordered ~= false and used[e.id] == true)
+            r.down:SetShown(spec.ordered ~= false and used[e.id] == true)
             r.up:SetEnabled(pos[e.id] ~= nil and pos[e.id] > 1)
             r.down:SetEnabled(pos[e.id] ~= nil and pos[e.id] < #shown)
             r:Show()

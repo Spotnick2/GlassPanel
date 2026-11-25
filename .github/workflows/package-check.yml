@@ -117,7 +117,8 @@ jobs:
       # ships (its XML, every file the XML loads, LICENSE, Media/*.tga) and
       # under Libs/LibTaxiTime-1.0 the same (no media); each
       # plugin is its own top-level folder named after its TOC (move-folders),
-      # with its TOC and Lua files - NOTHING else.
+      # with its TOC and Lua files (a bundled library's included) - NOTHING
+      # else but [Broker]'s CallbackHandler licence.
       - name: The package is exactly the core, its library and the plugins
         run: |
           zip=$(ls .release/*.zip | head -1)
@@ -136,6 +137,8 @@ jobs:
               echo "$name/$name.toc"
               tocfiles "$toc" "$name"
             done
+            # [Broker]'s bundled CallbackHandler ships its licence (#179).
+            echo GlassPanelBroker/Libs/CallbackHandler-1.0/LICENSE.txt
             echo "$lib/LibGlass-1.0.xml"
             echo "$lib/LICENSE"
             # Comments stripped non-greedily, as the test harness does (a sed

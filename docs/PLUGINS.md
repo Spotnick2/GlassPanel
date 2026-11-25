@@ -49,7 +49,9 @@ GlassPanel.RegisterBlock({
     label    = "GearScore",            -- the gold caption "GearScore: " and /gpanel list (default: id)
     showLabel = true,                  -- false: no caption by default (the user can still turn it on)
     caption  = function(block) end,    -- a caption that changes ("Olympus: " for Guild); nil/"" = label
-    icon     = 132627,                 -- file ID or path; optional
+    icon     = 132627,                 -- file ID or path; optional. Or function(block) -> texture, coords?
+                                       -- asked on every repaint (an icon that changes, #179): nil = no icon
+                                       -- right now (no room taken); coords { l, r, t, b }, else the stock trim
     replaces = "gold",                 -- another block's id: hidden while yours is loaded and shown (said
                                        -- once in chat), until the player shows it again
     side     = "left",                 -- default lane: "left", "center" or "right" (users drag it anywhere)
@@ -61,6 +63,10 @@ GlassPanel.RegisterBlock({
     onEvent  = function(block, event, ...) end,  -- every event, immediately: update state here
     text     = function(block) return "GS: 2057" end,  -- plain string, or nil/"" for no space
     tooltip  = function(block, tt) tt:AddLine("GearScore") end,  -- tt is GameTooltip
+    onEnter  = function(block, frame) return false end,  -- optional (#179): return true when you drew the
+                                       -- hover yourself (no tooltip of ours then, none redrawn,
+                                       -- and the GameTooltip isn't hidden on leave: yours to close)
+    onLeave  = function(block, frame) end,       -- optional: the mouse left the block
     onClick  = function(block, mouseButton) end,
     onDoubleClick = function(block, mouseButton) end,  -- optional: the second click of a double-click comes here
                                        -- instead of onClick (any button; the first still goes to onClick)
@@ -97,7 +103,13 @@ your own SavedVariables exist. Read them in your own `ADDON_LOADED` handler (fil
 addon's name), then call `GlassPanel.Refresh(id)`.
 
 `RegisterBlock` returns the block (the table you passed, with fields added) or `nil` after
-printing why it refused. `GlassPanel.Refresh(id)` repaints a block on the next frame when its
+printing why it refused.
+
+A plugin with options but no block to carry them (`Plugins\Broker`, #179: its blocks exist only once
+the player picks brokers) registers them on their own:
+`GlassPanel.RegisterOptions({ id = "broker", label = "Data brokers", options = { ... } })`, the same
+`options` list as a block's, listed under "Plugin options" after the blocks'. It returns the table, or
+`nil` after printing why it refused. Additive: `API_VERSION` is unchanged. `GlassPanel.Refresh(id)` repaints a block on the next frame when its
 data changed without an event. `GlassPanel.API_VERSION` is `1`.
 
 ## Rules the engine enforces
@@ -166,7 +178,8 @@ window's global `name`, its `title`, `hint` and `empty` texts, and five function
 entries offered, each `{ id = ..., ... }`, listed in that order when not picked), `picks(items)` (the
 saved order, as ids), `resolve(id)` (the entry for a saved id `items()` doesn't hold, or `nil` when the
 client can't resolve it right now: it's kept at the end of the saved order, untouched), `save(order)`
-and `label(entry)` (a row's text). It returns `Open()`, `Refresh()`, `RefreshSoon()` (once per frame,
+and `label(entry)` (a row's text). `ordered = false` (#179) leaves out Up/Down, for picks whose order
+means nothing (each a block of its own). It returns `Open()`, `Refresh()`, `RefreshSoon()` (once per frame,
 and only while the window is shown: call it from your events), `Window()` and `rows`. Additive:
 `API_VERSION` is unchanged.
 

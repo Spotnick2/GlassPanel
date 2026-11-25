@@ -69,6 +69,7 @@ function Methods.StopMovingOrSizing(w) w._moving = false end
 function Methods.RegisterForClicks(w, ...) w._clicks = { ... } end
 function Methods.SetRotation(t, radians) t._rotation = radians end
 function Methods.SetTextureSliceMargins(t, l, tp, r, b) t._slice = { l, tp, r, b } end
+function Methods.SetTexCoord(t, l, r, tp, b) t._coords = { l, r, tp, b } end
 -- 6 px per visible character: enough for layout arithmetic to be checkable.
 function Methods.GetStringWidth(fs)
     local t = fs._text
