@@ -2,6 +2,12 @@ package-as: GlassPanel
 
 enable-nolib-creation: no
 
+# LibDataBroker-1.1 is hard-embedded in Plugins/Broker/Libs (#179). Its
+# CurseForge page asks addons that do so to add a "tools used" entry for
+# libdatabroker-1-1 (not an embed entry), as AltStable does (#466).
+tools-used:
+  - libdatabroker-1-1
+
 # One CurseForge project, one addon folder per plugin (#7). WoW only
 # discovers addons as top-level folders under Interface/AddOns, so plugins
 # cannot ship nested inside GlassPanel/: the packager moves them out
@@ -43,7 +49,7 @@ manual-changelog:
 externals:
   Libs/LibGlass-1.0:
     url: https://github.com/Spotnick2/LibGlass
-    tag: r12
+    tag: r13
   # Flight times (#127), shared with Glass Unit Frames. In the core's Libs/,
   # never in a plugin folder move-folders moves (EMBEDDED-LIBRARIES section 3).
   Libs/LibTaxiTime-1.0:

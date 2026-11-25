@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.1.0
 
 - New: Glass Panel [Broker] puts other addons' LibDataBroker data sources on the bar, the way Titan Panel does: each one is a block of its own, which you move, hide and caption like the others. They're all off until you pick them under "Data brokers" in Options > AddOns > Glass Panel. Launchers (minimap-button addons) aren't listed, and neither is AltStable's while Glass Panel [AltStable] is on, since that block already shows it.
 
