@@ -50,6 +50,10 @@ for a full-width bar; `/gpanel setup` can also write an Edit Mode layout that ma
 - **Durability** and **Ammo** can warn you when they run low: a message in the middle of the
   screen with the raid-warning sound, once when the figure turns yellow and once when it turns
   red, never during a fight. Switch it on in each plugin's options.
+- **Broker**: other addons' data brokers (LibDataBroker, what most addons use to put a readout on
+  Titan Panel), each a block of its own, with that addon's own tooltip and clicks. They're all off
+  until you tick them: Options > AddOns > Glass Panel, "Choose data brokers...". Launchers
+  (minimap-button addons) aren't listed.
 
 XP+ docked on the bar, and zoomed out onto the screen with the combat timer idle:
 
@@ -99,6 +103,8 @@ titles then follow it.
   addon updated last.
 - Glass Unit Frames has a combat timer of its own over the portrait. To use this one instead,
   tick "Use this timer instead of Glass Unit Frames'" in the Combat plugin's options.
+- Unticking a data broker takes it off the bar at once; its row in the options' plugin list goes
+  at the next `/reload`.
 
 ## Reporting a problem
 
@@ -112,6 +118,8 @@ you expected and what happened instead. Lua errors are hidden by default on this
 Glass Panel includes the readouts of these Titan Panel plugins, so you can drop them:
 [Titan Panel [GearScore]](https://www.curseforge.com/wow/addons/titan-panel-gearscore) (the GearScore plugin) and
 [Titan Panel [XP]](https://www.curseforge.com/wow/addons/titan-panel-xp) (the XP+ plugin).
+Most other addons put their readout on Titan Panel through LibDataBroker: the Broker plugin shows
+those too.
 
 ## Development
 
@@ -121,4 +129,5 @@ repository. Tests run with `pwsh tests\run.ps1` (Lua 5.1).
 ## License
 
 MIT, see [LICENSE](LICENSE). The bundled LibGlass-1.0 and LibTaxiTime-1.0 keep their own MIT
-licenses.
+licenses, and the Broker plugin's CallbackHandler-1.0 and LibDataBroker-1.1 their own terms (see
+LICENSE).
